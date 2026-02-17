@@ -1,3 +1,5 @@
 {
-  "IDX.agenticWorkspace": true
+  "IDX.agenticWorkspace": true,
+  "cSpell.enabled": false,
+  "cSpell.ignorePaths": ["docs/**", "**/*.md"]
 }

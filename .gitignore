@@ -115,6 +115,8 @@ web_modules/
 .env.*
 !.env.example
 
+# dart_defines.json은 에셋으로 포함해 사용 (anon key는 공개용)
+
 # parcel-bundler cache (https://parceljs.org/)
 .cache
 .parcel-cache
