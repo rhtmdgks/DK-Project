@@ -39,6 +39,10 @@ enum AppRoute {
 /// SharedPreferences 키: 약관 동의 여부. [TermsScreen]에서 true로 저장한다.
 const String kTermsAgreedKey = 'terms_agreed';
 
+/// SharedPreferences 키: 로그인 상태 (profiles 테이블 기반 인증 사용 시).
+const String kLoggedInKey = 'logged_in';
+const String kLoggedInUserIdKey = 'logged_in_user_id';
+
 final GlobalKey<NavigatorState> _rootNavKey = GlobalKey<NavigatorState>();
 
 /// Material 3 Motion: Shared Axis(수평) + Fade 페이지 전환.
@@ -163,13 +167,43 @@ Future<String?> _handleRedirect(
     final session = supabase.auth.currentSession;
     final isOnLogin = location == AppRoute.login.path;
 
+    // 세션이 없으면 SharedPreferences에서 로그인 상태 확인 (profiles 테이블 기반 인증)
+    final loggedIn = prefs.getBool(kLoggedInKey) ?? false;
+    final loggedInUserId = prefs.getString(kLoggedInUserIdKey);
+
     // 미인증 → 로그인 페이지가 아니면 로그인으로 이동
-    if (session == null) {
+    if (session == null && !loggedIn) {
       return isOnLogin ? null : AppRoute.login.path;
     }
 
-    final profile = await getCurrentProfile();
-    if (profile == null) return AppRoute.login.path;
+    // 세션이 있으면 기존 로직 사용, 없으면 SharedPreferences 기반으로 프로필 조회 시도
+    AppProfile? profile;
+    if (session != null) {
+      profile = await getCurrentProfile();
+    } else if (loggedIn && loggedInUserId != null) {
+      // 세션 없이도 프로필 조회 시도 (RLS 정책이 허용하는 경우)
+      try {
+        final row = await supabase
+            .from('profiles')
+            .select()
+            .eq('user_id', loggedInUserId)
+            .maybeSingle();
+        if (row != null) {
+          profile = AppProfile.fromJson(row);
+        }
+      } catch (_) {
+        // 프로필 조회 실패 시 로그인 상태 초기화
+        await prefs.remove(kLoggedInKey);
+        await prefs.remove(kLoggedInUserIdKey);
+      }
+    }
+
+    if (profile == null) {
+      // 로그인 상태 초기화
+      await prefs.remove(kLoggedInKey);
+      await prefs.remove(kLoggedInUserIdKey);
+      return AppRoute.login.path;
+    }
 
     // 비밀번호 변경 강제
     if (profile.mustChangePassword) {

@@ -10,6 +10,7 @@ import 'package:myapp/core/widgets/async_body.dart';
 import 'package:myapp/core/widgets/dismiss_keyboard.dart';
 import 'package:myapp/core/widgets/tab_page_header.dart';
 import 'package:myapp/core/widgets/m3_list.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// [createdAt] ISO 문자열을 "2월 18일" 형식으로 포맷.
 String _formatDate(String? createdAt) {
@@ -61,8 +62,111 @@ class _SuggestionsTabState extends State<SuggestionsTab>
   }
 
   Future<void> _loadProfile() async {
-    final p = await getCurrentProfile();
+    AppProfile? p;
+    
+    // 세션이 있으면 기존 로직 사용
+    final session = supabase.auth.currentSession;
+    if (session != null) {
+      p = await getCurrentProfile();
+    } else {
+      // 세션이 없으면 SharedPreferences에서 user_id를 가져와서 직접 프로필 조회
+      final prefs = await SharedPreferences.getInstance();
+      final loggedInUserId = prefs.getString('logged_in_user_id');
+      
+      if (loggedInUserId != null) {
+        try {
+          final row = await supabase
+              .from('profiles')
+              .select()
+              .eq('user_id', loggedInUserId)
+              .maybeSingle();
+          if (row != null) {
+            p = AppProfile.fromJson(row);
+          }
+        } catch (_) {
+          // 프로필 조회 실패 시 무시
+        }
+      }
+    }
+    
     if (mounted) setState(() => _profile = p);
+  }
+
+  Future<void> _startDirectChat() async {
+    try {
+      // 관리자 프로필 찾기 (role이 'admin'인 사용자)
+      final adminProfiles = await supabase
+          .from('profiles')
+          .select('user_id, full_name')
+          .eq('role', 'admin')
+          .limit(1);
+
+      if (adminProfiles == null || (adminProfiles as List).isEmpty) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('관리자를 찾을 수 없습니다')),
+        );
+        return;
+      }
+
+      final adminProfile = (adminProfiles as List).first as Map<String, dynamic>;
+      final adminUserId = adminProfile['user_id'] as String;
+
+      // 현재 사용자 ID 가져오기 (세션이 없으면 SharedPreferences에서)
+      String? currentUserId;
+      final session = supabase.auth.currentSession;
+      if (session != null) {
+        currentUserId = session.user.id;
+      } else {
+        final prefs = await SharedPreferences.getInstance();
+        currentUserId = prefs.getString('logged_in_user_id');
+      }
+
+      if (currentUserId == null) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('로그인이 필요합니다')),
+        );
+        return;
+      }
+
+      // 1:1 채팅방 생성 또는 조회
+      final result = await supabase.rpc(
+        'create_or_get_direct_chat',
+        params: {
+          'p_other_user_id': adminUserId,
+          'p_user_id': currentUserId,
+        },
+      );
+
+      if (result == null) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('채팅방을 생성할 수 없습니다')),
+        );
+        return;
+      }
+
+      final resultMap = result as Map<String, dynamic>;
+      final roomId = resultMap['room_id'] as String?;
+
+      if (roomId == null) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('채팅방 ID를 가져올 수 없습니다')),
+        );
+        return;
+      }
+
+      // 채팅 화면으로 이동
+      if (!mounted) return;
+      context.push('${AppRoute.chatList.path}/$roomId');
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('오류: $e')),
+      );
+    }
   }
 
   Future<void> _fetch() async {
@@ -259,7 +363,7 @@ class _SuggestionsTabState extends State<SuggestionsTab>
             ),
             SizedBox(height: context.rh(32)),
             FilledButton.icon(
-              onPressed: () => context.push(AppRoute.chatList.path),
+              onPressed: _startDirectChat,
               icon: const Icon(Icons.chat_bubble_outline),
               label: const Text('채팅 시작하기'),
               style: FilledButton.styleFrom(

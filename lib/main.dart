@@ -8,6 +8,12 @@ import 'package:myapp/app.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // 세로 모드만 허용
+  await SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
+  ]);
+
   var url = const String.fromEnvironment('SUPABASE_URL', defaultValue: '');
   var anonKey = const String.fromEnvironment('SUPABASE_ANON_KEY', defaultValue: '');
 

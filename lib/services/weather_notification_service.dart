@@ -66,8 +66,9 @@ class WeatherNotificationService {
     return prefs.getBool(_keyWeatherEnabled) ?? false;
   }
 
-  /// Android 13 (API 33) 이상에서 알림 권한 요청
+  /// Android & iOS 알림 권한 요청
   static Future<bool> requestNotificationPermission() async {
+    // Android 권한 요청
     final androidImplementation = _plugin
         .resolvePlatformSpecificImplementation<
             AndroidFlutterLocalNotificationsPlugin>();
@@ -75,11 +76,26 @@ class WeatherNotificationService {
       final granted = await androidImplementation.requestNotificationsPermission();
       return granted ?? false;
     }
-    return true; // Android 13 미만에서는 권한이 필요 없음
+
+    // iOS 권한 요청
+    final iosImplementation = _plugin
+        .resolvePlatformSpecificImplementation<
+            IOSFlutterLocalNotificationsPlugin>();
+    if (iosImplementation != null) {
+      final result = await iosImplementation.requestPermissions(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+      return result ?? false;
+    }
+
+    return true; // 플랫폼을 확인할 수 없는 경우
   }
 
-  /// 알림 권한이 허용되었는지 확인
+  /// 알림 권한이 허용되었는지 확인 (Android & iOS)
   static Future<bool> isNotificationPermissionGranted() async {
+    // Android 확인
     final androidImplementation = _plugin
         .resolvePlatformSpecificImplementation<
             AndroidFlutterLocalNotificationsPlugin>();
@@ -87,7 +103,17 @@ class WeatherNotificationService {
       final granted = await androidImplementation.areNotificationsEnabled();
       return granted ?? false;
     }
-    return true; // Android 13 미만에서는 권한이 필요 없음
+
+    // iOS 확인
+    final iosImplementation = _plugin
+        .resolvePlatformSpecificImplementation<
+            IOSFlutterLocalNotificationsPlugin>();
+    if (iosImplementation != null) {
+      final result = await iosImplementation.checkPermissions();
+      return result?.isEnabled ?? false;
+    }
+
+    return true; // 플랫폼을 확인할 수 없는 경우
   }
 
   /// 날씨 알림 활성화/비활성화

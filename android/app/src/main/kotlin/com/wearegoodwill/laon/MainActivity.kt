@@ -1,4 +1,4 @@
-package com.example.myapp
+package com.wearegoodwill.laon
 
 import io.flutter.embedding.android.FlutterActivity
 

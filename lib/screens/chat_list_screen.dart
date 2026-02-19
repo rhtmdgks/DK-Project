@@ -6,6 +6,7 @@ import 'package:myapp/core/supabase_client.dart';
 import 'package:myapp/core/theme/app_theme.dart';
 import 'package:myapp/core/theme/responsive.dart';
 import 'package:myapp/core/widgets/async_body.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// 사용자가 참여 중인 채팅방 목록 화면. 반응형 대응.
 class ChatListScreen extends StatefulWidget {
@@ -19,6 +20,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
   bool _loading = true;
   String? _error;
   List<Map<String, dynamic>> _rooms = [];
+  Map<String, String> _roomDisplayNames = {}; // room_id -> display_name
 
   @override
   void initState() {
@@ -33,7 +35,13 @@ class _ChatListScreenState extends State<ChatListScreen> {
     });
 
     try {
-      final uid = supabase.auth.currentUser?.id;
+      // 세션이 없으면 SharedPreferences에서 user_id 가져오기
+      String? uid = supabase.auth.currentUser?.id;
+      if (uid == null) {
+        final prefs = await SharedPreferences.getInstance();
+        uid = prefs.getString('logged_in_user_id');
+      }
+      
       if (uid == null) {
         if (!mounted) return;
         setState(() {
@@ -43,17 +51,15 @@ class _ChatListScreenState extends State<ChatListScreen> {
         return;
       }
 
-      final memberRes = await supabase
-          .from('chat_room_members')
-          .select('room_id')
-          .eq('user_id', uid);
+      // RPC 함수를 사용하여 채팅방 목록 조회 (RLS 우회)
+      final roomsResult = await supabase.rpc(
+        'get_user_chat_rooms',
+        params: {'p_user_id': uid},
+      );
 
-      final roomIds = (memberRes as List)
-          .map((r) => (r as Map<String, dynamic>)['room_id'] as String?)
-          .whereType<String>()
-          .toList();
-
-      if (roomIds.isEmpty) {
+      final roomsList = roomsResult as List<dynamic>;
+      
+      if (roomsList.isEmpty) {
         if (!mounted) return;
         setState(() {
           _rooms = [];
@@ -62,14 +68,44 @@ class _ChatListScreenState extends State<ChatListScreen> {
         return;
       }
 
-      final roomRes = await supabase
-          .from('chat_rooms')
-          .select()
-          .inFilter('id', roomIds);
+      final roomRes = roomsList;
+
+      // 1:1 채팅방의 경우 상대방 이름 가져오기
+      final displayNames = <String, String>{};
+      for (final room in (roomRes as List)) {
+        final roomMap = room as Map<String, dynamic>;
+        final roomId = roomMap['id'] as String? ?? '';
+        final roomType = roomMap['type'] as String? ?? 'group';
+        
+        if (roomType == 'direct' && uid != null) {
+          try {
+            final otherUserResult = await supabase.rpc(
+              'get_direct_chat_other_user',
+              params: {
+                'p_room_id': roomId,
+                'p_user_id': uid,
+              },
+            );
+            if (otherUserResult != null) {
+              final otherUserMap = otherUserResult as Map<String, dynamic>;
+              final otherUserName = otherUserMap['full_name'] as String? ?? '알 수 없음';
+              displayNames[roomId] = otherUserName;
+            } else {
+              displayNames[roomId] = roomMap['name'] as String? ?? '채팅방';
+            }
+          } catch (_) {
+            // 실패 시 기본 이름 사용
+            displayNames[roomId] = roomMap['name'] as String? ?? '채팅방';
+          }
+        } else {
+          displayNames[roomId] = roomMap['name'] as String? ?? '채팅방';
+        }
+      }
 
       if (!mounted) return;
       setState(() {
         _rooms = List<Map<String, dynamic>>.from(roomRes as List);
+        _roomDisplayNames = displayNames;
         _loading = false;
       });
     } catch (e) {
@@ -118,7 +154,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
           itemBuilder: (context, i) {
             final room = _rooms[i];
             final id = room['id'] as String? ?? '';
-            final name = room['name'] as String? ?? '채팅방';
+            final displayName = _roomDisplayNames[id] ?? room['name'] as String? ?? '채팅방';
             return CupertinoButton(
               padding: EdgeInsets.symmetric(
                 vertical: context.rh(12),
@@ -129,7 +165,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                 children: [
                   Expanded(
                     child: Text(
-                      name,
+                      displayName,
                       style: AppFonts.scaled(context, AppFonts.bodyMedium)
                           .copyWith(color: AppColors.textDark),
                     ),

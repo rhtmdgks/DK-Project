@@ -9,6 +9,10 @@ import 'package:myapp/core/routing/app_router.dart';
 import 'package:myapp/core/supabase_client.dart';
 import 'package:myapp/core/theme/app_theme.dart';
 import 'package:myapp/core/theme/responsive.dart';
+import 'package:myapp/services/announcement_notification_service.dart';
+import 'package:myapp/services/class_move_notification_service.dart';
+import 'package:myapp/services/meal_notification_service.dart';
+import 'package:myapp/services/schedule_notification_service.dart';
 import 'package:myapp/services/weather_notification_service.dart';
 
 /// Figma "마이페이지-설정" (node 670:3801 / 670:4463 / 657:7709)
@@ -85,7 +89,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     await prefs.setBool('$_prefPrefix$key', newValue);
 
-    if (key == 'weather') {
+    // 각 알림 타입별 서비스 시작/중지
+    if (key == 'meal') {
+      MealNotificationService.setMealEnabled(newValue)
+          .catchError((Object e, StackTrace _) {});
+    } else if (key == 'schedule') {
+      ScheduleNotificationService.setScheduleEnabled(newValue)
+          .catchError((Object e, StackTrace _) {});
+    } else if (key == 'class_move') {
+      ClassMoveNotificationService.setClassMoveEnabled(newValue)
+          .catchError((Object e, StackTrace _) {});
+    } else if (key == 'notice') {
+      AnnouncementNotificationService.refreshSubscription()
+          .catchError((Object e, StackTrace _) {});
+    } else if (key == 'weather') {
       if (newValue) {
         // 날씨 알림을 켤 때: 위치 권한 요청 (알림 권한은 위에서 이미 확인함)
         try {
@@ -481,8 +498,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (shouldLogout != true) return;
 
     try {
-      await supabase.auth.signOut();
+      // Supabase 세션 로그아웃 시도 (실패해도 계속 진행)
+      try {
+        await supabase.auth.signOut();
+      } catch (_) {
+        // 세션이 없거나 signOut 실패해도 계속 진행
+      }
+
+      // SharedPreferences에서 로그인 상태 제거
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('logged_in');
+      await prefs.remove('logged_in_user_id');
+
       if (!mounted) return;
+      
+      // 로그인 페이지로 이동
       context.go(AppRoute.login.path);
     } catch (e) {
       if (!mounted) return;

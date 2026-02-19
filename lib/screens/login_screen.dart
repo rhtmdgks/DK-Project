@@ -8,6 +8,7 @@ import 'package:myapp/core/supabase_client.dart';
 import 'package:myapp/core/theme/app_theme.dart';
 import 'package:myapp/core/theme/responsive.dart';
 import 'package:myapp/core/widgets/laon_icon.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 /// 로그인 화면. Figma DK-Project node 653:4736 기준.
@@ -62,25 +63,199 @@ class _LoginScreenState extends State<LoginScreen> {
       final studentId = _studentIdController.text.trim();
       final password = _passwordController.text;
 
-      await supabase.rpc(
-        'login_sync_password',
-        params: {'p_student_id': studentId, 'p_password': password},
-      );
+      print('=== LOGIN START ===');
+      print('Student ID: $studentId');
+      print('Password length: ${password.length}');
 
-      final email = emailFromStudentId(studentId);
-      await supabase.auth.signInWithPassword(
-        email: email,
-        password: password,
-      );
+      // 1. profiles 테이블에서 직접 인증 확인
+      print('Step 1: Calling login_from_profiles RPC...');
+      dynamic result;
+      try {
+        result = await supabase.rpc(
+          'login_from_profiles',
+          params: {
+            'p_student_id': studentId,
+            'p_password': password,
+          },
+        );
+        print('RPC call completed');
+        print('RPC result: $result');
+        print('RPC result type: ${result.runtimeType}');
+        print('RPC result toString: ${result.toString()}');
+      } catch (rpcError, rpcStack) {
+        print('=== RPC CALL ERROR ===');
+        print('RPC Error: $rpcError');
+        print('RPC Error type: ${rpcError.runtimeType}');
+        print('RPC Stack trace: $rpcStack');
+        if (rpcError is Exception) {
+          print('RPC Exception details: $rpcError');
+        }
+        setState(() {
+          _error = 'RPC 호출 실패: $rpcError';
+          _loading = false;
+        });
+        return;
+      }
 
-      if (!mounted) return;
+      // RPC 결과 파싱 (JSONB 반환)
+      print('Step 2: Parsing RPC result...');
+      Map<String, dynamic>? resultMap;
+      try {
+        if (result is Map<String, dynamic>) {
+          resultMap = result;
+          print('Result is already Map<String, dynamic>');
+        } else if (result is Map) {
+          resultMap = Map<String, dynamic>.from(result);
+          print('Result converted from Map');
+        } else if (result != null) {
+          print('Attempting to convert result...');
+          resultMap = Map<String, dynamic>.from(result as Map);
+          print('Result converted successfully');
+        } else {
+          print('Result is null');
+        }
+        print('Parsed resultMap: $resultMap');
+      } catch (parseError, parseStack) {
+        print('=== RPC RESULT PARSE ERROR ===');
+        print('Parse Error: $parseError');
+        print('Parse Error type: ${parseError.runtimeType}');
+        print('Parse Stack trace: $parseStack');
+        print('Original result: $result');
+        setState(() {
+          _error = '결과 파싱 실패: $parseError';
+          _loading = false;
+        });
+        return;
+      }
 
-      final profile = await getCurrentProfile();
-      if (!mounted) return;
+      if (resultMap == null) {
+        print('=== RPC RESULT IS NULL ===');
+        setState(() {
+          _error = 'RPC 결과가 null입니다';
+          _loading = false;
+        });
+        return;
+      }
+
+      print('Step 3: Checking RPC result success...');
+      print('resultMap keys: ${resultMap.keys}');
+      print('resultMap values: ${resultMap.values}');
+      print('success value: ${resultMap['success']}');
+      print('success type: ${resultMap['success'].runtimeType}');
+
+      if (resultMap['success'] != true) {
+        print('=== RPC AUTHENTICATION FAILED ===');
+        print('Success is not true');
+        print('Full resultMap: $resultMap');
+        setState(() {
+          _error = '학번 또는 비밀번호를 확인하세요 (RPC 실패)';
+          _loading = false;
+        });
+        return;
+      }
+
+      print('Step 4: Extracting user_id and email...');
+      final userId = resultMap['user_id'] as String?;
+      final email = resultMap['email'] as String?;
+      print('userId: $userId');
+      print('email: $email');
+      print('userId type: ${userId.runtimeType}');
+      print('email type: ${email.runtimeType}');
+
+      if (userId == null || email == null) {
+        print('=== MISSING USER_ID OR EMAIL ===');
+        print('userId is null: ${userId == null}');
+        print('email is null: ${email == null}');
+        print('Full resultMap: $resultMap');
+        setState(() {
+          _error = '로그인 정보를 가져올 수 없습니다 (userId: $userId, email: $email)';
+          _loading = false;
+        });
+        return;
+      }
+
+      print('Step 5: Extracting profile from RPC result...');
+      // RPC 결과에서 프로필 정보 추출
+      final profileData = resultMap['profile'] as Map<String, dynamic>?;
+      print('Profile data from RPC: $profileData');
+      
+      if (profileData == null) {
+        print('=== PROFILE DATA IS NULL IN RPC RESULT ===');
+        setState(() {
+          _error = '프로필 정보를 가져올 수 없습니다';
+          _loading = false;
+        });
+        return;
+      }
+
+      print('Step 6: Creating AppProfile from RPC data...');
+      AppProfile? profile;
+      try {
+        profile = AppProfile.fromJson(profileData);
+        print('Profile created successfully');
+        print('Profile ID: ${profile.id}');
+        print('Profile student_id: ${profile.studentId}');
+        print('Profile must_change_password: ${profile.mustChangePassword}');
+      } catch (profileError, profileStack) {
+        print('=== PROFILE CREATION ERROR ===');
+        print('Profile Error: $profileError');
+        print('Profile Error type: ${profileError.runtimeType}');
+        print('Profile Stack trace: $profileStack');
+        print('Profile data: $profileData');
+        setState(() {
+          _error = '프로필 생성 실패: $profileError';
+          _loading = false;
+        });
+        return;
+      }
+
+      print('Step 7: Attempting Supabase auth.signInWithPassword (for session)...');
+      print('Email: $email');
+      print('Password length: ${password.length}');
+      
+      // 2. 세션 생성을 위해 signInWithPassword 시도 (실패해도 계속 진행)
+      bool sessionCreated = false;
+      try {
+        final authResponse = await supabase.auth.signInWithPassword(
+          email: email,
+          password: password,
+        );
+        print('=== SUPABASE AUTH SUCCESS ===');
+        print('Auth response: $authResponse');
+        print('User ID: ${authResponse.user?.id}');
+        print('User email: ${authResponse.user?.email}');
+        print('Session: ${authResponse.session != null}');
+        sessionCreated = true;
+      } catch (authError, authStack) {
+        print('=== SUPABASE AUTH ERROR (continuing anyway) ===');
+        print('Auth Error: $authError');
+        print('Auth Error type: ${authError.runtimeType}');
+        print('Auth Stack trace: $authStack');
+        
+        if (authError is Exception) {
+          print('Auth Exception: $authError');
+        }
+        
+        // Supabase Auth 에러 상세 정보
+        try {
+          if (authError.toString().contains('AuthApiException')) {
+            print('AuthApiException detected');
+          }
+          print('Auth error toString: ${authError.toString()}');
+        } catch (_) {}
+        
+        // 세션 생성 실패해도 프로필 정보가 있으므로 계속 진행
+        print('Session creation failed, but continuing with profile data from RPC');
+        sessionCreated = false;
+      }
+
+      if (!mounted) {
+        print('=== WIDGET NOT MOUNTED (after auth attempt) ===');
+        return;
+      }
 
       if (profile == null) {
-        await supabase.auth.signOut();
-        if (!mounted) return;
+        print('=== PROFILE IS NULL ===');
         setState(() {
           _error = '프로필을 찾을 수 없습니다';
           _loading = false;
@@ -88,15 +263,51 @@ class _LoginScreenState extends State<LoginScreen> {
         return;
       }
 
+      print('Step 8: Saving login state to SharedPreferences...');
+      // 로그인 상태를 SharedPreferences에 저장 (세션 없이도 인증 상태 유지)
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool(kLoggedInKey, true);
+        await prefs.setString(kLoggedInUserIdKey, userId);
+        print('Login state saved successfully');
+        print('Saved userId: $userId');
+      } catch (prefsError) {
+        print('=== SHARED PREFERENCES ERROR ===');
+        print('Prefs Error: $prefsError');
+        // 에러가 발생해도 계속 진행
+      }
+
+      print('Step 9: Navigation...');
+      print('mustChangePassword: ${profile.mustChangePassword}');
       if (profile.mustChangePassword) {
+        print('Navigating to password change screen');
         context.go(AppRoute.passwordChange.path);
       } else {
+        print('Navigating to home screen');
         context.go(AppRoute.home.path);
       }
-    } catch (_) {
+      print('=== LOGIN SUCCESS ===');
+    } catch (e, stackTrace) {
+      print('=== UNEXPECTED ERROR ===');
+      print('Error: $e');
+      print('Error type: ${e.runtimeType}');
+      print('Stack trace: $stackTrace');
+      
+      if (e is Exception) {
+        print('Exception: $e');
+      }
+      
+      if (e is Error) {
+        print('Error: $e');
+      }
+      
+      try {
+        print('Error toString: ${e.toString()}');
+      } catch (_) {}
+      
       if (!mounted) return;
       setState(() {
-        _error = '학번 또는 비밀번호를 확인하세요';
+        _error = '예상치 못한 오류: $e';
         _loading = false;
       });
     }
