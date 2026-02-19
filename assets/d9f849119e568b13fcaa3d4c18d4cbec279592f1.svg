@@ -1,0 +1,21 @@
+<svg preserveAspectRatio="none" width="100%" height="100%" overflow="visible" style="display: block;" viewBox="0 0 27.9004 27.9" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="Inbox" filter="url(#filter0_d_736_5273)">
+<g id="Vector">
+<path d="M24.1502 13.5983L21.9194 5.79079C21.5743 4.58281 20.4703 3.75 19.214 3.75H8.68643C7.43013 3.75 6.32604 4.58283 5.9809 5.79079L3.75019 13.5983" fill="var(--fill-0, #F8FAFF)"/>
+<path d="M24.1502 13.5983L21.9194 5.79079C21.5743 4.58281 20.4703 3.75 19.214 3.75H8.68643C7.43013 3.75 6.32604 4.58283 5.9809 5.79079L3.75019 13.5983" stroke="var(--stroke-0, #0B66FF)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+<path id="Vector_2" d="M11.4378 14.469C11.0747 13.996 10.5661 13.5983 9.96987 13.5983H3.75019V21.3362C3.75019 22.8903 5.00997 24.15 6.56399 24.15H21.3364C22.8905 24.15 24.1502 22.8903 24.1502 21.3362V13.5983H17.9304C17.3342 13.5983 16.8257 13.996 16.4626 14.469C15.884 15.2227 14.9739 15.7086 13.9502 15.7086C12.9265 15.7086 12.0164 15.2227 11.4378 14.469Z" fill="var(--fill-0, #F8FAFF)" stroke="var(--stroke-0, #0B66FF)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+<defs>
+<filter id="filter0_d_736_5273" x="0" y="0" width="27.9004" height="27.9" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feFlood flood-opacity="0" result="BackgroundImageFix"/>
+<feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+<feOffset/>
+<feGaussianBlur stdDeviation="1.5"/>
+<feComposite in2="hardAlpha" operator="out"/>
+<feColorMatrix type="matrix" values="0 0 0 0 0.239216 0 0 0 0 0.501961 0 0 0 0 1 0 0 0 1 0"/>
+<feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_736_5273"/>
+<feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_736_5273" result="shape"/>
+</filter>
+</defs>
+</svg>

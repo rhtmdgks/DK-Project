@@ -148,11 +148,13 @@ Future<String?> _handleRedirect(
   try {
     final location = state.matchedLocation;
 
-    // 최초 진입: 약관 미동의 시 약관 화면으로
+    // 최초 진입: 약관 미동의 시 약관 화면으로 (개인정보처리방침은 온보딩에서 열 수 있도록 허용)
     final prefs = await SharedPreferences.getInstance();
     final termsAgreed = prefs.getBool(kTermsAgreedKey) ?? false;
     if (!termsAgreed) {
-      return location == AppRoute.terms.path ? null : AppRoute.terms.path;
+      if (location == AppRoute.terms.path) return null;
+      if (location == AppRoute.privacyPolicy.path) return null;
+      return AppRoute.terms.path;
     }
 
     // 스플래시는 리다이렉트 우회

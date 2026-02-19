@@ -14,6 +14,7 @@ void showNotificationSideSheet(BuildContext context) {
   showGeneralDialog<void>(
     context: context,
     barrierDismissible: true,
+    barrierLabel: '알림',
     barrierColor: Colors.black54,
     transitionDuration: AppMotion.overlayDuration,
     transitionBuilder: (context, animation, secondaryAnimation, child) {

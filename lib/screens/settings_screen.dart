@@ -60,11 +60,58 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _onToggle(String key, bool newValue) async {
     setState(() => _toggles[key] = newValue);
     final prefs = await SharedPreferences.getInstance();
+    
+    // 알림을 켤 때는 알림 권한 확인 및 요청 (모든 알림 타입에 공통)
+    if (newValue) {
+      final hasNotificationPermission = await WeatherNotificationService.isNotificationPermissionGranted();
+      if (!hasNotificationPermission) {
+        final notificationGranted = await WeatherNotificationService.requestNotificationPermission();
+        if (!notificationGranted) {
+          // 권한이 거부되면 토글을 다시 false로 변경
+          if (mounted) {
+            setState(() => _toggles[key] = false);
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('알림 권한이 필요합니다. 앱이 꺼져있어도 알림을 받으려면 설정에서 알림 권한을 허용해주세요.'),
+                backgroundColor: AppColors.error,
+                duration: Duration(seconds: 4),
+              ),
+            );
+          }
+          return;
+        }
+      }
+    }
+
     await prefs.setBool('$_prefPrefix$key', newValue);
 
     if (key == 'weather') {
-      await WeatherNotificationService.setWeatherEnabled(newValue);
-      if (newValue) await _updateWeatherLocation();
+      if (newValue) {
+        // 날씨 알림을 켤 때: 위치 권한 요청 (알림 권한은 위에서 이미 확인함)
+        try {
+          // 위치 권한 확인 및 요청 (현재 위치의 날씨 정보를 가져오기 위해 필요)
+          await _updateWeatherLocation();
+
+          // 알림 활성화 및 스케줄링 (알림 권한은 이미 확인했으므로 skip)
+          await WeatherNotificationService.setWeatherEnabled(true, skipPermissionCheck: true);
+        } catch (e) {
+          // 오류 발생 시 토글을 다시 false로 변경하고 사용자에게 알림
+          if (mounted) {
+            setState(() => _toggles[key] = false);
+            await prefs.setBool('$_prefPrefix$key', false);
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(e.toString().replaceAll('Exception: ', '')),
+                backgroundColor: AppColors.error,
+                duration: const Duration(seconds: 3),
+              ),
+            );
+          }
+        }
+      } else {
+        // 날씨 알림을 끌 때
+        await WeatherNotificationService.setWeatherEnabled(false);
+      }
     }
   }
 
@@ -89,8 +136,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return CupertinoPageScaffold(
       backgroundColor: AppColors.background,
       navigationBar: CupertinoNavigationBar(
-        heroTag: 'nav-settings',
-        transitionBetweenRoutes: true,
         backgroundColor: AppColors.white,
         border: null,
         leading: CupertinoButton(

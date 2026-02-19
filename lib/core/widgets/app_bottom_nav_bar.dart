@@ -94,9 +94,10 @@ class _NavButton extends StatelessWidget {
     final iconSize = context.rs(24);
     final gap = context.rh(6);
 
-    return SizedBox(
-      height: context.rh(54),
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: context.rh(8)),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           SvgPicture.asset(

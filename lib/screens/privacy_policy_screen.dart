@@ -2,6 +2,8 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'package:myapp/core/theme/app_theme.dart';
 import 'package:myapp/core/theme/responsive.dart';
@@ -46,13 +48,11 @@ class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> {
     return CupertinoPageScaffold(
       backgroundColor: AppColors.background,
       navigationBar: CupertinoNavigationBar(
-        heroTag: 'nav-privacy-policy',
-        transitionBetweenRoutes: true,
         backgroundColor: AppColors.white,
         border: null,
         leading: CupertinoButton(
           padding: EdgeInsets.zero,
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: () => context.pop(),
           child: const Icon(CupertinoIcons.back),
         ),
         middle: Text(
@@ -108,6 +108,14 @@ class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> {
       child: MarkdownBody(
         data: _markdown,
         selectable: true,
+        onTapLink: (text, href, title) async {
+          if (href == null || href.isEmpty) return;
+          final uri = Uri.tryParse(href);
+          if (uri == null) return;
+          try {
+            await launchUrl(uri, mode: LaunchMode.externalApplication);
+          } catch (_) {}
+        },
         styleSheet: MarkdownStyleSheet(
         h1: AppFonts.scaled(context, AppFonts.titleBold),
         h2: AppFonts.scaled(context, AppFonts.titleSemiBold),

@@ -66,11 +66,59 @@ class WeatherNotificationService {
     return prefs.getBool(_keyWeatherEnabled) ?? false;
   }
 
-  static Future<void> setWeatherEnabled(bool enabled) async {
+  /// Android 13 (API 33) 이상에서 알림 권한 요청
+  static Future<bool> requestNotificationPermission() async {
+    final androidImplementation = _plugin
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>();
+    if (androidImplementation != null) {
+      final granted = await androidImplementation.requestNotificationsPermission();
+      return granted ?? false;
+    }
+    return true; // Android 13 미만에서는 권한이 필요 없음
+  }
+
+  /// 알림 권한이 허용되었는지 확인
+  static Future<bool> isNotificationPermissionGranted() async {
+    final androidImplementation = _plugin
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>();
+    if (androidImplementation != null) {
+      final granted = await androidImplementation.areNotificationsEnabled();
+      return granted ?? false;
+    }
+    return true; // Android 13 미만에서는 권한이 필요 없음
+  }
+
+  /// 날씨 알림 활성화/비활성화
+  /// 
+  /// [skipPermissionCheck]: true이면 알림 권한 확인을 건너뜀 (호출하는 쪽에서 이미 확인한 경우)
+  static Future<void> setWeatherEnabled(bool enabled, {bool skipPermissionCheck = false}) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_keyWeatherEnabled, enabled);
     if (enabled) {
-      await scheduleDailyNotification();
+      // Android 13 이상에서 알림 권한 확인 및 요청 (skipPermissionCheck가 false인 경우만)
+      if (!skipPermissionCheck) {
+        final hasPermission = await isNotificationPermissionGranted();
+        if (!hasPermission) {
+          final granted = await requestNotificationPermission();
+          if (!granted) {
+            // 권한이 거부되면 설정을 다시 false로 변경
+            await prefs.setBool(_keyWeatherEnabled, false);
+            throw Exception('알림 권한이 필요합니다. 설정에서 알림 권한을 허용해주세요.');
+          }
+        }
+      }
+      try {
+        await scheduleDailyNotification();
+      } catch (e) {
+        // 정확한 알람 권한 오류는 scheduleDailyNotification 내부에서 처리됨
+        // 다른 오류는 다시 throw
+        if (!e.toString().contains('exact_alarms_not_permitted')) {
+          await prefs.setBool(_keyWeatherEnabled, false);
+          rethrow;
+        }
+      }
     } else {
       await _plugin.cancel(_notificationId);
     }
@@ -96,23 +144,49 @@ class WeatherNotificationService {
       scheduled = scheduled.add(const Duration(days: 1));
     }
 
-    await _plugin.zonedSchedule(
-      _notificationId,
-      '오늘 날씨',
-      '오늘 날씨를 확인해보세요.',
-      scheduled,
-      NotificationDetails(
-        android: AndroidNotificationDetails(
-          _channelId,
-          _channelName,
-          channelDescription: '6시 30분 날씨 알림',
+    try {
+      await _plugin.zonedSchedule(
+        _notificationId,
+        '오늘 날씨',
+        '오늘 날씨를 확인해보세요.',
+        scheduled,
+        NotificationDetails(
+          android: AndroidNotificationDetails(
+            _channelId,
+            _channelName,
+            channelDescription: '6시 30분 날씨 알림',
+          ),
+          iOS: const DarwinNotificationDetails(),
         ),
-        iOS: const DarwinNotificationDetails(),
-      ),
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
-    );
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+      );
+    } catch (e) {
+      // Android 12 이상에서 정확한 알람 권한이 없는 경우
+      if (e.toString().contains('exact_alarms_not_permitted')) {
+        // 정확한 알람 권한이 없으면 부정확한 알람 모드로 폴백
+        await _plugin.zonedSchedule(
+          _notificationId,
+          '오늘 날씨',
+          '오늘 날씨를 확인해보세요.',
+          scheduled,
+          NotificationDetails(
+            android: AndroidNotificationDetails(
+              _channelId,
+              _channelName,
+              channelDescription: '6시 30분 날씨 알림',
+            ),
+            iOS: const DarwinNotificationDetails(),
+          ),
+          androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+          uiLocalNotificationDateInterpretation:
+              UILocalNotificationDateInterpretation.absoluteTime,
+        );
+      } else {
+        rethrow;
+      }
+    }
   }
 
   /// 앱이 포그라운드로 올라왔을 때 호출. 6:30 지났고 오늘 아직 안 띄웠으면 날씨 조회 후 알림.

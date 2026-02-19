@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:myapp/core/auth/auth_state.dart';
 import 'package:myapp/core/routing/app_router.dart';
@@ -7,10 +8,11 @@ import 'package:myapp/core/supabase_client.dart';
 import 'package:myapp/core/theme/app_theme.dart';
 import 'package:myapp/core/theme/responsive.dart';
 import 'package:myapp/core/widgets/laon_icon.dart';
+import 'package:url_launcher/url_launcher.dart';
 
-/// Figma "로그인 화면"에 맞춘 로그인 페이지.
+/// 로그인 화면. Figma DK-Project node 653:4736 기준.
 ///
-/// 반응형: compact(폰) / medium(폴드) / expanded(태블릿)에 대응.
+/// 배경 #F8FAFF, LAON 아이콘 + 환영 문구, 학번/비밀번호 입력 카드, 로그인 버튼.
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -35,11 +37,9 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void initState() {
     super.initState();
-    _studentIdController.addListener(_onFieldChanged);
-    _passwordController.addListener(_onFieldChanged);
+    _studentIdController.addListener(() => setState(() {}));
+    _passwordController.addListener(() => setState(() {}));
   }
-
-  void _onFieldChanged() => setState(() {});
 
   @override
   void dispose() {
@@ -102,139 +102,86 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  /// Material 3 SnackBar: 비밀번호 문의 안내 + 오른쪽 액션으로 담당자 인스타 연결.
+  /// https://api.flutter.dev/flutter/material/SnackBar-class.html
+  void _showPasswordFindSnackBar() {
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.clearSnackBars();
+    messenger.showSnackBar(
+      SnackBar(
+        content: const Text(
+          '비밀번호 문의는 담당자에게 연락해 주세요.',
+        ),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(4),
+        ),
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        duration: const Duration(seconds: 4),
+        action: SnackBarAction(
+          label: '연락하기',
+          onPressed: () async {
+            final uri = Uri.parse('https://www.instagram.com/s_jin_611/');
+            try {
+              await launchUrl(uri, mode: LaunchMode.externalApplication);
+            } catch (_) {}
+          },
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final hPad = context.rs(32);
+    final hPad = context.rs(20);
     final iconSize = context.rmin(80);
 
-    return CupertinoPageScaffold(
+    return Scaffold(
       backgroundColor: AppColors.background,
-      child: Material(
-        type: MaterialType.transparency,
-        child: GestureDetector(
-          onTap: () => FocusScope.of(context).unfocus(),
+      body: GestureDetector(
+        onTap: () => FocusScope.of(context).unfocus(),
+        behavior: HitTestBehavior.opaque,
         child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: EdgeInsets.symmetric(horizontal: hPad),
-              child: ResponsiveConstraint(
-                maxWidth: 480,
-                child: Column(
-                  children: [
-                    SizedBox(height: context.rh(40)),
+          child: SingleChildScrollView(
+            padding: EdgeInsets.symmetric(horizontal: hPad * 0.6),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                minHeight: MediaQuery.of(context).size.height -
+                    MediaQuery.of(context).padding.top -
+                    MediaQuery.of(context).padding.bottom,
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                    SizedBox(height: context.rh(48)),
                     LaonIcon(size: iconSize),
                     SizedBox(height: context.rh(28)),
                     Text(
                       'LAON에 오신걸 환영합니다!',
                       textAlign: TextAlign.center,
-                      style: AppFonts.scaled(context, AppFonts.heading1Medium)
-                          .copyWith(height: 1.3),
+                      style: TextStyle(
+                        fontFamily: AppFonts.fontFamily,
+                        fontSize: 27,
+                        fontWeight: FontWeight.w500,
+                        height: 32 / 24,
+                        color: AppColors.textPrimary,
+                      ),
                     ),
-                    SizedBox(height: context.rh(6)),
+                    SizedBox(height: context.rh(5)),
                     Text(
                       '회원 서비스 이용을 위해 로그인 해주세요.',
                       textAlign: TextAlign.center,
-                      style: AppFonts.scaled(context, AppFonts.bodyRegular)
-                          .copyWith(color: AppColors.textSecondary),
+                      style: TextStyle(
+                        fontFamily: AppFonts.fontFamily,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w400,
+                        height: 24 / 16,
+                        color: AppColors.textSecondary,
+                      ),
                     ),
                     SizedBox(height: context.rh(32)),
-                    Container(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: context.rs(24),
-                        vertical: context.rh(28),
-                      ),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.surface,
-                        borderRadius: AppShapes.borderRadiusLarge,
-                        border: Border.all(color: AppColors.borderLight),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Theme.of(context)
-                                .colorScheme
-                                .shadow
-                                .withValues(alpha: 0.08),
-                            offset: const Offset(0, 4),
-                            blurRadius: 12,
-                            spreadRadius: 0,
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          _buildLabel('학번'),
-                          SizedBox(height: context.rh(6)),
-                          _buildInputField(
-                            controller: _studentIdController,
-                            focusNode: _studentIdFocus,
-                            hint: 'ex. 10101',
-                            keyboardType: TextInputType.number,
-                            textInputAction: TextInputAction.next,
-                            onSubmitted: (_) => FocusScope.of(context)
-                                .requestFocus(_passwordFocus),
-                          ),
-                          SizedBox(height: context.rh(20)),
-                          _buildLabel('비밀번호'),
-                          SizedBox(height: context.rh(6)),
-                          _buildInputField(
-                            controller: _passwordController,
-                            focusNode: _passwordFocus,
-                            obscureText: _obscurePassword,
-                            textInputAction: TextInputAction.done,
-                            onSubmitted: (_) => _submit(),
-                            suffixIcon: GestureDetector(
-                              onTap: () => setState(
-                                  () => _obscurePassword = !_obscurePassword),
-                              child: Icon(
-                                _obscurePassword
-                                    ? CupertinoIcons.eye_slash
-                                    : CupertinoIcons.eye,
-                                size: context.rs(20),
-                                color: AppColors.hint,
-                              ),
-                            ),
-                          ),
-                          SizedBox(height: context.rh(6)),
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: CupertinoButton(
-                              padding: EdgeInsets.symmetric(
-                                  horizontal: context.rs(8),
-                                  vertical: context.rh(4)),
-                              minSize: 0,
-                              onPressed: () {},
-                              child: Text(
-                                '비밀번호 찾기',
-                                style: AppFonts.scaled(context, AppFonts.smallRegular)
-                                    .copyWith(color: AppColors.primaryBlue500),
-                              ),
-                            ),
-                          ),
-                          if (_error != null) ...[
-                            SizedBox(height: context.rh(12)),
-                            Container(
-                              padding: EdgeInsets.symmetric(
-                                horizontal: context.rs(12),
-                                vertical: context.rh(10),
-                              ),
-                              decoration: BoxDecoration(
-                                color: AppColors.error.withValues(alpha: 0.08),
-                                borderRadius: AppShapes.borderRadiusSmall,
-                              ),
-                              child: Text(
-                                _error!,
-                                style: AppFonts.scaled(
-                                  context,
-                                  AppFonts.smallRegular,
-                                ).copyWith(color: AppColors.error),
-                              ),
-                            ),
-                          ],
-                          SizedBox(height: context.rh(24)),
-                          _buildLoginButton(),
-                        ],
-                      ),
-                    ),
+                    _buildCard(context),
                     SizedBox(height: context.rh(32)),
                   ],
                 ),
@@ -242,43 +189,147 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
           ),
         ),
-      ),
-    ),
     );
   }
 
-  Widget _buildLabel(String text) {
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: Text(
-        text,
-        style: AppFonts.scaled(context, AppFonts.bodyMedium),
-      ),
+  Widget _buildCard(BuildContext context) {
+    return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            '학번',
+            style: TextStyle(
+              fontFamily: AppFonts.fontFamily,
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+              height: 24 / 16,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          SizedBox(height: context.rh(8)),
+          _buildInput(
+            controller: _studentIdController,
+            focusNode: _studentIdFocus,
+            hint: 'ex. 10101',
+            keyboardType: TextInputType.number,
+            textInputAction: TextInputAction.next,
+            onSubmitted: () => FocusScope.of(context).requestFocus(_passwordFocus),
+          ),
+          SizedBox(height: context.rh(20)),
+          Text(
+            '비밀번호',
+            style: TextStyle(
+              fontFamily: AppFonts.fontFamily,
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+              height: 24 / 16,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          SizedBox(height: context.rh(8)),
+          _buildInput(
+            controller: _passwordController,
+            focusNode: _passwordFocus,
+            hint: '비밀번호를 입력하세요',
+            obscureText: _obscurePassword,
+            textInputAction: TextInputAction.done,
+            onSubmitted: () => _submit(),
+            suffix: GestureDetector(
+              onTap: () => setState(() => _obscurePassword = !_obscurePassword),
+              child: SizedBox(
+                width: 14,
+                height: 14,
+                child: Center(
+                  child: _obscurePassword
+                      ? SvgPicture.asset(
+                          'assets/icons/icon_password_eye.svg',
+                          width: 14,
+                          height: 14,
+                          fit: BoxFit.contain,
+                          colorFilter: const ColorFilter.mode(
+                            AppColors.hint,
+                            BlendMode.srcIn,
+                          ),
+                        )
+                      : SvgPicture.asset(
+                          'assets/icons/eye.svg',
+                          width: 14,
+                          height: 14,
+                          fit: BoxFit.contain,
+                          colorFilter: const ColorFilter.mode(
+                            AppColors.hint,
+                            BlendMode.srcIn,
+                          ),
+                        ),
+                ),
+              ),
+            ),
+          ),
+          SizedBox(height: context.rh(8)),
+          Align(
+            alignment: Alignment.centerRight,
+            child: CupertinoButton(
+              padding: EdgeInsets.symmetric(
+                horizontal: context.rs(8),
+                vertical: context.rh(4),
+              ),
+              minSize: 0,
+              onPressed: _loading ? null : _showPasswordFindSnackBar,
+              child: Text(
+                '비밀번호 찾기',
+                style: TextStyle(
+                  fontFamily: AppFonts.fontFamily,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w400,
+                  color: AppColors.primaryBlue,
+                ),
+              ),
+            ),
+          ),
+          if (_error != null) ...[
+            SizedBox(height: context.rh(12)),
+            Container(
+              padding: EdgeInsets.symmetric(
+                horizontal: context.rs(12),
+                vertical: context.rh(10),
+              ),
+              decoration: BoxDecoration(
+                color: AppColors.error.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(AppShapes.radiusSmall),
+              ),
+              child: Text(
+                _error!,
+                style: TextStyle(
+                  fontFamily: AppFonts.fontFamily,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w400,
+                  color: AppColors.error,
+                ),
+              ),
+            ),
+          ],
+          SizedBox(height: context.rh(40)),
+          _buildLoginButton(context),
+        ],
     );
   }
 
-  Widget _buildInputField({
+  Widget _buildInput({
     required TextEditingController controller,
     required FocusNode focusNode,
-    String hint = '',
+    required String hint,
     bool obscureText = false,
     TextInputType? keyboardType,
     TextInputAction? textInputAction,
-    ValueChanged<String>? onSubmitted,
-    Widget? suffixIcon,
+    VoidCallback? onSubmitted,
+    Widget? suffix,
   }) {
     return Container(
+      width: double.infinity,
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerLowest,
-        borderRadius: AppShapes.borderRadiusMedium,
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(AppShapes.radiusMedium),
         border: Border.all(color: AppColors.border),
-        boxShadow: [
-          BoxShadow(
-            color: Theme.of(context).colorScheme.shadow.withValues(alpha: 0.04),
-            offset: const Offset(0, 1),
-            blurRadius: 3,
-          ),
-        ],
       ),
       child: Row(
         children: [
@@ -289,58 +340,61 @@ class _LoginScreenState extends State<LoginScreen> {
               obscureText: obscureText,
               keyboardType: keyboardType,
               textInputAction: textInputAction,
-              onSubmitted: onSubmitted,
+              onSubmitted: onSubmitted != null ? (_) => onSubmitted() : null,
               enabled: !_loading,
-              style: AppFonts.scaled(context, AppFonts.bodyRegular).copyWith(
+              style: TextStyle(
+                fontFamily: AppFonts.fontFamily,
+                fontSize: 16,
+                fontWeight: FontWeight.w400,
                 color: AppColors.textPrimary,
               ),
               placeholder: hint,
-              placeholderStyle:
-                  AppFonts.scaled(context, AppFonts.bodyRegular).copyWith(
+              placeholderStyle: TextStyle(
+                fontFamily: AppFonts.fontFamily,
+                fontSize: 16,
                 color: AppColors.hint,
               ),
               padding: EdgeInsets.symmetric(
                 horizontal: context.rs(20),
                 vertical: context.rh(14),
               ),
-              decoration: BoxDecoration(
-                borderRadius: AppShapes.borderRadiusMedium,
-                color: Colors.transparent,
-              ),
+              decoration: const BoxDecoration(color: Colors.transparent),
             ),
           ),
-          if (suffixIcon != null)
+          if (suffix != null)
             Padding(
               padding: EdgeInsets.only(right: context.rs(16)),
-              child: suffixIcon,
+              child: suffix,
             ),
         ],
       ),
     );
   }
 
-  Widget _buildLoginButton() {
+  Widget _buildLoginButton(BuildContext context) {
     final active = _canSubmit && !_loading;
-    final theme = Theme.of(context);
 
     return SizedBox(
       width: double.infinity,
-      height: context.rh(52),
+      height: context.rh(50),
       child: FilledButton(
         onPressed: active ? _submit : null,
         style: FilledButton.styleFrom(
+          backgroundColor: active ? AppColors.primaryBlue : AppColors.hint,
+          disabledBackgroundColor: AppColors.hint,
           shape: RoundedRectangleBorder(
-            borderRadius: AppShapes.borderRadiusMedium,
+            borderRadius: BorderRadius.circular(24),
           ),
-          elevation: active ? 0 : 0,
+          elevation: 0,
+          padding: EdgeInsets.zero,
         ),
         child: _loading
             ? SizedBox(
-                height: context.rh(24),
-                width: context.rh(24),
+                width: 24,
+                height: 24,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  color: theme.colorScheme.onPrimary,
+                  color: AppColors.background,
                 ),
               )
             : Row(
@@ -349,17 +403,19 @@ class _LoginScreenState extends State<LoginScreen> {
                 children: [
                   Text(
                     '로그인하기',
-                    style: AppFonts.scaled(context, AppFonts.bodyMedium)
-                        .copyWith(
-                      color: theme.colorScheme.onPrimary,
-                      fontWeight: FontWeight.w600,
+                    style: TextStyle(
+                      fontFamily: AppFonts.fontFamily,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w500,
+                      height: 24 / 18,
+                      color: AppColors.background,
                     ),
                   ),
                   SizedBox(width: context.rs(6)),
                   Icon(
-                    Icons.arrow_forward_rounded,
-                    size: context.rs(18),
-                    color: theme.colorScheme.onPrimary,
+                    CupertinoIcons.chevron_right,
+                    size: 18,
+                    color: AppColors.background,
                   ),
                 ],
               ),

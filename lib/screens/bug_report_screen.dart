@@ -49,25 +49,23 @@ class _BugReportScreenState extends State<BugReportScreen> {
       child: CupertinoPageScaffold(
         backgroundColor: AppColors.background,
         navigationBar: CupertinoNavigationBar(
-          heroTag: 'nav-bug-report',
-          transitionBetweenRoutes: true,
           backgroundColor: AppColors.white,
           border: null,
           leading: CupertinoButton(
-          padding: EdgeInsets.zero,
-          onPressed: () => context.pop(),
-          child: SvgPicture.asset(
-            'assets/images/icon_back_arrow.svg',
-            width: context.rs(12),
-            height: context.rs(22),
-            fit: BoxFit.contain,
+            padding: EdgeInsets.zero,
+            onPressed: () => context.pop(),
+            child: SvgPicture.asset(
+              'assets/images/icon_back_arrow.svg',
+              width: context.rs(12),
+              height: context.rs(22),
+              fit: BoxFit.contain,
+            ),
+          ),
+          middle: Text(
+            '버그 신고',
+            style: AppFonts.scaled(context, _Styles.pageTitle),
           ),
         ),
-        middle: Text(
-          '버그 신고',
-          style: AppFonts.scaled(context, _Styles.pageTitle),
-        ),
-      ),
       child: Material(
         type: MaterialType.transparency,
         child: SafeArea(
