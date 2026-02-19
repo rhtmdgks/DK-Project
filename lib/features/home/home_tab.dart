@@ -33,7 +33,14 @@ class HomeTab extends StatefulWidget {
 class _HomeTabState extends State<HomeTab> {
   String? _fullName;
   String? _avatarUrl;
+  String? _role;
   bool _loading = true;
+
+  bool get _isTeacher => _role == 'teacher';
+  String get _nameWithHonorific {
+    final name = _fullName ?? (_isTeacher ? '선생님' : '학생');
+    return _isTeacher ? '$name 선생님' : '$name님';
+  }
 
 
   /// 샘플 오늘의 수업 데이터 (추후 API 연동 시 교체).
@@ -101,6 +108,7 @@ class _HomeTabState extends State<HomeTab> {
       setState(() {
         _fullName = profile?.fullName;
         _avatarUrl = profile?.avatarUrl;
+        _role = profile?.role;
         _loading = false;
       });
     } catch (_) {
@@ -192,7 +200,7 @@ class _HomeTabState extends State<HomeTab> {
   // ── 2. 프로필 인사말 ──
 
   Widget _buildGreeting() {
-    final name = _fullName ?? '학생';
+    final name = _fullName ?? (_isTeacher ? '선생님' : '학생');
     final avatarSize = context.rmin(64);
 
     return Padding(
@@ -220,12 +228,20 @@ class _HomeTabState extends State<HomeTab> {
             ),
             child: ClipOval(
               child: _avatarUrl != null && _avatarUrl!.isNotEmpty
-                  ? SvgPicture.network(
+                  ? Image.network(
                       _avatarUrl!,
                       width: avatarSize,
                       height: avatarSize,
-                      fit: BoxFit.contain,
-                      placeholderBuilder: (context) => Icon(
+                      fit: BoxFit.cover,
+                      loadingBuilder: (context, child, loadingProgress) {
+                        if (loadingProgress == null) return child;
+                        return Icon(
+                          CupertinoIcons.person_fill,
+                          size: context.rmin(36),
+                          color: AppColors.primaryBlue500,
+                        );
+                      },
+                      errorBuilder: (_, __, ___) => Icon(
                         CupertinoIcons.person_fill,
                         size: context.rmin(36),
                         color: AppColors.primaryBlue500,
@@ -244,7 +260,7 @@ class _HomeTabState extends State<HomeTab> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '안녕하세요 $name님,',
+                  '안녕하세요 $_nameWithHonorific,',
                   style: AppFonts.scaled(context, AppFonts.titleMedium),
                 ),
                 Text(
@@ -262,8 +278,6 @@ class _HomeTabState extends State<HomeTab> {
   // ── 3. 오늘의 수업 섹션 ──
 
   Widget _buildTodayClassesSection() {
-    final name = _fullName ?? '학생';
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -316,7 +330,9 @@ class _HomeTabState extends State<HomeTab> {
         Padding(
           padding: EdgeInsets.only(left: context.rs(27)),
           child: Text(
-            '오늘 $name님이 수강하실 과목이에요.',
+            _isTeacher
+                ? '오늘 $_nameWithHonorific의 수업이에요.'
+                : '오늘 $_nameWithHonorific이 수강하실 과목이에요.',
             style: AppFonts.scaled(context, AppFonts.display3Regular),
           ),
         ),
@@ -479,7 +495,7 @@ class _HomeTabState extends State<HomeTab> {
           ),
           SizedBox(height: context.rh(2)),
           Text(
-            '$name님의 다음 시간 과목 정보에요.',
+            '$_nameWithHonorific의 다음 시간 과목 정보에요.',
             style: AppFonts.scaled(context, AppFonts.display3Regular),
           ),
           SizedBox(height: context.rh(12)),

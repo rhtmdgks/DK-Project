@@ -12,6 +12,25 @@ import 'package:myapp/core/widgets/tab_page_header.dart';
 import 'package:myapp/core/widgets/m3_list.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+/// FAB를 하단에서 더 가깝게 두기 위한 커스텀 위치.
+class _LowerFabLocation extends FloatingActionButtonLocation {
+  const _LowerFabLocation();
+
+  @override
+  Offset getOffset(ScaffoldPrelayoutGeometry scaffoldGeometry) {
+    const double end = 16.0;
+    const double bottom = 6.0;
+    return Offset(
+      scaffoldGeometry.scaffoldSize.width -
+          scaffoldGeometry.floatingActionButtonSize.width -
+          end,
+      scaffoldGeometry.contentBottom -
+          scaffoldGeometry.floatingActionButtonSize.height -
+          bottom,
+    );
+  }
+}
+
 /// [createdAt] ISO 문자열을 "2월 18일" 형식으로 포맷.
 String _formatDate(String? createdAt) {
   if (createdAt == null || createdAt.isEmpty) return '';
@@ -208,10 +227,11 @@ class _SuggestionsTabState extends State<SuggestionsTab>
               bottom: false,
               minimum: EdgeInsets.zero,
               child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: context.rs(22)),
+                padding: EdgeInsets.only(left: context.rs(16)),
                 child: TabPageHeader(
                   title: '건의함',
                   subtitle: '건의 목록을 확인하거나 질문을 등록하세요.',
+                  contentPadding: EdgeInsets.zero,
                 ),
               ),
             ),
@@ -220,16 +240,15 @@ class _SuggestionsTabState extends State<SuggestionsTab>
                 type: MaterialType.transparency,
                 child: Column(
                   children: [
-                    Padding(
-                      padding: EdgeInsets.only(right: context.rs(16)),
-                      child: TabBar.secondary(
-                        controller: _tabController,
-                        indicatorColor: AppColors.primaryBlue500,
-                        tabs: const [
-                          Tab(text: '건의 목록'),
-                          Tab(text: '채팅하기'),
-                        ],
-                      ),
+                    TabBar.secondary(
+                      controller: _tabController,
+                      indicatorColor: AppColors.primaryBlue500,
+                      padding: EdgeInsets.zero,
+                      labelPadding: EdgeInsets.zero,
+                      tabs: const [
+                        Tab(text: '건의 목록'),
+                        Tab(text: '채팅하기'),
+                      ],
                     ),
                     Expanded(
                       child: TabBarView(
@@ -252,6 +271,7 @@ class _SuggestionsTabState extends State<SuggestionsTab>
           foregroundColor: Theme.of(context).colorScheme.onPrimaryContainer,
           child: const Icon(Icons.add),
         ),
+        floatingActionButtonLocation: const _LowerFabLocation(),
       ),
     );
   }
@@ -266,11 +286,7 @@ class _SuggestionsTabState extends State<SuggestionsTab>
       child: RefreshIndicator(
         onRefresh: _fetch,
         child: ListView.separated(
-          padding: EdgeInsets.only(
-          right: context.rs(22),
-            top: context.rh(16),
-            bottom: context.rh(16),
-          ),
+          padding: EdgeInsets.symmetric(vertical: context.rh(16)),
           itemCount: _list.length,
           separatorBuilder: (_, __) => Divider(height: 1),
           itemBuilder: (context, i) => _buildSuggestionTile(_list[i]),
@@ -341,7 +357,7 @@ class _SuggestionsTabState extends State<SuggestionsTab>
   Widget _buildChatSection() {
     return Center(
       child: Padding(
-        padding: EdgeInsets.all(context.rs(22)),
+        padding: EdgeInsets.symmetric(vertical: context.rh(22)),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [

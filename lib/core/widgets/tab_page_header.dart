@@ -17,11 +17,15 @@ class TabPageHeader extends StatelessWidget {
     required this.title,
     required this.subtitle,
     this.trailing,
+    this.contentPadding,
   });
 
   final String title;
   final String subtitle;
   final Widget? trailing;
+
+  /// null이면 기본 좌우 패딩(16), 지정 시 해당 값 사용(예: [EdgeInsets.zero]로 끝에 붙이기).
+  final EdgeInsets? contentPadding;
 
   @override
   Widget build(BuildContext context) {
@@ -29,13 +33,14 @@ class TabPageHeader extends StatelessWidget {
     
     // Material 3 Small App Bar 높이: 64dp
     const double appBarHeight = 64.0;
-    
+    final resolvedPadding = contentPadding ?? EdgeInsets.only(
+      left: 16,
+      right: trailing != null ? 8 : 16,
+    );
+
     return Container(
       height: appBarHeight,
-      padding: EdgeInsets.only(
-        left: 16,
-        right: trailing != null ? 8 : 16,
-      ),
+      padding: resolvedPadding,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [

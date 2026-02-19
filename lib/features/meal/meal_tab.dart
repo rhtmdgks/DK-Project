@@ -149,7 +149,7 @@ class _MealTabState extends State<MealTab> {
     final rowCount = (totalCells / 7).ceil().clamp(1, 6);
 
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: context.rs(14)),
+      padding: EdgeInsets.symmetric(horizontal: context.rs(22)),
       child: Container(
         padding: EdgeInsets.all(context.rs(16)),
         decoration: BoxDecoration(

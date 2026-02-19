@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:myapp/core/auth/auth_state.dart';
+import 'package:myapp/core/network/dns_fallback.dart';
 import 'package:myapp/core/routing/app_router.dart';
 import 'package:myapp/core/supabase_client.dart';
 import 'package:myapp/core/theme/app_theme.dart';
@@ -67,35 +68,82 @@ class _LoginScreenState extends State<LoginScreen> {
       print('Student ID: $studentId');
       print('Password length: ${password.length}');
 
-      // 1. profiles 테이블에서 직접 인증 확인
-      print('Step 1: Calling login_from_profiles RPC...');
-      dynamic result;
-      try {
-        result = await supabase.rpc(
-          'login_from_profiles',
-          params: {
-            'p_student_id': studentId,
-            'p_password': password,
-          },
-        );
-        print('RPC call completed');
-        print('RPC result: $result');
-        print('RPC result type: ${result.runtimeType}');
-        print('RPC result toString: ${result.toString()}');
-      } catch (rpcError, rpcStack) {
-        print('=== RPC CALL ERROR ===');
-        print('RPC Error: $rpcError');
-        print('RPC Error type: ${rpcError.runtimeType}');
-        print('RPC Stack trace: $rpcStack');
-        if (rpcError is Exception) {
-          print('RPC Exception details: $rpcError');
-        }
-        setState(() {
-          _error = 'RPC 호출 실패: $rpcError';
-          _loading = false;
-        });
-        return;
+      // 1. profiles 테이블에서 직접 인증 확인 (DNS 오류 시 최대 4회 재시도, 실패 시 8.8.8.8 DNS 우회 시도)
+      const maxAttempts = 4;
+      const retryDelay = Duration(seconds: 2);
+      final supabaseHost = Uri.tryParse(supabaseBaseUrl ?? '')?.host ?? supabaseBaseUrl ?? '';
+      bool isHostLookupError(Object e) {
+        final s = e.toString();
+        return s.contains('SocketException') ||
+            s.contains('host lookup') ||
+            s.contains('No address associated with hostname') ||
+            s.contains('no address associated with hostname') ||
+            s.contains('Failed host lookup');
       }
+
+      dynamic result;
+      int attempt = 0;
+      while (attempt < maxAttempts) {
+        print('Step 1: Calling login_from_profiles RPC... (attempt ${attempt + 1}/$maxAttempts)');
+        try {
+          result = await supabase.rpc(
+            'login_from_profiles',
+            params: {
+              'p_student_id': studentId,
+              'p_password': password,
+            },
+          );
+          print('RPC call completed');
+          break;
+        } catch (rpcError, rpcStack) {
+          if (!isHostLookupError(rpcError)) {
+            print('=== RPC CALL ERROR (non-DNS) ===');
+            print('RPC Error: $rpcError');
+            final errStr = rpcError.toString();
+            final isNetworkError = errStr.contains('SocketException') ||
+                errStr.contains('Connection refused');
+            setState(() {
+              _error = isNetworkError
+                  ? '서버에 연결할 수 없습니다.\n연결 주소: $supabaseHost'
+                  : 'RPC 호출 실패: $rpcError';
+              _loading = false;
+            });
+            return;
+          }
+          attempt++;
+          if (attempt < maxAttempts) {
+            print('Host lookup failed, retrying in ${retryDelay.inSeconds}s...');
+            await Future<void>.delayed(retryDelay);
+          } else {
+            // 마지막 시도: Google DNS(8.8.8.8)로 호스트 조회 후 해당 IP로 RPC
+            print('Trying fallback: resolve $supabaseHost via 8.8.8.8 and call RPC by IP');
+            final resolvedIp = await resolveHostViaGoogleDns(supabaseHost);
+            if (resolvedIp != null && supabaseBaseUrl != null && supabaseAnonKey != null) {
+              try {
+                result = await loginRpcViaResolvedIp(
+                  baseUrl: supabaseBaseUrl!,
+                  anonKey: supabaseAnonKey!,
+                  resolvedIp: resolvedIp,
+                  studentId: studentId,
+                  password: password,
+                );
+                print('RPC via resolved IP completed');
+                break;
+              } catch (fallbackError) {
+                print('Fallback RPC failed: $fallbackError');
+              }
+            }
+            final host = supabaseHost;
+            setState(() {
+              _error = '서버에 연결할 수 없습니다. 인터넷 연결과 네트워크 설정을 확인해 주세요.\n연결 주소: $host';
+              _loading = false;
+            });
+            return;
+          }
+        }
+      }
+      print('RPC result: $result');
+      print('RPC result type: ${result.runtimeType}');
 
       // RPC 결과 파싱 (JSONB 반환)
       print('Step 2: Parsing RPC result...');

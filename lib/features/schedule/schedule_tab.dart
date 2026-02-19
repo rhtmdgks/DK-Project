@@ -248,23 +248,23 @@ class _ScheduleTabState extends State<ScheduleTab> {
           borderRadius: BorderRadius.circular(12),
           child: Padding(
             padding: EdgeInsets.symmetric(
-              horizontal: context.rs(20),
-              vertical: context.rh(16),
+              horizontal: context.rs(16),
+              vertical: context.rh(10),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(
                   Icons.add_rounded,
-                  size: context.rs(24),
+                  size: context.rs(20),
                   color: theme.colorScheme.onSurface,
                 ),
-                SizedBox(width: context.rs(10)),
+                SizedBox(width: context.rs(8)),
                 Text(
                   '새로운 이벤트',
-                  style: AppFonts.scaled(context, AppFonts.titleMedium).copyWith(
+                  style: AppFonts.scaled(context, AppFonts.bodyMedium).copyWith(
                     color: theme.colorScheme.onSurface,
-                    fontWeight: FontWeight.w500,
+                    fontWeight: FontWeight.w400,
                   ),
                 ),
               ],

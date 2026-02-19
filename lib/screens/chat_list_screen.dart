@@ -88,8 +88,11 @@ class _ChatListScreenState extends State<ChatListScreen> {
             );
             if (otherUserResult != null) {
               final otherUserMap = otherUserResult as Map<String, dynamic>;
-              final otherUserName = otherUserMap['full_name'] as String? ?? '알 수 없음';
-              displayNames[roomId] = otherUserName;
+              final studentId = otherUserMap['student_id'] as String? ?? '';
+              final fullName = otherUserMap['full_name'] as String? ?? '알 수 없음';
+              displayNames[roomId] = studentId.isEmpty
+                  ? fullName
+                  : '$studentId $fullName';
             } else {
               displayNames[roomId] = roomMap['name'] as String? ?? '채팅방';
             }

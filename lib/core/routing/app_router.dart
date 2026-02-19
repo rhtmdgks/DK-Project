@@ -43,7 +43,8 @@ const String kTermsAgreedKey = 'terms_agreed';
 const String kLoggedInKey = 'logged_in';
 const String kLoggedInUserIdKey = 'logged_in_user_id';
 
-final GlobalKey<NavigatorState> _rootNavKey = GlobalKey<NavigatorState>();
+/// 알림 탭 등 외부에서 홈 탭 이동 시 사용 (예: 공지사항 알림 → 공지/투표 탭).
+final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
 
 /// Material 3 Motion: Shared Axis(수평) + Fade 페이지 전환.
 CustomTransitionPage<void> _m3Page(GoRouterState state, Widget child) {
@@ -80,7 +81,7 @@ CustomTransitionPage<void> _m3Page(GoRouterState state, Widget child) {
 /// 5. 이미 인증된 사용자가 로그인 페이지 접근 → 홈
 GoRouter createAppRouter() {
   return GoRouter(
-    navigatorKey: _rootNavKey,
+    navigatorKey: rootNavigatorKey,
     initialLocation: AppRoute.splash.path,
     redirect: _handleRedirect,
     routes: [

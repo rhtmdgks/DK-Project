@@ -3,6 +3,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'package:myapp/core/auth/auth_state.dart';
 import 'package:myapp/core/supabase_client.dart';
 
 /// 공지사항 알림: 새 공지사항이 생성되면 실시간으로 알림 표시.
@@ -98,6 +99,63 @@ class AnnouncementNotificationService {
     return await _requestIOSPermission();
   }
 
+  static String? _stringArg(Map<String, dynamic> m, String key) {
+    final v = m[key];
+    if (v == null) return null;
+    final s = v.toString().trim();
+    return s.isEmpty ? null : s;
+  }
+
+  static int? _intOrNull(dynamic v) {
+    if (v == null) return null;
+    if (v is int) return v;
+    return int.tryParse(v.toString());
+  }
+
+  /// 공지 대상(target_grade, target_class)이 현재 사용자에게 해당하는지 판단.
+  /// target_grade: null/빈값/전체 → 학년 무시. '1학년','2학년','3학년'이면 해당 학년만.
+  /// target_class: null → 학년 전체. 값 있으면 해당 반만 (학년+반 일치 시 알림).
+  static Future<bool> _shouldNotifyCurrentUser(
+    String? targetGrade,
+    int? targetClass,
+  ) async {
+    final profile = await getCurrentProfile();
+    final userGrade = profile?.gradeOrFromStudentId;
+    final userClass = profile?.classNumOrFromStudentId;
+
+    // 학년 필터
+    if (targetGrade != null && targetGrade.trim().isNotEmpty) {
+      final t = targetGrade.trim().toLowerCase();
+      if (t != '전체' && t != 'all') {
+        if (userGrade == null) return true; // 학년 모르면 전체로 간주
+        switch (t) {
+          case '1학년':
+          case '1':
+            if (userGrade != 1) return false;
+            break;
+          case '2학년':
+          case '2':
+            if (userGrade != 2) return false;
+            break;
+          case '3학년':
+          case '3':
+            if (userGrade != 3) return false;
+            break;
+          default:
+            return false;
+        }
+      }
+    }
+
+    // 반 필터: target_class가 있으면 해당 반만
+    if (targetClass != null) {
+      if (userClass == null) return true; // 반을 알 수 없으면 알림(학년만 맞으면)
+      if (userClass != targetClass) return false;
+    }
+
+    return true;
+  }
+
   /// 공지사항 알림 구독 시작
   static Future<void> startListening() async {
     // 이미 구독 중이면 중복 구독 방지
@@ -129,6 +187,13 @@ class AnnouncementNotificationService {
             final stillEnabled = await isNoticeEnabled();
             if (!stillEnabled) return;
 
+            // 대상(학년·반) 필터
+            final targetGrade = _stringArg(newRow, 'target_grade') ??
+                _stringArg(newRow, 'target_audience') ??
+                _stringArg(newRow, 'target');
+            final targetClass = _intOrNull(newRow['target_class']);
+            if (!await _shouldNotifyCurrentUser(targetGrade, targetClass)) return;
+
             final title = newRow['title'] as String? ?? '새 공지사항';
             final body = newRow['body'] as String?;
 
@@ -144,6 +209,7 @@ class AnnouncementNotificationService {
                 ),
                 iOS: const DarwinNotificationDetails(),
               ),
+              payload: 'announcement',
             );
           },
         )

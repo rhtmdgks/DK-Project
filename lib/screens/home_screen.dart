@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:myapp/core/theme/app_theme.dart';
 import 'package:myapp/core/widgets/app_bottom_nav_bar.dart';
 import 'package:myapp/features/home/home_tab.dart';
@@ -20,6 +21,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
+  bool _handledNoticeTab = false;
 
   static const _tabs = <Widget>[
     HomeTab(),
@@ -31,6 +33,18 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // 공지사항 알림 탭 시 /?tab=notice 로 들어오면 공지/투표 탭으로 전환
+    final tab = GoRouterState.of(context).uri.queryParameters['tab'];
+    if (tab == 'notice' && !_handledNoticeTab) {
+      _handledNoticeTab = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        setState(() => _currentIndex = 4);
+        context.go('/');
+      });
+    } else if (tab != 'notice') {
+      _handledNoticeTab = false;
+    }
     return Scaffold(
       backgroundColor: AppColors.background,
       resizeToAvoidBottomInset: false,

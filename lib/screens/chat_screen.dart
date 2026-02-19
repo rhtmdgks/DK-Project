@@ -1,6 +1,10 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:myapp/core/supabase_client.dart';
 import 'package:myapp/core/theme/app_motion.dart';
@@ -8,10 +12,57 @@ import 'package:myapp/core/widgets/dismiss_keyboard.dart';
 import 'package:myapp/core/theme/app_theme.dart';
 import 'package:myapp/core/theme/responsive.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+/// 발신자 표시 이름 (학번 + 이름)
+String _senderDisplayName(Map<String, dynamic> m) {
+  final studentId = m['sender_student_id'] as String? ?? '';
+  final fullName = m['sender_full_name'] as String? ?? '알 수 없음';
+  if (studentId.isEmpty) return fullName;
+  return '$studentId $fullName';
+}
+
+/// DB는 UTC(timestamptz)로 오므로 로컬 시간으로 변환 후 표시
+DateTime? _toLocal(String? createdAt) {
+  if (createdAt == null || createdAt.isEmpty) return null;
+  try {
+    final dt = DateTime.parse(createdAt);
+    return dt.isUtc ? dt.toLocal() : dt;
+  } catch (_) {
+    return null;
+  }
+}
+
+/// 보낸 시간 "오전 02:34" 형식 (로컬 시간)
+String _formatTime(String? createdAt) {
+  final local = _toLocal(createdAt);
+  if (local == null) return '';
+  final h = local.hour;
+  final prefix = h < 12 ? '오전' : '오후';
+  final hour = h > 12 ? h - 12 : (h == 0 ? 12 : h);
+  final minute = local.minute.toString().padLeft(2, '0');
+  return '$prefix ${hour.toString().padLeft(2, '0')}:$minute';
+}
+
+/// 날짜 구분선용 "2026년 2월 20일" (로컬 날짜)
+String _formatDate(String? createdAt) {
+  final local = _toLocal(createdAt);
+  if (local == null) return '';
+  return '${local.year}년 ${local.month}월 ${local.day}일';
+}
+
+/// 같은 날인지 (로컬 기준)
+bool _isSameDay(String? a, String? b) {
+  final la = _toLocal(a);
+  final lb = _toLocal(b);
+  if (la == null || lb == null) return false;
+  return la.year == lb.year && la.month == lb.month && la.day == lb.day;
+}
 
 /// 개별 채팅방 화면. 반응형 대응.
 ///
 /// Supabase Realtime으로 실시간 메시지를 수신한다.
+/// 메시지별 프로필·이름·보낸 시간·날짜 구분선·이미지 첨부·종이비행기 전송 버튼 지원.
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key, required this.roomId});
 
@@ -24,6 +75,7 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   final _messageController = TextEditingController();
   final _scrollController = ScrollController();
+  final ImagePicker _imagePicker = ImagePicker();
 
   List<Map<String, dynamic>> _messages = [];
   bool _loading = true;
@@ -32,6 +84,9 @@ class _ChatScreenState extends State<ChatScreen> {
   String? _roomDisplayName;
   bool _isDirectChat = false;
   String? _currentUserId;
+  File? _pickedImage;
+  File? _pickedVideo;
+  bool _sending = false;
 
   @override
   void initState() {
@@ -43,7 +98,6 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _loadCurrentUserId() async {
-    // 세션이 있으면 사용, 없으면 SharedPreferences에서 가져오기
     String? userId = supabase.auth.currentUser?.id;
     if (userId == null) {
       final prefs = await SharedPreferences.getInstance();
@@ -58,7 +112,6 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Future<void> _loadRoomInfo() async {
     try {
-      // 현재 사용자 ID 가져오기
       String? userId = _currentUserId;
       if (userId == null) {
         userId = supabase.auth.currentUser?.id;
@@ -68,7 +121,6 @@ class _ChatScreenState extends State<ChatScreen> {
         }
       }
 
-      // 채팅방 정보 가져오기 (RPC 함수 사용)
       final roomResult = await supabase.rpc(
         'get_chat_room',
         params: {
@@ -76,7 +128,7 @@ class _ChatScreenState extends State<ChatScreen> {
           'p_user_id': userId!,
         },
       );
-      
+
       final roomRes = roomResult as Map<String, dynamic>?;
 
       if (roomRes != null) {
@@ -85,7 +137,6 @@ class _ChatScreenState extends State<ChatScreen> {
         _isDirectChat = roomType == 'direct';
 
         if (_isDirectChat && userId != null) {
-          // 1:1 채팅방인 경우 상대방 이름 가져오기
           final otherUserResult = await supabase.rpc(
             'get_direct_chat_other_user',
             params: {
@@ -95,7 +146,11 @@ class _ChatScreenState extends State<ChatScreen> {
           );
           if (otherUserResult != null) {
             final otherUserMap = otherUserResult as Map<String, dynamic>;
-            final otherUserName = otherUserMap['full_name'] as String? ?? '알 수 없음';
+            final studentId = otherUserMap['student_id'] as String? ?? '';
+            final fullName = otherUserMap['full_name'] as String? ?? '알 수 없음';
+            final otherUserName = studentId.isEmpty
+                ? fullName
+                : '$studentId $fullName';
             if (mounted) {
               setState(() {
                 _roomDisplayName = otherUserName;
@@ -103,7 +158,6 @@ class _ChatScreenState extends State<ChatScreen> {
             }
           }
         } else {
-          // 그룹 채팅방인 경우 방 이름 사용
           if (mounted) {
             setState(() {
               _roomDisplayName = roomMap['name'] as String? ?? '채팅방';
@@ -112,7 +166,6 @@ class _ChatScreenState extends State<ChatScreen> {
         }
       }
     } catch (_) {
-      // 실패 시 기본값 사용
       if (mounted) {
         setState(() {
           _roomDisplayName = '채팅방';
@@ -135,7 +188,6 @@ class _ChatScreenState extends State<ChatScreen> {
       _error = null;
     });
     try {
-      // 현재 사용자 ID 가져오기
       String? userId = _currentUserId;
       if (userId == null) {
         userId = supabase.auth.currentUser?.id;
@@ -154,7 +206,6 @@ class _ChatScreenState extends State<ChatScreen> {
         return;
       }
 
-      // RPC 함수를 사용하여 메시지 조회 (RLS 우회)
       final result = await supabase.rpc(
         'get_chat_messages',
         params: {
@@ -164,11 +215,15 @@ class _ChatScreenState extends State<ChatScreen> {
       );
 
       if (!mounted) return;
-      
-      // RPC 결과를 파싱
-      final messagesList = result as List<dynamic>;
+
+      final messagesList = result as List<dynamic>? ?? [];
+      var messages = messagesList
+          .map((m) => Map<String, dynamic>.from(m as Map))
+          .toList();
+      await _enrichMessageSenders(messages);
+      if (!mounted) return;
       setState(() {
-        _messages = messagesList.map((m) => Map<String, dynamic>.from(m as Map)).toList();
+        _messages = messages;
         _loading = false;
       });
       _scrollToEnd();
@@ -178,6 +233,44 @@ class _ChatScreenState extends State<ChatScreen> {
         _error = e.toString();
         _loading = false;
       });
+    }
+  }
+
+  Future<Map<String, dynamic>> _fetchSenderProfile(String senderId) async {
+    try {
+      final res = await supabase.rpc(
+        'get_profile_display',
+        params: {'p_user_id': senderId},
+      );
+      final p = res as Map<String, dynamic>?;
+      if (p == null) return {};
+      return {
+        'sender_full_name': p['full_name'],
+        'sender_student_id': p['student_id'],
+        'sender_avatar_url': p['avatar_url'],
+      };
+    } catch (_) {
+      return {};
+    }
+  }
+
+  /// 메시지 발신자 이름이 비어 있으면 get_profile_display RPC로 보강 (백오피스 연동 대비)
+  Future<void> _enrichMessageSenders(List<Map<String, dynamic>> messages) async {
+    final needEnrich = messages
+        .where((m) =>
+            m['sender_id'] != null &&
+            (m['sender_full_name'] == null || m['sender_full_name'] == ''))
+        .map((m) => m['sender_id'] as String)
+        .toSet()
+        .toList();
+    for (final senderId in needEnrich) {
+      final profile = await _fetchSenderProfile(senderId);
+      if (profile.isEmpty) continue;
+      for (final m in messages) {
+        if (m['sender_id'] == senderId) {
+          m.addAll(profile);
+        }
+      }
     }
   }
 
@@ -193,14 +286,22 @@ class _ChatScreenState extends State<ChatScreen> {
             column: 'room_id',
             value: widget.roomId,
           ),
-          callback: (payload) {
+          callback: (payload) async {
             final newRow = payload.newRecord;
-            if (newRow.isNotEmpty && mounted) {
-              setState(() {
-                _messages.add(Map<String, dynamic>.from(newRow));
-              });
-              _scrollToEnd();
+            if (newRow.isEmpty || !mounted) return;
+            final msg = Map<String, dynamic>.from(newRow);
+            final id = msg['id'] as String?;
+            if (id != null && _messages.any((m) => m['id'] == id)) return; // 이미 있으면 무시
+            final senderId = msg['sender_id'] as String?;
+            if (senderId != null) {
+              final profile = await _fetchSenderProfile(senderId);
+              msg.addAll(profile);
             }
+            if (!mounted) return;
+            setState(() {
+              _messages.add(msg);
+            });
+            _scrollToEnd();
           },
         )
         .subscribe();
@@ -218,45 +319,208 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
+  Future<void> _pickImage() async {
+    final x = await _imagePicker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1200,
+      imageQuality: 85,
+    );
+    if (x != null && mounted) {
+      setState(() {
+        _pickedImage = File(x.path);
+        _pickedVideo = null;
+      });
+    }
+  }
+
+  Future<void> _pickVideo() async {
+    final x = await _imagePicker.pickVideo(source: ImageSource.gallery);
+    if (x != null && mounted) {
+      setState(() {
+        _pickedVideo = File(x.path);
+        _pickedImage = null;
+      });
+    }
+  }
+
+  void _showAttachmentOptions() {
+    showCupertinoModalPopup<void>(
+      context: context,
+      builder: (ctx) => CupertinoActionSheet(
+        title: const Text('사진 또는 동영상'),
+        actions: [
+          CupertinoActionSheetAction(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              _pickImage();
+            },
+            child: const Text('사진'),
+          ),
+          CupertinoActionSheetAction(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              _pickVideo();
+            },
+            child: const Text('동영상'),
+          ),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          isDefaultAction: true,
+          onPressed: () => Navigator.of(ctx).pop(),
+          child: const Text('취소'),
+        ),
+      ),
+    );
+  }
+
+  void _showErrorDialog(String title, String message) {
+    if (!mounted) return;
+    showCupertinoDialog<void>(
+      context: context,
+      builder: (ctx) => CupertinoAlertDialog(
+        title: Text(title),
+        content: Padding(
+          padding: const EdgeInsets.only(top: 12),
+          child: Text(message),
+        ),
+        actions: [
+          CupertinoDialogAction(
+            isDefaultAction: true,
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('확인'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<String?> _uploadImage(File file) async {
+    final ext = file.path.split('.').last.toLowerCase();
+    if (ext.isEmpty || !['jpg', 'jpeg', 'png', 'gif', 'webp'].contains(ext)) {
+      return null;
+    }
+    final path =
+        '${widget.roomId}/${_currentUserId ?? 'anon'}/${DateTime.now().millisecondsSinceEpoch}.$ext';
+    await supabase.storage.from('chat-attachments').upload(
+          path,
+          file,
+          fileOptions: const FileOptions(upsert: true),
+        );
+    return supabase.storage.from('chat-attachments').getPublicUrl(path);
+  }
+
+  Future<String?> _uploadVideo(File file) async {
+    final ext = file.path.split('.').last.toLowerCase();
+    if (ext.isEmpty || !['mp4', 'mov', 'webm', 'm4v'].contains(ext)) {
+      return null;
+    }
+    final path =
+        '${widget.roomId}/${_currentUserId ?? 'anon'}/${DateTime.now().millisecondsSinceEpoch}.$ext';
+    await supabase.storage.from('chat-attachments').upload(
+          path,
+          file,
+          fileOptions: const FileOptions(upsert: true),
+        );
+    return supabase.storage.from('chat-attachments').getPublicUrl(path);
+  }
+
   Future<void> _send() async {
     final content = _messageController.text.trim();
-    if (content.isEmpty) return;
+    final hasImage = _pickedImage != null;
+    final hasVideo = _pickedVideo != null;
+    if (content.isEmpty && !hasImage && !hasVideo) return;
 
-    // 세션이 없으면 SharedPreferences에서 user_id 가져오기
     String? uid = supabase.auth.currentUser?.id;
     if (uid == null) {
       final prefs = await SharedPreferences.getInstance();
       uid = prefs.getString('logged_in_user_id');
     }
-    
-    if (uid == null) return;
+    if (uid == null) {
+      _showErrorDialog('전송 불가', '로그인 정보가 없어 전송할 수 없습니다.');
+      return;
+    }
 
-    _messageController.clear();
+    final imageToSend = _pickedImage;
+    final videoToSend = _pickedVideo;
+    if (mounted) setState(() => _sending = true);
 
     try {
-      // RPC 함수를 사용하여 메시지 삽입 (RLS 우회)
-      await supabase.rpc(
-        'insert_chat_message',
-        params: {
-          'p_room_id': widget.roomId,
-          'p_sender_id': uid,
-          'p_content': content,
-        },
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('전송 실패: $e')),
-      );
+      String? attachmentUrl;
+      String? attachmentType;
+      if (imageToSend != null) {
+        try {
+          attachmentUrl = await _uploadImage(imageToSend)
+              .timeout(const Duration(seconds: 30), onTimeout: () => throw TimeoutException('사진 업로드 시간 초과'));
+        } catch (e) {
+          if (mounted) setState(() => _sending = false);
+          _showErrorDialog('사진 업로드 실패', e.toString());
+          return;
+        }
+        attachmentType = attachmentUrl != null ? 'image' : null;
+        if (attachmentUrl == null && mounted) {
+          setState(() => _sending = false);
+          _showErrorDialog('사진 형식 오류', 'jpg, png, gif, webp만 가능합니다.');
+          return;
+        }
+      } else if (videoToSend != null) {
+        try {
+          attachmentUrl = await _uploadVideo(videoToSend);
+        } catch (e) {
+          if (mounted) setState(() => _sending = false);
+          _showErrorDialog('동영상 업로드 실패', e.toString());
+          return;
+        }
+        attachmentType = attachmentUrl != null ? 'video' : null;
+        if (attachmentUrl == null && mounted) {
+          setState(() => _sending = false);
+          _showErrorDialog('동영상 형식 오류', 'mp4, mov, webm, m4v만 가능합니다.');
+          return;
+        }
+      }
+
+      await supabase
+          .rpc(
+            'insert_chat_message',
+            params: {
+              'p_room_id': widget.roomId,
+              'p_sender_id': uid,
+              'p_content': content,
+              'p_attachment_url': attachmentUrl,
+              'p_attachment_type': attachmentType,
+            },
+          )
+          .timeout(const Duration(seconds: 15), onTimeout: () => throw TimeoutException('전송 요청 시간 초과'));
+
+      _messageController.clear();
+      if (mounted) {
+        setState(() {
+          _pickedImage = null;
+          _pickedVideo = null;
+          _sending = false;
+        });
+        // 새 메시지는 Realtime INSERT로만 추가 (fetch 시 중복 방지)
+        _scrollToEnd();
+      }
+    } catch (e, stack) {
+      if (mounted) setState(() => _sending = false);
+      debugPrint('Chat send error: $e\n$stack');
+      final msg = e.toString().toLowerCase();
+      if (msg.contains('insert_chat_message') || msg.contains('function') || msg.contains('not_room_member')) {
+        _showErrorDialog(
+          '전송 실패',
+          '사진/동영상 전송을 위해 서버(Supabase)에 run_on_remote_fix_chat_and_profiles.sql 적용이 필요합니다.',
+        );
+      } else {
+        _showErrorDialog('전송 실패', '${e.toString()}');
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return DismissKeyboard(
-      child: CupertinoPageScaffold(
-        backgroundColor: AppColors.background,
-        navigationBar: CupertinoNavigationBar(
+    return CupertinoPageScaffold(
+      backgroundColor: AppColors.background,
+      navigationBar: CupertinoNavigationBar(
         backgroundColor: AppColors.white,
         border: null,
         leading: CupertinoButton(
@@ -265,7 +529,7 @@ class _ChatScreenState extends State<ChatScreen> {
           child: const Icon(CupertinoIcons.back),
         ),
         middle: Text(
-          _roomDisplayName ?? '채팅',
+          '학생회와 채팅하기',
           style: AppFonts.scaled(context, AppFonts.titleSemiBold)
               .copyWith(color: AppColors.textDark),
         ),
@@ -274,11 +538,12 @@ class _ChatScreenState extends State<ChatScreen> {
         type: MaterialType.transparency,
         child: Column(
           children: [
-          Expanded(child: _buildBody()),
-          _buildInputBar(),
-        ],
+            Expanded(
+              child: DismissKeyboard(child: _buildBody()),
+            ),
+            _buildInputBar(),
+          ],
         ),
-      ),
       ),
     );
   }
@@ -317,37 +582,288 @@ class _ChatScreenState extends State<ChatScreen> {
     final bubbleRadius = context.rs(12);
     final maxBubbleWidth = context.screenWidth * 0.75;
 
-    return ListView.builder(
-      controller: _scrollController,
-      padding: EdgeInsets.all(context.rs(8)),
-      itemCount: _messages.length,
-      itemBuilder: (context, i) {
-        final m = _messages[i];
-        final content = m['content'] as String? ?? '';
-        final senderId = m['sender_id'] as String? ?? '';
-        final isMe = senderId == _currentUserId;
+    final children = <Widget>[];
+    String? prevDate;
 
-        return Align(
-          alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-          child: Container(
-            constraints: BoxConstraints(maxWidth: maxBubbleWidth),
-            margin: EdgeInsets.only(bottom: context.rh(4)),
-            padding: EdgeInsets.symmetric(
-              horizontal: context.rs(12),
-              vertical: context.rh(8),
-            ),
-            decoration: BoxDecoration(
-              color: isMe ? AppColors.timetableBg : AppColors.border,
-              borderRadius: BorderRadius.circular(bubbleRadius),
-            ),
+    for (var i = 0; i < _messages.length; i++) {
+      final m = _messages[i];
+      final createdAt = m['created_at'] as String?;
+      final dateLabel = _formatDate(createdAt);
+      if (dateLabel.isNotEmpty && !_isSameDay(prevDate, createdAt)) {
+        children.add(_buildDateDivider(dateLabel));
+        prevDate = createdAt;
+      }
+      children.add(_buildMessageRow(m, maxBubbleWidth, bubbleRadius));
+    }
+
+    return ListView(
+      controller: _scrollController,
+      padding: EdgeInsets.all(context.rs(12)),
+      children: children,
+    );
+  }
+
+  Widget _buildVideoPreview(
+    BuildContext context,
+    String url,
+    double maxWidth,
+    bool isMe,
+  ) {
+    return Padding(
+      padding: EdgeInsets.only(top: context.rh(4)),
+      child: GestureDetector(
+        onTap: () async {
+          final uri = Uri.tryParse(url);
+          if (uri != null && await canLaunchUrl(uri)) {
+            await launchUrl(uri, mode: LaunchMode.externalApplication);
+          }
+        },
+        child: Container(
+          constraints: BoxConstraints(
+            maxWidth: maxWidth - 24,
+            minHeight: 80,
+          ),
+          padding: EdgeInsets.symmetric(
+            horizontal: context.rs(12),
+            vertical: context.rh(12),
+          ),
+          decoration: BoxDecoration(
+            color: (isMe ? AppColors.white : AppColors.textDark)
+                .withValues(alpha: 0.2),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.play_circle_fill,
+                size: context.rs(40),
+                color: isMe ? AppColors.primaryBlue : AppColors.white,
+              ),
+              SizedBox(width: context.rs(10)),
+              Text(
+                '동영상 재생',
+                style: AppFonts.scaled(context, AppFonts.bodyMedium).copyWith(
+                  color: isMe ? AppColors.primaryBlue : AppColors.white,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDateDivider(String dateLabel) {
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: context.rh(16)),
+      child: Row(
+        children: [
+          Expanded(child: Divider(color: AppColors.border, height: 1)),
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: context.rs(12)),
             child: Text(
-              content,
-              style: AppFonts.scaled(context, AppFonts.smallRegular)
-                  .copyWith(color: AppColors.textDark),
+              dateLabel,
+              style: AppFonts.scaled(context, AppFonts.captionRegular)
+                  .copyWith(color: AppColors.textSecondary),
             ),
           ),
-        );
-      },
+          Expanded(child: Divider(color: AppColors.border, height: 1)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMessageRow(
+    Map<String, dynamic> m,
+    double maxBubbleWidth,
+    double bubbleRadius,
+  ) {
+    final content = m['content'] as String? ?? '';
+    final senderId = m['sender_id'] as String? ?? '';
+    final isMe = senderId == _currentUserId;
+    final displayName = _senderDisplayName(m);
+    final timeStr = _formatTime(m['created_at'] as String?);
+    final avatarUrl = m['sender_avatar_url'] as String?;
+    String? attachmentUrl = m['attachment_url'] as String?;
+    if (attachmentUrl != null && attachmentUrl.isNotEmpty) {
+      final path = attachmentUrl.startsWith('http') ? null : attachmentUrl.replaceFirst(RegExp(r'^/+'), '');
+      if (path != null && path.isNotEmpty) {
+        attachmentUrl = supabase.storage.from('chat-attachments').getPublicUrl(path);
+      }
+    }
+    final attachmentType = m['attachment_type'] as String?;
+    final hasVideo = attachmentUrl != null &&
+        (attachmentType == 'video' ||
+            RegExp(r'\.(mp4|webm|mov|m4v)(\?|$)', caseSensitive: false)
+                .hasMatch(attachmentUrl));
+    final hasImage = attachmentUrl != null && !hasVideo;
+
+    final effectiveAvatarUrl = (avatarUrl != null && avatarUrl.isNotEmpty)
+        ? avatarUrl!
+        : 'https://api.dicebear.com/9.x/notionists/png?seed=${senderId.isEmpty ? 'unknown' : senderId}';
+
+    Widget avatar = SizedBox(
+      width: context.rs(36),
+      height: context.rs(36),
+      child: ClipOval(
+        child: Image.network(
+          effectiveAvatarUrl,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => Container(
+            color: AppColors.border,
+            child: Center(
+              child: Text(
+                displayName.isNotEmpty ? displayName[0] : '?',
+                style: AppFonts.scaled(context, AppFonts.captionMedium)
+                    .copyWith(color: AppColors.textSecondary),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    Widget nameAndTime = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (isMe && timeStr.isNotEmpty)
+          Padding(
+            padding: EdgeInsets.only(right: context.rs(6)),
+            child: Text(
+              timeStr,
+              style: AppFonts.scaled(context, AppFonts.captionRegular)
+                  .copyWith(color: AppColors.textSecondary),
+            ),
+          ),
+        Text(
+          displayName,
+          style: AppFonts.scaled(context, AppFonts.captionMedium)
+              .copyWith(color: AppColors.textDark),
+        ),
+        if (!isMe && timeStr.isNotEmpty)
+          Padding(
+            padding: EdgeInsets.only(left: context.rs(6)),
+            child: Text(
+              timeStr,
+              style: AppFonts.scaled(context, AppFonts.captionRegular)
+                  .copyWith(color: AppColors.textSecondary),
+            ),
+          ),
+      ],
+    );
+
+    Widget bubble = Container(
+      constraints: BoxConstraints(maxWidth: maxBubbleWidth),
+      padding: EdgeInsets.symmetric(
+        horizontal: context.rs(12),
+        vertical: context.rh(8),
+      ),
+      decoration: BoxDecoration(
+        color: isMe ? AppColors.primaryBlue : AppColors.border,
+        borderRadius: BorderRadius.circular(bubbleRadius),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (content.isNotEmpty)
+            Text(
+              content,
+              style: AppFonts.scaled(context, AppFonts.smallRegular)
+                  .copyWith(
+                      color: isMe ? AppColors.white : AppColors.textDark),
+            ),
+          if (content.isNotEmpty && (hasImage || hasVideo))
+            SizedBox(height: context.rh(8)),
+          if (hasImage)
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: maxBubbleWidth - 24,
+                  minHeight: 120,
+                  maxHeight: 240,
+                ),
+                child: Image.network(
+                  attachmentUrl!,
+                  fit: BoxFit.contain,
+                  loadingBuilder: (_, child, progress) =>
+                      progress == null
+                          ? child
+                          : Container(
+                              color: AppColors.border.withValues(alpha: 0.3),
+                              child: const Center(
+                                child: CupertinoActivityIndicator(),
+                              ),
+                            ),
+                  errorBuilder: (_, __, ___) => Container(
+                    padding: EdgeInsets.all(context.rs(12)),
+                    color: AppColors.border.withValues(alpha: 0.3),
+                    child: Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.broken_image_outlined,
+                            size: context.rs(32),
+                            color: AppColors.textSecondary,
+                          ),
+                          SizedBox(height: context.rh(4)),
+                          Text(
+                            '이미지를 불러올 수 없습니다',
+                            style: AppFonts.scaled(context, AppFonts.captionRegular)
+                                .copyWith(color: AppColors.textSecondary),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          if (hasVideo)
+            _buildVideoPreview(context, attachmentUrl!, maxBubbleWidth, isMe),
+        ],
+      ),
+    );
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: context.rh(12)),
+      child: Row(
+        mainAxisAlignment:
+            isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: isMe
+            ? [
+                Flexible(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      nameAndTime,
+                      SizedBox(height: context.rh(4)),
+                      bubble,
+                    ],
+                  ),
+                ),
+                SizedBox(width: context.rs(8)),
+                avatar,
+              ]
+            : [
+                avatar,
+                SizedBox(width: context.rs(8)),
+                Flexible(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      nameAndTime,
+                      SizedBox(height: context.rh(4)),
+                      bubble,
+                    ],
+                  ),
+                ),
+              ],
+      ),
     );
   }
 
@@ -357,34 +873,112 @@ class _ChatScreenState extends State<ChatScreen> {
       color: AppColors.white,
       child: SafeArea(
         top: false,
-        child: Row(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Expanded(
-              child: CupertinoTextField(
-                controller: _messageController,
-                placeholder: '메시지를 입력하세요',
-                textInputAction: TextInputAction.send,
-                onSubmitted: (_) => _send(),
-                padding: EdgeInsets.symmetric(
-                  horizontal: context.rs(14),
-                  vertical: context.rh(10),
-                ),
-                decoration: BoxDecoration(
-                  color: AppColors.background,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: AppColors.border),
+            if (_pickedImage != null || _pickedVideo != null)
+              Padding(
+                padding: EdgeInsets.only(bottom: context.rh(8)),
+                child: Row(
+                  children: [
+                    if (_pickedImage != null)
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.file(
+                          _pickedImage!,
+                          width: 64,
+                          height: 64,
+                          fit: BoxFit.cover,
+                        ),
+                      )
+                    else if (_pickedVideo != null)
+                      Container(
+                        width: 64,
+                        height: 64,
+                        decoration: BoxDecoration(
+                          color: AppColors.border,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(
+                          Icons.play_circle_fill,
+                          size: 32,
+                          color: AppColors.primaryBlue,
+                        ),
+                      ),
+                    SizedBox(width: context.rs(8)),
+                    GestureDetector(
+                      onTap: () => setState(() {
+                        _pickedImage = null;
+                        _pickedVideo = null;
+                      }),
+                      child: Icon(
+                        Icons.close,
+                        size: context.rs(24),
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ),
-            SizedBox(width: context.rs(8)),
-            CupertinoButton(
-              padding: EdgeInsets.zero,
-              onPressed: _send,
-              child: Icon(
-                CupertinoIcons.arrow_up_circle_fill,
-                color: AppColors.primaryBlue,
-                size: context.rs(36),
-              ),
+            Row(
+              children: [
+                CupertinoButton(
+                  padding: EdgeInsets.zero,
+                  onPressed: _sending ? null : _showAttachmentOptions,
+                  child: Icon(
+                    CupertinoIcons.paperclip,
+                    color: AppColors.textSecondary,
+                    size: context.rs(28),
+                  ),
+                ),
+                SizedBox(width: context.rs(4)),
+                Expanded(
+                  child: CupertinoTextField(
+                    controller: _messageController,
+                    placeholder: '메시지를 입력하세요...',
+                    textInputAction: TextInputAction.send,
+                    onSubmitted: (_) => _send(),
+                    enabled: !_sending,
+                    padding: EdgeInsets.symmetric(
+                      horizontal: context.rs(14),
+                      vertical: context.rh(10),
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.background,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                  ),
+                ),
+                SizedBox(width: context.rs(8)),
+                CupertinoButton(
+                  padding: EdgeInsets.zero,
+                  minSize: 0,
+                  onPressed: _sending
+                      ? null
+                      : () {
+                          FocusScope.of(context).unfocus();
+                          _send();
+                        },
+                  child: Container(
+                    width: context.rs(48),
+                    height: context.rs(48),
+                    alignment: Alignment.center,
+                    decoration: const BoxDecoration(
+                      color: AppColors.primaryBlue,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Transform.rotate(
+                      angle: -0.35,
+                      child: Icon(
+                        Icons.send_rounded,
+                        color: AppColors.white,
+                        size: context.rs(22),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ],
         ),

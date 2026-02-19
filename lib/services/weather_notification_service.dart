@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest_all.dart' as tz_data;
 
+import 'package:myapp/core/routing/app_router.dart';
 import 'package:myapp/services/weather_service.dart';
 
 /// 날씨 알림: 6시 30분에 현지 날씨를 반영한 알림 표시.
@@ -43,7 +45,13 @@ class WeatherNotificationService {
     );
     await _plugin.initialize(
       const InitializationSettings(android: android, iOS: ios),
-      onDidReceiveNotificationResponse: (_) {},
+      onDidReceiveNotificationResponse: (NotificationResponse response) {
+        final payload = response.payload;
+        if (payload == 'announcement') {
+          final ctx = rootNavigatorKey.currentContext;
+          if (ctx != null) GoRouter.of(ctx).go('/?tab=notice');
+        }
+      },
     );
 
     await _plugin

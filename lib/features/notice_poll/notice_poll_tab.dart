@@ -119,10 +119,11 @@ class _NoticePollTabState extends State<NoticePollTab>
             bottom: false,
             minimum: EdgeInsets.zero,
             child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: context.rs(22)),
+              padding: EdgeInsets.only(left: context.rs(16)),
               child: TabPageHeader(
                 title: '공지 / 투표',
                 subtitle: '공지사항과 투표를 확인하세요.',
+                contentPadding: EdgeInsets.zero,
               ),
             ),
           ),
@@ -132,7 +133,7 @@ class _NoticePollTabState extends State<NoticePollTab>
               child: Column(
                 children: [
                   Padding(
-                    padding: EdgeInsets.only(right: context.rs(16)),
+                    padding: EdgeInsets.symmetric(horizontal: context.rs(22)),
                     child: TabBar.secondary(
                       controller: _tabController,
                       indicatorColor: AppColors.primaryBlue500,
@@ -171,10 +172,11 @@ class _NoticePollTabState extends State<NoticePollTab>
         onRefresh: _fetchAnnouncements,
         color: Theme.of(context).colorScheme.primary,
         child: ListView.separated(
-          padding: EdgeInsets.only(
-            right: context.rs(22),
-            top: context.rh(16),
-            bottom: context.rh(16),
+          padding: EdgeInsets.fromLTRB(
+            context.rs(22),
+            context.rh(16),
+            context.rs(22),
+            context.rh(16),
           ),
           itemCount: _announcements.length,
           separatorBuilder: (_, __) => Divider(height: 1),
@@ -219,10 +221,11 @@ class _NoticePollTabState extends State<NoticePollTab>
       onRetry: _fetchPolls,
       emptyMessage: '투표가 없습니다.',
       child: ListView.separated(
-        padding: EdgeInsets.only(
-          right: context.rs(22),
-          top: context.rh(16),
-          bottom: context.rh(16),
+        padding: EdgeInsets.fromLTRB(
+          context.rs(22),
+          context.rh(16),
+          context.rs(22),
+          context.rh(16),
         ),
         itemCount: _polls.length,
         separatorBuilder: (_, __) => Divider(height: 1),
