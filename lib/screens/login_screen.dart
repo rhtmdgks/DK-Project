@@ -213,19 +213,51 @@ class _LoginScreenState extends State<LoginScreen> {
       print('Email: $email');
       print('Password length: ${password.length}');
       
-      // 2. 세션 생성을 위해 signInWithPassword 시도 (실패해도 계속 진행)
+      // 2. 세션 생성을 위해 signInWithPassword 시도
+      // 백오피스 Auth 변경사항: 모든 사용자가 auth.users에 존재하므로 성공해야 함
       bool sessionCreated = false;
       try {
-        final authResponse = await supabase.auth.signInWithPassword(
-          email: email,
-          password: password,
-        );
-        print('=== SUPABASE AUTH SUCCESS ===');
-        print('Auth response: $authResponse');
-        print('User ID: ${authResponse.user?.id}');
-        print('User email: ${authResponse.user?.email}');
-        print('Session: ${authResponse.session != null}');
-        sessionCreated = true;
+        // 먼저 기본 이메일 형식 시도 (${studentId}@school.local)
+        try {
+          final authResponse = await supabase.auth.signInWithPassword(
+            email: email,
+            password: password,
+          );
+          print('=== SUPABASE AUTH SUCCESS (기본 이메일) ===');
+          print('Auth response: $authResponse');
+          print('User ID: ${authResponse.user?.id}');
+          print('User email: ${authResponse.user?.email}');
+          print('Session: ${authResponse.session != null}');
+          sessionCreated = true;
+        } catch (firstError) {
+          // 기본 이메일 실패 시 백오피스 형식 시도 (${username}-${profileId}@laon.local)
+          final profileId = profileData['id'] as String?;
+          if (profileId != null) {
+            final backofficeEmail = '$studentId-$profileId@laon.local';
+            print('기본 이메일 실패, 백오피스 형식 시도: $backofficeEmail');
+            try {
+              final authResponse = await supabase.auth.signInWithPassword(
+                email: backofficeEmail,
+                password: password,
+              );
+              print('=== SUPABASE AUTH SUCCESS (백오피스 이메일) ===');
+              print('Auth response: $authResponse');
+              print('User ID: ${authResponse.user?.id}');
+              print('User email: ${authResponse.user?.email}');
+              print('Session: ${authResponse.session != null}');
+              print('사용된 이메일: $backofficeEmail');
+              sessionCreated = true;
+            } catch (secondError) {
+              // 두 형식 모두 실패
+              print('=== SUPABASE AUTH ERROR (모든 형식 실패) ===');
+              print('First Error: $firstError');
+              print('Second Error: $secondError');
+              throw secondError;
+            }
+          } else {
+            throw firstError;
+          }
+        }
       } catch (authError, authStack) {
         print('=== SUPABASE AUTH ERROR (continuing anyway) ===');
         print('Auth Error: $authError');
@@ -244,8 +276,10 @@ class _LoginScreenState extends State<LoginScreen> {
           print('Auth error toString: ${authError.toString()}');
         } catch (_) {}
         
-        // 세션 생성 실패해도 프로필 정보가 있으므로 계속 진행
+        // 백오피스 변경사항: auth.users에 사용자가 있어야 하므로
+        // 세션 생성 실패는 예상치 못한 상황이지만, 프로필 정보가 있으므로 계속 진행
         print('Session creation failed, but continuing with profile data from RPC');
+        print('Note: 백오피스에서 auth.users를 생성했어야 하는데 실패했습니다.');
         sessionCreated = false;
       }
 
