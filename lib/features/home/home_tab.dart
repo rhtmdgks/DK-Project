@@ -7,13 +7,14 @@ import 'package:myapp/core/routing/app_router.dart';
 import 'package:myapp/core/theme/app_theme.dart';
 import 'package:myapp/core/theme/responsive.dart';
 import 'package:myapp/core/widgets/laon_icon.dart';
+import 'package:myapp/widgets/notification_side_sheet.dart';
 
 /// Figma "App Wireframes > HOME" (node 296:5429) 홈 대시보드 탭.
 ///
 /// 구성:
 /// 1. 커스텀 앱바 (LAON 로고 + 알림/설정 아이콘)
 /// 2. 프로필 인사말
-/// 3. 오늘의 수업 (수평 스크롤 카드)
+/// 3. 오늘의 수업 (Material 3 카드)
 /// 4. 다음 시간 과목 (상세 정보 카드)
 class HomeTab extends StatefulWidget {
   const HomeTab({super.key});
@@ -24,26 +25,28 @@ class HomeTab extends StatefulWidget {
 
 class _HomeTabState extends State<HomeTab> {
   String? _fullName;
+  String? _avatarUrl;
   bool _loading = true;
 
-  /// 샘플 오늘의 수업 데이터 (추후 API 연동 시 교체)
+
+  /// 샘플 오늘의 수업 데이터 (추후 API 연동 시 교체). 아이콘은 Material 3 Icons.
   static const _todayClasses = [
-    _SubjectCard(name: '수학Ⅱ', iconAsset: 'assets/images/icon_math_formula.svg'),
-    _SubjectCard(name: '수학Ⅱ', iconAsset: 'assets/images/icon_math_formula.svg'),
-    _SubjectCard(name: '화학 I', iconAsset: 'assets/images/icon_h2o.svg'),
-    _SubjectCard(name: '국어', iconAsset: null),
-    _SubjectCard(name: '영어', iconAsset: null),
+    _SubjectCard(name: '수학Ⅱ', icon: Icons.calculate_outlined, period: 1),
+    _SubjectCard(name: '수학Ⅱ', icon: Icons.calculate_outlined, period: 2),
+    _SubjectCard(name: '생명과학', icon: Icons.science_outlined, period: 3),
+    _SubjectCard(name: '국어', icon: Icons.menu_book_outlined, period: 4),
+    _SubjectCard(name: '영어', icon: Icons.translate, period: 5),
   ];
 
   /// 샘플 다음 시간 과목 데이터
   static const _nextClass = _NextClassInfo(
-    name: '화학 I',
+    name: '생명과학',
     period: 3,
-    location: '2층 창의융합실',
+    location: '2-10',
     time: '10:30',
-    teacher: '이은하 선생님',
+    teacher: '오신영 선생님',
     notice: '수행평가가 예정되어있어요!',
-    iconAsset: 'assets/images/icon_h2o.svg',
+    icon: Icons.science_outlined,
   );
 
   @override
@@ -52,12 +55,18 @@ class _HomeTabState extends State<HomeTab> {
     _loadProfile();
   }
 
+  @override
+  void dispose() {
+    super.dispose();
+  }
+
   Future<void> _loadProfile() async {
     try {
       final profile = await getCurrentProfile();
       if (!mounted) return;
       setState(() {
         _fullName = profile?.fullName;
+        _avatarUrl = profile?.avatarUrl;
         _loading = false;
       });
     } catch (_) {
@@ -73,17 +82,21 @@ class _HomeTabState extends State<HomeTab> {
       child: RefreshIndicator(
         onRefresh: _loadProfile,
         child: _loading
-            ? const Center(child: CupertinoActivityIndicator(radius: 12))
+            ? Center(
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+              )
             : ListView(
                 padding: EdgeInsets.zero,
                 children: [
                   _buildAppBar(),
+                  SizedBox(height: context.rh(24)),
                   _buildGreeting(),
-                  SizedBox(height: context.rh(16)),
+                  SizedBox(height: context.rh(28)),
                   _buildTodayClassesSection(),
-                  SizedBox(height: context.rh(8)),
-                  _buildDivider(),
-                  SizedBox(height: context.rh(8)),
+                  SizedBox(height: context.rh(24)),
                   _buildNextClassSection(),
                   SizedBox(height: context.rh(32)),
                 ],
@@ -111,9 +124,7 @@ class _HomeTabState extends State<HomeTab> {
           const Spacer(),
           _buildIconButton(
             'assets/images/icon_bell.svg',
-            onTap: () {
-              // TODO: 알림 화면 이동
-            },
+            onTap: () => showNotificationSideSheet(context),
           ),
           SizedBox(width: context.rs(28)),
           _buildIconButton(
@@ -148,7 +159,7 @@ class _HomeTabState extends State<HomeTab> {
 
   Widget _buildGreeting() {
     final name = _fullName ?? '학생';
-    final avatarSize = context.rmin(48);
+    final avatarSize = context.rmin(64);
 
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: context.rs(22)),
@@ -173,13 +184,27 @@ class _HomeTabState extends State<HomeTab> {
                 ),
               ],
             ),
-            child: Icon(
-              CupertinoIcons.person_fill,
-              size: context.rmin(28),
-              color: AppColors.primaryBlue500,
+            child: ClipOval(
+              child: _avatarUrl != null && _avatarUrl!.isNotEmpty
+                  ? SvgPicture.network(
+                      _avatarUrl!,
+                      width: avatarSize,
+                      height: avatarSize,
+                      fit: BoxFit.contain,
+                      placeholderBuilder: (context) => Icon(
+                        CupertinoIcons.person_fill,
+                        size: context.rmin(36),
+                        color: AppColors.primaryBlue500,
+                      ),
+                    )
+                  : Icon(
+                      CupertinoIcons.person_fill,
+                      size: context.rmin(36),
+                      color: AppColors.primaryBlue500,
+                    ),
             ),
           ),
-          SizedBox(width: context.rs(19)),
+          SizedBox(width: context.rs(12)),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -219,28 +244,33 @@ class _HomeTabState extends State<HomeTab> {
                 style: AppFonts.scaled(context, AppFonts.sectionTitle),
               ),
               const Spacer(),
-              GestureDetector(
-                onTap: () {
-                  // TODO: 전체 시간표 화면 이동
-                },
-                child: Container(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: context.rs(12),
-                    vertical: context.rh(6),
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppColors.primaryBlue500.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    '더보기',
-                    style: AppFonts.scaled(
-                      context,
-                      AppFonts.display3Medium,
-                    ).copyWith(
-                      color: AppColors.primaryBlue500,
-                      fontWeight: FontWeight.w600,
-                      fontSize: context.rs(14),
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () => context.push(AppRoute.todayClasses.path),
+                  borderRadius: AppShapes.borderRadiusExtraLarge,
+                  child: Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: context.rs(14),
+                      vertical: context.rh(8),
+                    ),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context)
+                          .colorScheme
+                          .primaryContainer
+                          .withValues(alpha: 0.6),
+                      borderRadius: AppShapes.borderRadiusExtraLarge,
+                    ),
+                    child: Text(
+                      '더보기',
+                      style: AppFonts.scaled(
+                        context,
+                        AppFonts.display3Medium,
+                      ).copyWith(
+                        color: Theme.of(context).colorScheme.primary,
+                        fontWeight: FontWeight.w600,
+                        fontSize: context.rs(14),
+                      ),
                     ),
                   ),
                 ),
@@ -257,112 +287,98 @@ class _HomeTabState extends State<HomeTab> {
           ),
         ),
         SizedBox(height: context.rh(16)),
-        _buildClassCardsList(),
+        _buildTodayClassesList(),
       ],
     );
   }
 
-  Widget _buildClassCardsList() {
-    final cardWidth = context.rs(179);
-    final cardHeight = context.rh(140);
-    final iconSize = context.rmin(49);
+  /// 오늘의 수업 리스트 (가로 스크롤)
+  static const double _cardSquareSize = 160;
+
+  Widget _buildTodayClassesList() {
+    return SizedBox(
+      height: _cardSquareSize,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        padding: EdgeInsets.symmetric(horizontal: context.rs(22)),
+        itemCount: _todayClasses.length,
+        itemBuilder: (context, index) {
+          return Padding(
+            padding: EdgeInsets.only(
+              right: index < _todayClasses.length - 1 ? context.rs(12) : 0,
+            ),
+            child: _buildTodayClassCard(_todayClasses[index]),
+          );
+        },
+      ),
+    );
+  }
+
+  /// M2 스타일 정사각형 카드. Card + elevation, 교시 + 과목 아이콘 + 이름.
+  Widget _buildTodayClassCard(_SubjectCard subject) {
+    const double size = _cardSquareSize;
+    final theme = Theme.of(context);
 
     return SizedBox(
-      height: cardHeight,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: EdgeInsets.symmetric(horizontal: context.rs(23)),
-        itemCount: _todayClasses.length,
-        separatorBuilder: (_, __) => SizedBox(width: context.rs(17)),
-        itemBuilder: (_, index) {
-          final subject = _todayClasses[index];
-          return Container(
-            width: cardWidth,
-            height: cardHeight,
-            decoration: BoxDecoration(
-              color: AppColors.white,
-              borderRadius: BorderRadius.circular(context.rs(20)),
-              border: Border.all(color: AppColors.borderLight),
-              boxShadow: const [
-                BoxShadow(
-                  color: AppColors.cardShadow,
-                  offset: Offset(0, 4),
-                  blurRadius: 12,
+      width: size,
+      height: size,
+      child: Card(
+        elevation: 2,
+        shadowColor: theme.colorScheme.shadow.withValues(alpha: 0.2),
+        shape: RoundedRectangleBorder(
+          borderRadius: AppShapes.borderRadiusLarge,
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () {},
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primaryContainer.withValues(alpha: 0.6),
+                    borderRadius: AppShapes.borderRadiusSmall,
+                  ),
+                  child: Text(
+                    '${subject.period}교시',
+                    style: AppFonts.scaled(context, AppFonts.display3Medium).copyWith(
+                      color: theme.colorScheme.onPrimaryContainer,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primaryContainer.withValues(alpha: 0.5),
+                    borderRadius: AppShapes.borderRadiusMedium,
+                  ),
+                  alignment: Alignment.center,
+                  child: Icon(
+                    subject.icon,
+                    size: 32,
+                    color: theme.colorScheme.primary,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  subject.name,
+                  style: AppFonts.scaled(context, AppFonts.display3SemiBold).copyWith(
+                    color: AppColors.textPrimary,
+                  ),
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(context.rs(20)),
-              child: Stack(
-                children: [
-                  Positioned(
-                    left: 0,
-                    right: 0,
-                    top: 0,
-                    height: cardHeight * 0.5,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            AppColors.primaryBlue500.withOpacity(0.15),
-                            AppColors.timetableBg,
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  if (subject.iconAsset != null)
-                  Positioned(
-                    top: cardHeight * 0.2,
-                    left: 0,
-                    right: 0,
-                    child: Center(
-                      child: SvgPicture.asset(
-                        subject.iconAsset!,
-                        width: iconSize,
-                        height: iconSize,
-                        fit: BoxFit.contain,
-                      ),
-                    ),
-                  )
-                else
-                  Positioned(
-                    top: cardHeight * 0.25,
-                    left: 0,
-                    right: 0,
-                    child: Center(
-                      child: Text(
-                        subject.name.substring(0, 1),
-                        style: TextStyle(
-                          fontFamily: AppFonts.fontFamily,
-                          fontSize: context.rs(32),
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.primaryBlue500,
-                        ),
-                      ),
-                    ),
-                  ),
-                Positioned(
-                  bottom: context.rh(12),
-                  left: 0,
-                  right: 0,
-                  child: Center(
-                    child: Text(
-                      subject.name,
-                      style: AppFonts.scaled(
-                        context,
-                        AppFonts.display3SemiBold,
-                      ).copyWith(color: AppColors.textPrimary),
-                    ),
-                  ),
-                ),
-                ],
-              ),
-            ),
-          );
-        },
+          ),
+        ),
       ),
     );
   }
@@ -407,8 +423,9 @@ class _HomeTabState extends State<HomeTab> {
   }
 
   Widget _buildNextClassCard(_NextClassInfo info) {
-    final iconAreaWidth = context.rs(77);
+    final iconSize = context.rs(48);
     final infoIconSize = context.rs(20);
+    final theme = Theme.of(context);
 
     return Container(
       width: double.infinity,
@@ -417,12 +434,12 @@ class _HomeTabState extends State<HomeTab> {
         vertical: context.rh(22),
       ),
       decoration: BoxDecoration(
-        color: AppColors.textPrimary,
-        borderRadius: BorderRadius.circular(context.rs(20)),
-        boxShadow: const [
+        color: theme.colorScheme.inverseSurface,
+        borderRadius: AppShapes.borderRadiusLarge,
+        boxShadow: [
           BoxShadow(
-            color: AppColors.cardShadow,
-            offset: Offset(0, 6),
+            color: theme.colorScheme.shadow.withValues(alpha: 0.08),
+            offset: const Offset(0, 6),
             blurRadius: 16,
             spreadRadius: 0,
           ),
@@ -441,7 +458,7 @@ class _HomeTabState extends State<HomeTab> {
                   style: AppFonts.scaled(
                     context,
                     AppFonts.titleSemiBold,
-                  ).copyWith(color: AppColors.background),
+                  ).copyWith(color: theme.colorScheme.onInverseSurface),
                 ),
                 SizedBox(height: context.rh(2)),
                 Text(
@@ -449,52 +466,56 @@ class _HomeTabState extends State<HomeTab> {
                   style: AppFonts.scaled(
                     context,
                     AppFonts.display3Light,
-                  ),
+                  ).copyWith(color: theme.colorScheme.onInverseSurface),
                 ),
                 SizedBox(height: context.rh(14)),
                 _buildInfoRow(
-                  'assets/images/icon_clock.svg',
+                  context,
+                  Icons.schedule_outlined,
                   info.time,
                   infoIconSize,
                 ),
                 SizedBox(height: context.rh(8)),
                 _buildInfoRow(
-                  'assets/images/icon_user.svg',
+                  context,
+                  Icons.person_outline,
                   info.teacher,
                   infoIconSize,
                 ),
                 SizedBox(height: context.rh(8)),
                 _buildInfoRow(
-                  'assets/images/icon_clipboard.svg',
+                  context,
+                  Icons.assignment_outlined,
                   info.notice,
                   infoIconSize,
                 ),
               ],
             ),
           ),
-          // 오른쪽: 과목 일러스트
-          if (info.iconAsset != null)
-            SizedBox(
-              width: iconAreaWidth,
-              child: SvgPicture.asset(
-                info.iconAsset!,
-                width: iconAreaWidth,
-                fit: BoxFit.contain,
-              ),
+          // 오른쪽: 과목 아이콘 (영역 축소해 notice 한 줄 유지)
+          SizedBox(
+            width: iconSize,
+            height: iconSize,
+            child: Icon(
+              info.icon,
+              size: iconSize,
+              color: theme.colorScheme.onInverseSurface.withValues(alpha: 0.9),
             ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildInfoRow(String iconPath, String text, double iconSize) {
+  Widget _buildInfoRow(
+      BuildContext context, IconData icon, String text, double iconSize) {
+    final theme = Theme.of(context);
     return Row(
       children: [
-        SvgPicture.asset(
-          iconPath,
-          width: iconSize,
-          height: iconSize,
-          fit: BoxFit.contain,
+        Icon(
+          icon,
+          size: iconSize,
+          color: theme.colorScheme.onInverseSurface.withValues(alpha: 0.85),
         ),
         SizedBox(width: context.rs(10)),
         Expanded(
@@ -503,7 +524,7 @@ class _HomeTabState extends State<HomeTab> {
             style: AppFonts.scaled(
               context,
               AppFonts.display3Regular,
-            ).copyWith(color: AppColors.background),
+            ).copyWith(color: theme.colorScheme.onInverseSurface),
           ),
         ),
       ],
@@ -525,15 +546,17 @@ class _HomeTabState extends State<HomeTab> {
   }
 }
 
-/// 오늘의 수업 카드 데이터.
+/// 오늘의 수업 카드 데이터. [icon]은 Material 3 Icons.
 class _SubjectCard {
   const _SubjectCard({
     required this.name,
-    required this.iconAsset,
+    required this.icon,
+    required this.period,
   });
 
   final String name;
-  final String? iconAsset;
+  final IconData icon;
+  final int period;
 }
 
 /// 다음 시간 과목 상세 정보 데이터.
@@ -545,7 +568,7 @@ class _NextClassInfo {
     required this.time,
     required this.teacher,
     required this.notice,
-    this.iconAsset,
+    required this.icon,
   });
 
   final String name;
@@ -554,5 +577,5 @@ class _NextClassInfo {
   final String time;
   final String teacher;
   final String notice;
-  final String? iconAsset;
+  final IconData icon;
 }

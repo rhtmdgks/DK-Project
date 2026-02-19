@@ -144,13 +144,16 @@ class _LoginScreenState extends State<LoginScreen> {
                         vertical: context.rh(28),
                       ),
                       decoration: BoxDecoration(
-                        color: AppColors.white,
-                        borderRadius: BorderRadius.circular(20),
+                        color: Theme.of(context).colorScheme.surface,
+                        borderRadius: AppShapes.borderRadiusLarge,
                         border: Border.all(color: AppColors.borderLight),
-                        boxShadow: const [
+                        boxShadow: [
                           BoxShadow(
-                            color: AppColors.cardShadow,
-                            offset: Offset(0, 4),
+                            color: Theme.of(context)
+                                .colorScheme
+                                .shadow
+                                .withValues(alpha: 0.08),
+                            offset: const Offset(0, 4),
                             blurRadius: 12,
                             spreadRadius: 0,
                           ),
@@ -215,8 +218,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                 vertical: context.rh(10),
                               ),
                               decoration: BoxDecoration(
-                                color: AppColors.error.withOpacity(0.08),
-                                borderRadius: BorderRadius.circular(10),
+                                color: AppColors.error.withValues(alpha: 0.08),
+                                borderRadius: AppShapes.borderRadiusSmall,
                               ),
                               child: Text(
                                 _error!,
@@ -264,17 +267,15 @@ class _LoginScreenState extends State<LoginScreen> {
     ValueChanged<String>? onSubmitted,
     Widget? suffixIcon,
   }) {
-    final radius = context.rs(14);
-
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.background,
-        borderRadius: BorderRadius.circular(radius),
+        color: Theme.of(context).colorScheme.surfaceContainerLowest,
+        borderRadius: AppShapes.borderRadiusMedium,
         border: Border.all(color: AppColors.border),
-        boxShadow: const [
+        boxShadow: [
           BoxShadow(
-            color: AppColors.cardShadow,
-            offset: Offset(0, 1),
+            color: Theme.of(context).colorScheme.shadow.withValues(alpha: 0.04),
+            offset: const Offset(0, 1),
             blurRadius: 3,
           ),
         ],
@@ -303,8 +304,8 @@ class _LoginScreenState extends State<LoginScreen> {
                 vertical: context.rh(14),
               ),
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(radius),
-                color: AppColors.background,
+                borderRadius: AppShapes.borderRadiusMedium,
+                color: Colors.transparent,
               ),
             ),
           ),
@@ -320,31 +321,28 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Widget _buildLoginButton() {
     final active = _canSubmit && !_loading;
+    final theme = Theme.of(context);
 
-    return Container(
+    return SizedBox(
       width: double.infinity,
       height: context.rh(52),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: active
-            ? const [
-                BoxShadow(
-                  color: AppColors.buttonShadow,
-                  offset: Offset(0, 4),
-                  blurRadius: 12,
-                  spreadRadius: 0,
-                ),
-              ]
-            : null,
-      ),
-      child: CupertinoButton(
-        padding: EdgeInsets.zero,
-        borderRadius: BorderRadius.circular(14),
-        color: active ? AppColors.primaryBlue : AppColors.textSecondary,
-        disabledColor: AppColors.textSecondary,
+      child: FilledButton(
         onPressed: active ? _submit : null,
+        style: FilledButton.styleFrom(
+          shape: RoundedRectangleBorder(
+            borderRadius: AppShapes.borderRadiusMedium,
+          ),
+          elevation: active ? 0 : 0,
+        ),
         child: _loading
-            ? const CupertinoActivityIndicator(color: AppColors.white)
+            ? SizedBox(
+                height: context.rh(24),
+                width: context.rh(24),
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: theme.colorScheme.onPrimary,
+                ),
+              )
             : Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 mainAxisSize: MainAxisSize.min,
@@ -353,15 +351,15 @@ class _LoginScreenState extends State<LoginScreen> {
                     '로그인하기',
                     style: AppFonts.scaled(context, AppFonts.bodyMedium)
                         .copyWith(
-                      color: AppColors.white,
+                      color: theme.colorScheme.onPrimary,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
                   SizedBox(width: context.rs(6)),
                   Icon(
-                    CupertinoIcons.arrow_right,
+                    Icons.arrow_forward_rounded,
                     size: context.rs(18),
-                    color: AppColors.white,
+                    color: theme.colorScheme.onPrimary,
                   ),
                 ],
               ),

@@ -6,6 +6,20 @@ import 'package:myapp/core/supabase_client.dart';
 import 'package:myapp/core/theme/app_theme.dart';
 import 'package:myapp/core/theme/responsive.dart';
 import 'package:myapp/core/widgets/async_body.dart';
+import 'package:myapp/core/widgets/m3_list.dart';
+import 'package:myapp/core/widgets/tab_page_header.dart';
+
+/// [createdAt] ISO 문자열을 "2월 18일" 형식으로 포맷.
+String _formatDate(String? createdAt) {
+  if (createdAt == null || createdAt.isEmpty) return '';
+  try {
+    final dt = DateTime.parse(createdAt);
+    const months = ['1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월', '9월', '10월', '11월', '12월'];
+    return '${months[dt.month - 1]} ${dt.day}일';
+  } catch (_) {
+    return '';
+  }
+}
 
 /// 공지/투표 탭. 반응형 대응.
 ///
@@ -17,8 +31,9 @@ class NoticePollTab extends StatefulWidget {
   State<NoticePollTab> createState() => _NoticePollTabState();
 }
 
-class _NoticePollTabState extends State<NoticePollTab> {
-  int _segmentIndex = 0;
+class _NoticePollTabState extends State<NoticePollTab>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabController;
 
   bool _loadingAnnouncements = false;
   bool _loadingPolls = false;
@@ -30,8 +45,15 @@ class _NoticePollTabState extends State<NoticePollTab> {
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
     _fetchAnnouncements();
     _fetchPolls();
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
   }
 
   Future<void> _fetchAnnouncements() async {
@@ -90,51 +112,50 @@ class _NoticePollTabState extends State<NoticePollTab> {
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
       backgroundColor: AppColors.background,
-      navigationBar: CupertinoNavigationBar(
-        backgroundColor: AppColors.white,
-        border: null,
-        middle: Text(
-          '공지 / 투표',
-          style: AppFonts.scaled(context, AppFonts.titleSemiBold)
-              .copyWith(color: AppColors.textDark),
-        ),
-        trailing: CupertinoButton(
-          padding: EdgeInsets.zero,
-          onPressed: () => context.push(AppRoute.chatList.path),
-          child: const Text('채팅'),
-        ),
-      ),
-      child: Material(
-        type: MaterialType.transparency,
-        child: Column(
-          children: [
-          Padding(
-            padding: EdgeInsets.symmetric(
-              horizontal: context.rs(16),
-              vertical: context.rh(8),
-            ),
-            child: CupertinoSegmentedControl<int>(
-              groupValue: _segmentIndex,
-              children: const {
-                0: Padding(
-                  padding: EdgeInsets.symmetric(vertical: 10),
-                  child: Text('공지사항'),
-                ),
-                1: Padding(
-                  padding: EdgeInsets.symmetric(vertical: 10),
-                  child: Text('투표'),
-                ),
-              },
-              onValueChanged: (v) => setState(() => _segmentIndex = v),
+      child: Column(
+        children: [
+          SafeArea(
+            top: true,
+            bottom: false,
+            minimum: EdgeInsets.zero,
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: context.rs(22)),
+              child: TabPageHeader(
+                title: '공지 / 투표',
+                subtitle: '공지사항과 투표를 확인하세요.',
+              ),
             ),
           ),
           Expanded(
-            child: _segmentIndex == 0
-                ? _buildAnnouncementsBody()
-                : _buildPollsBody(),
+            child: Material(
+              type: MaterialType.transparency,
+              child: Column(
+                children: [
+                  Padding(
+                    padding: EdgeInsets.only(right: context.rs(16)),
+                    child: TabBar.secondary(
+                      controller: _tabController,
+                      indicatorColor: AppColors.primaryBlue500,
+                      tabs: const [
+                        Tab(text: '공지사항'),
+                        Tab(text: '투표'),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: TabBarView(
+                      controller: _tabController,
+                      children: [
+                        _buildAnnouncementsBody(),
+                        _buildPollsBody(),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ],
-        ),
       ),
     );
   }
@@ -146,42 +167,46 @@ class _NoticePollTabState extends State<NoticePollTab> {
       isEmpty: _announcements.isEmpty,
       onRetry: _fetchAnnouncements,
       emptyMessage: '공지사항이 없습니다.',
-      child: ListView.builder(
-        padding: context.horizontalPadding.copyWith(
-          top: context.rh(16),
-          bottom: context.rh(16),
+      child: RefreshIndicator(
+        onRefresh: _fetchAnnouncements,
+        color: Theme.of(context).colorScheme.primary,
+        child: ListView.separated(
+          padding: EdgeInsets.only(
+            right: context.rs(22),
+            top: context.rh(16),
+            bottom: context.rh(16),
+          ),
+          itemCount: _announcements.length,
+          separatorBuilder: (_, __) => Divider(height: 1),
+          itemBuilder: (context, i) {
+            final a = _announcements[i];
+            final title = a['title'] as String? ?? '';
+            final body = a['body'] as String? ?? '';
+            final dateStr = _formatDate(a['created_at'] as String?);
+            return M3ListTileInbox(
+              title: title.isEmpty ? '(제목 없음)' : title,
+              subtitle: body.isEmpty ? null : body,
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (dateStr.isNotEmpty)
+                    Text(
+                      dateStr,
+                      style: AppFonts.scaled(context, AppFonts.captionRegular),
+                    ),
+                  SizedBox(width: context.rs(4)),
+                  Icon(Icons.chevron_right, size: context.rs(20), color: AppColors.hint),
+                ],
+              ),
+              onTap: () => showM3DetailSheet(
+                context,
+                title: title.isEmpty ? '(제목 없음)' : title,
+                body: body.isEmpty ? '내용 없음' : body,
+                secondary: dateStr,
+              ),
+            );
+          },
         ),
-        itemCount: _announcements.length,
-        itemBuilder: (context, i) {
-          final a = _announcements[i];
-          return Container(
-            margin: EdgeInsets.only(bottom: context.rh(8)),
-            decoration: BoxDecoration(
-              color: AppColors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.borderLight),
-            ),
-            padding: EdgeInsets.symmetric(
-              horizontal: context.rs(16),
-              vertical: context.rh(12),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  a['title'] as String? ?? '',
-                  style: AppFonts.scaled(context, AppFonts.bodyMedium),
-                ),
-                SizedBox(height: context.rh(4)),
-                Text(
-                  a['body'] as String? ?? '',
-                  style: AppFonts.scaled(context, AppFonts.smallRegular),
-                ),
-              ],
-            ),
-          );
-        },
       ),
     );
   }
@@ -193,18 +218,69 @@ class _NoticePollTabState extends State<NoticePollTab> {
       isEmpty: _polls.isEmpty,
       onRetry: _fetchPolls,
       emptyMessage: '투표가 없습니다.',
-      child: ListView.builder(
-        padding: context.horizontalPadding.copyWith(
+      child: ListView.separated(
+        padding: EdgeInsets.only(
+          right: context.rs(22),
           top: context.rh(16),
           bottom: context.rh(16),
         ),
         itemCount: _polls.length,
+        separatorBuilder: (_, __) => Divider(height: 1),
         itemBuilder: (context, i) {
-          return _PollCard(
-            poll: _polls[i],
-            onVote: _fetchPolls,
+          final poll = _polls[i];
+          final question = poll['question'] as String? ?? '';
+          final options = poll['options'] as List<dynamic>? ?? [];
+          final optionCount = options.length;
+          return M3ListTileInbox(
+            title: question.isEmpty ? '(투표)' : question,
+            subtitle: optionCount > 0 ? '$optionCount개 선택지' : null,
+            trailing: Icon(Icons.chevron_right, size: context.rs(20), color: AppColors.hint),
+            onTap: () => _showPollDetail(context, poll),
           );
         },
+      ),
+    );
+  }
+
+  void _showPollDetail(BuildContext context, Map<String, dynamic> poll) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        decoration: BoxDecoration(
+          color: Theme.of(ctx).colorScheme.surface,
+          borderRadius: BorderRadius.vertical(
+            top: Radius.circular(AppShapes.radiusLarge),
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(height: context.rh(12)),
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.border,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Flexible(
+              child: SingleChildScrollView(
+                padding: EdgeInsets.all(context.rs(16)),
+                child: _PollCard(
+                  poll: poll,
+                  onVote: () {
+                    _fetchPolls();
+                    if (ctx.mounted) Navigator.of(ctx).pop();
+                  },
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -296,11 +372,18 @@ class _PollCardState extends State<_PollCard> {
         options.map((e) => e is String ? e : e.toString()).toList();
 
     return Container(
-      margin: EdgeInsets.only(bottom: context.rh(8)),
+      margin: EdgeInsets.only(bottom: context.rh(12)),
       decoration: BoxDecoration(
         color: AppColors.white,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.borderLight),
+        boxShadow: const [
+          BoxShadow(
+            color: AppColors.cardShadow,
+            offset: Offset(0, 2),
+            blurRadius: 8,
+          ),
+        ],
       ),
       padding: EdgeInsets.all(context.rs(16)),
       child: Column(
@@ -319,30 +402,37 @@ class _PollCardState extends State<_PollCard> {
                       .copyWith(color: AppColors.error),
                 ),
               ),
-            RadioGroup<int>(
-              groupValue: _selectedIndex ?? -1,
-              onChanged: (int? v) {
-                if (!_voted) setState(() => _selectedIndex = v);
-              },
+            Theme(
+              data: Theme.of(context).copyWith(
+                radioTheme: RadioThemeData(
+                  fillColor: WidgetStateProperty.resolveWith<Color>((states) {
+                    if (states.contains(WidgetState.selected)) {
+                      return AppColors.primaryBlue;
+                    }
+                    return AppColors.textSecondary;
+                  }),
+                ),
+              ),
               child: Column(
                 children: optionsList.asMap().entries.map((e) {
                   final idx = e.key;
                   final opt = e.value;
                   return Padding(
                     padding: EdgeInsets.only(top: context.rh(8)),
-                    child: ListTile(
+                    child: RadioListTile<int>(
+                      value: idx,
+                      groupValue: _selectedIndex ?? -1,
+                      onChanged: _voted
+                          ? null
+                          : (int? v) {
+                              if (v != null) setState(() => _selectedIndex = v);
+                            },
                       title: Text(
                         opt,
-                        style:
-                            AppFonts.scaled(context, AppFonts.smallMedium),
+                        style: AppFonts.scaled(context, AppFonts.smallMedium),
                       ),
-                      leading: Radio<int>(
-                        value: idx,
-                        enabled: !_voted,
-                      ),
-                      onTap: _voted
-                          ? null
-                          : () => setState(() => _selectedIndex = idx),
+                      contentPadding: EdgeInsets.zero,
+                      dense: true,
                     ),
                   );
                 }).toList(),

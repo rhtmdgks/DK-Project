@@ -86,6 +86,8 @@ class _ChatListScreenState extends State<ChatListScreen> {
     return CupertinoPageScaffold(
       backgroundColor: AppColors.background,
       navigationBar: CupertinoNavigationBar(
+        heroTag: 'nav-chat-list',
+        transitionBetweenRoutes: true,
         backgroundColor: AppColors.white,
         border: null,
         leading: CupertinoButton(

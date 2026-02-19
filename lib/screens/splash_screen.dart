@@ -4,6 +4,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:myapp/core/routing/app_router.dart';
+import 'package:myapp/core/theme/app_motion.dart';
 import 'package:myapp/core/theme/app_theme.dart';
 import 'package:myapp/core/theme/responsive.dart';
 import 'package:myapp/core/widgets/laon_icon.dart';
@@ -21,7 +22,6 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen>
     with SingleTickerProviderStateMixin {
-  static const _animationDuration = Duration(milliseconds: 800);
   static const _navigationDelay = Duration(milliseconds: 2200);
 
   late final AnimationController _controller;
@@ -33,11 +33,11 @@ class _SplashScreenState extends State<SplashScreen>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: _animationDuration,
+      duration: AppMotion.emphasisDuration,
     );
     _fadeScale = CurvedAnimation(
       parent: _controller,
-      curve: Curves.easeOutCubic,
+      curve: AppMotion.emphasisCurve,
     );
     _controller.forward();
 

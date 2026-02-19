@@ -6,6 +6,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:myapp/core/supabase_client.dart';
+import 'package:myapp/core/widgets/dismiss_keyboard.dart';
 import 'package:myapp/core/theme/app_theme.dart';
 import 'package:myapp/core/theme/responsive.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -44,12 +45,15 @@ class _BugReportScreenState extends State<BugReportScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return CupertinoPageScaffold(
-      backgroundColor: AppColors.background,
-      navigationBar: CupertinoNavigationBar(
-        backgroundColor: AppColors.white,
-        border: null,
-        leading: CupertinoButton(
+    return DismissKeyboard(
+      child: CupertinoPageScaffold(
+        backgroundColor: AppColors.background,
+        navigationBar: CupertinoNavigationBar(
+          heroTag: 'nav-bug-report',
+          transitionBetweenRoutes: true,
+          backgroundColor: AppColors.white,
+          border: null,
+          leading: CupertinoButton(
           padding: EdgeInsets.zero,
           onPressed: () => context.pop(),
           child: SvgPicture.asset(
@@ -92,6 +96,7 @@ class _BugReportScreenState extends State<BugReportScreen> {
           ],
         ),
       ),
+    ),
     ),
     );
   }

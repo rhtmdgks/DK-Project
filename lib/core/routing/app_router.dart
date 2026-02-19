@@ -1,36 +1,74 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:myapp/core/auth/auth_state.dart';
+import 'package:myapp/core/theme/app_motion.dart';
 import 'package:myapp/core/supabase_client.dart';
 import 'package:myapp/screens/chat_list_screen.dart';
 import 'package:myapp/screens/chat_screen.dart';
 import 'package:myapp/screens/home_screen.dart';
 import 'package:myapp/screens/login_screen.dart';
 import 'package:myapp/screens/password_change_screen.dart';
+import 'package:myapp/screens/privacy_policy_screen.dart';
 import 'package:myapp/screens/bug_report_screen.dart';
 import 'package:myapp/screens/settings_screen.dart';
 import 'package:myapp/screens/splash_screen.dart';
+import 'package:myapp/screens/suggestions_chat_screen.dart';
+import 'package:myapp/screens/terms_screen.dart';
+import 'package:myapp/screens/today_classes_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// 앱 전체 라우트 경로 열거형.
 enum AppRoute {
   splash('/splash'),
+  terms('/terms'),
   login('/login'),
   passwordChange('/password-change'),
   home('/'),
   settings('/settings'),
+  privacyPolicy('/privacy'),
   bugReport('/bug-report'),
   chatList('/chat'),
-  chatRoom('/chat/:roomId');
+  chatRoom('/chat/:roomId'),
+  suggestionsChat('/suggestions/chat'),
+  todayClasses('/today-classes');
 
   const AppRoute(this.path);
   final String path;
 }
 
+/// SharedPreferences 키: 약관 동의 여부. [TermsScreen]에서 true로 저장한다.
+const String kTermsAgreedKey = 'terms_agreed';
+
 final GlobalKey<NavigatorState> _rootNavKey = GlobalKey<NavigatorState>();
+
+/// Material 3 Motion: Shared Axis(수평) + Fade 페이지 전환.
+CustomTransitionPage<void> _m3Page(GoRouterState state, Widget child) {
+  return CustomTransitionPage<void>(
+    key: state.pageKey,
+    child: child,
+    transitionDuration: AppMotion.pageTransitionDuration,
+    reverseTransitionDuration: AppMotion.pageTransitionDuration,
+    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      final curve = CurvedAnimation(
+        parent: animation,
+        curve: AppMotion.pageTransitionCurve,
+        reverseCurve: AppMotion.curveAccelerated,
+      );
+      return SlideTransition(
+        position: Tween<Offset>(
+          begin: const Offset(0.05, 0),
+          end: Offset.zero,
+        ).animate(curve),
+        child: FadeTransition(opacity: curve, child: child),
+      );
+    },
+  );
+}
 
 /// GoRouter 인스턴스를 생성한다.
 ///
 /// 리다이렉트 로직:
+/// 0. 최초 진입 시 약관 미동의 → 약관 화면
 /// 1. 스플래시 → 패스스루
 /// 2. 미인증 → 로그인
 /// 3. 프로필 없음 → 로그인
@@ -44,40 +82,60 @@ GoRouter createAppRouter() {
     routes: [
       GoRoute(
         path: AppRoute.splash.path,
-        builder: (_, __) => const SplashScreen(),
+        pageBuilder: (_, state) => _m3Page(state, const SplashScreen()),
+      ),
+      GoRoute(
+        path: AppRoute.terms.path,
+        pageBuilder: (_, state) => _m3Page(state, const TermsScreen()),
       ),
       GoRoute(
         path: AppRoute.login.path,
-        builder: (_, __) => const LoginScreen(),
+        pageBuilder: (_, state) => _m3Page(state, const LoginScreen()),
       ),
       GoRoute(
         path: AppRoute.passwordChange.path,
-        builder: (_, __) => const PasswordChangeScreen(),
+        pageBuilder: (_, state) =>
+            _m3Page(state, const PasswordChangeScreen()),
       ),
       GoRoute(
         path: AppRoute.home.path,
-        builder: (_, __) => const HomeScreen(),
+        pageBuilder: (_, state) => _m3Page(state, const HomeScreen()),
       ),
       GoRoute(
         path: AppRoute.settings.path,
-        builder: (_, __) => const SettingsScreen(),
+        pageBuilder: (_, state) => _m3Page(state, const SettingsScreen()),
+      ),
+      GoRoute(
+        path: AppRoute.privacyPolicy.path,
+        pageBuilder: (_, state) =>
+            _m3Page(state, const PrivacyPolicyScreen()),
       ),
       GoRoute(
         path: AppRoute.bugReport.path,
-        builder: (_, __) => const BugReportScreen(),
+        pageBuilder: (_, state) => _m3Page(state, const BugReportScreen()),
       ),
       GoRoute(
         path: AppRoute.chatList.path,
-        builder: (_, __) => const ChatListScreen(),
+        pageBuilder: (_, state) => _m3Page(state, const ChatListScreen()),
         routes: [
           GoRoute(
             path: ':roomId',
-            builder: (_, state) {
+            pageBuilder: (_, state) {
               final roomId = state.pathParameters['roomId']!;
-              return ChatScreen(roomId: roomId);
+              return _m3Page(state, ChatScreen(roomId: roomId));
             },
           ),
         ],
+      ),
+      GoRoute(
+        path: AppRoute.suggestionsChat.path,
+        pageBuilder: (_, state) =>
+            _m3Page(state, const SuggestionsChatScreen()),
+      ),
+      GoRoute(
+        path: AppRoute.todayClasses.path,
+        pageBuilder: (_, state) =>
+            _m3Page(state, const TodayClassesScreen()),
       ),
     ],
   );
@@ -87,31 +145,43 @@ Future<String?> _handleRedirect(
   BuildContext context,
   GoRouterState state,
 ) async {
-  final location = state.matchedLocation;
+  try {
+    final location = state.matchedLocation;
 
-  // 스플래시는 리다이렉트 우회
-  if (location == AppRoute.splash.path) return null;
+    // 최초 진입: 약관 미동의 시 약관 화면으로
+    final prefs = await SharedPreferences.getInstance();
+    final termsAgreed = prefs.getBool(kTermsAgreedKey) ?? false;
+    if (!termsAgreed) {
+      return location == AppRoute.terms.path ? null : AppRoute.terms.path;
+    }
 
-  final session = supabase.auth.currentSession;
-  final isOnLogin = location == AppRoute.login.path;
+    // 스플래시는 리다이렉트 우회
+    if (location == AppRoute.splash.path) return null;
 
-  // 미인증 → 로그인 페이지가 아니면 로그인으로 이동
-  if (session == null) {
-    return isOnLogin ? null : AppRoute.login.path;
+    final session = supabase.auth.currentSession;
+    final isOnLogin = location == AppRoute.login.path;
+
+    // 미인증 → 로그인 페이지가 아니면 로그인으로 이동
+    if (session == null) {
+      return isOnLogin ? null : AppRoute.login.path;
+    }
+
+    final profile = await getCurrentProfile();
+    if (profile == null) return AppRoute.login.path;
+
+    // 비밀번호 변경 강제
+    if (profile.mustChangePassword) {
+      return location == AppRoute.passwordChange.path
+          ? null
+          : AppRoute.passwordChange.path;
+    }
+
+    // 이미 인증된 상태에서 로그인 접근 → 홈
+    if (isOnLogin) return AppRoute.home.path;
+
+    return null;
+  } catch (_, __) {
+    // Cold start(아이콘 재실행) 시 네트워크/저장소 등 예외 시 로그인으로 폴백
+    return AppRoute.login.path;
   }
-
-  final profile = await getCurrentProfile();
-  if (profile == null) return AppRoute.login.path;
-
-  // 비밀번호 변경 강제
-  if (profile.mustChangePassword) {
-    return location == AppRoute.passwordChange.path
-        ? null
-        : AppRoute.passwordChange.path;
-  }
-
-  // 이미 인증된 상태에서 로그인 접근 → 홈
-  if (isOnLogin) return AppRoute.home.path;
-
-  return null;
 }

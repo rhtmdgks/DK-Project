@@ -1,7 +1,10 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:myapp/core/supabase_client.dart';
+import 'package:myapp/core/theme/app_motion.dart';
+import 'package:myapp/core/widgets/dismiss_keyboard.dart';
 import 'package:myapp/core/theme/app_theme.dart';
 import 'package:myapp/core/theme/responsive.dart';
 
@@ -98,8 +101,8 @@ class _ChatScreenState extends State<ChatScreen> {
       if (_scrollController.hasClients) {
         _scrollController.animateTo(
           _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 200),
-          curve: Curves.easeOut,
+          duration: AppMotion.effectDuration,
+          curve: AppMotion.effectCurve,
         );
       }
     });
@@ -130,13 +133,21 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return CupertinoPageScaffold(
-      backgroundColor: AppColors.background,
-      navigationBar: CupertinoNavigationBar(
+    return DismissKeyboard(
+      child: CupertinoPageScaffold(
+        backgroundColor: AppColors.background,
+        navigationBar: CupertinoNavigationBar(
+        heroTag: 'nav-chat-${widget.roomId}',
+        transitionBetweenRoutes: true,
         backgroundColor: AppColors.white,
         border: null,
+        leading: CupertinoButton(
+          padding: EdgeInsets.zero,
+          onPressed: () => context.pop(),
+          child: const Icon(CupertinoIcons.back),
+        ),
         middle: Text(
-          '채팅 ${widget.roomId.substring(0, 8)}...',
+          '채팅 ${widget.roomId.length > 8 ? "${widget.roomId.substring(0, 8)}..." : widget.roomId}',
           style: AppFonts.scaled(context, AppFonts.titleSemiBold)
               .copyWith(color: AppColors.textDark),
         ),
@@ -149,6 +160,7 @@ class _ChatScreenState extends State<ChatScreen> {
           _buildInputBar(),
         ],
         ),
+      ),
       ),
     );
   }

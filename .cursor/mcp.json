@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "TalkToFigma": {
+      "command": "/Users/s.h.putrats/.bun/bin/bunx",
+      "args": ["cursor-talk-to-figma-mcp@latest"]
+    }
+  }
+}

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:myapp/core/routing/app_router.dart';
 import 'package:myapp/core/supabase_client.dart';
+import 'package:myapp/core/widgets/dismiss_keyboard.dart';
 import 'package:myapp/core/theme/app_theme.dart';
 import 'package:myapp/core/theme/responsive.dart';
 
@@ -74,9 +75,12 @@ class _PasswordChangeScreenState extends State<PasswordChangeScreen> {
   Widget build(BuildContext context) {
     final pad = context.rs(24);
 
-    return CupertinoPageScaffold(
-      backgroundColor: AppColors.background,
-      navigationBar: CupertinoNavigationBar(
+    return DismissKeyboard(
+      child: CupertinoPageScaffold(
+        backgroundColor: AppColors.background,
+        navigationBar: CupertinoNavigationBar(
+        heroTag: 'nav-password-change',
+        transitionBetweenRoutes: true,
         backgroundColor: AppColors.white,
         border: null,
         middle: Text(
@@ -166,6 +170,7 @@ class _PasswordChangeScreenState extends State<PasswordChangeScreen> {
           ),
         ),
       ),
+    ),
     ),
     );
   }

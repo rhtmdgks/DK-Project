@@ -1,15 +1,20 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
 import 'package:myapp/core/routing/app_router.dart';
+import 'package:myapp/core/supabase_client.dart';
 import 'package:myapp/core/theme/app_theme.dart';
 import 'package:myapp/core/theme/responsive.dart';
+import 'package:myapp/services/weather_notification_service.dart';
 
 /// Figma "마이페이지-설정" (node 670:3801 / 670:4463 / 657:7709)
 ///
 /// 구성:
-/// 1. 커스텀 앱바 (뒤로가기 + "설정" + 검색/알림 아이콘)
+/// 1. 커스텀 앱바 (뒤로가기 + "설정")
 /// 2. 알림 설정 섹션 (5개 토글)
 /// 3. 기타 설정 섹션 (버그 신고, 개인정보 처리방침)
 class SettingsScreen extends StatefulWidget {
@@ -20,7 +25,7 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  /// 알림 설정 토글 상태 (키: 설정 ID)
+  /// 알림 설정 토글 상태 (키: 설정 ID). SharedPreferences에서 로드.
   final Map<String, bool> _toggles = {
     'meal': false,
     'schedule': false,
@@ -29,11 +34,63 @@ class _SettingsScreenState extends State<SettingsScreen> {
     'weather': false,
   };
 
+  static const _prefPrefix = 'setting_';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadToggles();
+  }
+
+  Future<void> _loadToggles() async {
+    final prefs = await SharedPreferences.getInstance();
+    final weatherOn = await WeatherNotificationService.isWeatherEnabled();
+    if (!mounted) return;
+    setState(() {
+      for (final key in _toggles.keys) {
+        if (key == 'weather') {
+          _toggles[key] = weatherOn;
+        } else {
+          _toggles[key] = prefs.getBool('$_prefPrefix$key') ?? _toggles[key]!;
+        }
+      }
+    });
+  }
+
+  Future<void> _onToggle(String key, bool newValue) async {
+    setState(() => _toggles[key] = newValue);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('$_prefPrefix$key', newValue);
+
+    if (key == 'weather') {
+      await WeatherNotificationService.setWeatherEnabled(newValue);
+      if (newValue) await _updateWeatherLocation();
+    }
+  }
+
+  Future<void> _updateWeatherLocation() async {
+    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) return;
+    final denied = await Geolocator.checkPermission() == LocationPermission.denied;
+    if (denied) {
+      final status = await Geolocator.requestPermission();
+      if (status == LocationPermission.denied || status == LocationPermission.deniedForever) return;
+    }
+    try {
+      final pos = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.medium,
+      );
+      await WeatherNotificationService.saveLocation(pos.latitude, pos.longitude);
+    } catch (_) {}
+  }
+
   @override
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
       backgroundColor: AppColors.background,
       navigationBar: CupertinoNavigationBar(
+        heroTag: 'nav-settings',
+        transitionBetweenRoutes: true,
         backgroundColor: AppColors.white,
         border: null,
         leading: CupertinoButton(
@@ -50,31 +107,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
           '설정',
           style: AppFonts.scaled(context, _Styles.pageTitle),
         ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CupertinoButton(
-              padding: EdgeInsets.zero,
-              onPressed: () {},
-              child: SvgPicture.asset(
-                'assets/images/icon_search.svg',
-                width: context.rs(24),
-                height: context.rs(24),
-                fit: BoxFit.contain,
-              ),
-            ),
-            CupertinoButton(
-              padding: EdgeInsets.zero,
-              onPressed: () {},
-              child: SvgPicture.asset(
-                'assets/images/icon_bell.svg',
-                width: context.rs(22),
-                height: context.rs(22),
-                fit: BoxFit.contain,
-              ),
-            ),
-          ],
-        ),
       ),
       child: Material(
         type: MaterialType.transparency,
@@ -86,6 +118,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   _buildNotificationSection(),
                   SizedBox(height: context.rh(16)),
                   _buildOtherSection(),
+                  SizedBox(height: context.rh(24)),
+                  _buildLogoutButton(),
             SizedBox(height: context.rh(32)),
           ],
         ),
@@ -161,7 +195,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 icon: Icons.cloud_rounded,
                 iconColor: const Color(0xFF9C7CDB),
                 title: '날씨 알림',
-                description: '등교 전 비 소식이 있다면 알려드려요!',
+                description: '매일 6시 30분에 현지 날씨(비/구름/눈/맑음)를 알려줘요.',
               ),
             ],
           ),
@@ -224,19 +258,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ),
           SizedBox(width: context.rs(8)),
-          _buildToggle(isOn, () {
-            setState(() => _toggles[key] = !isOn);
-          }),
+          _buildToggle(isOn, () => _onToggle(key, !isOn)),
         ],
       ),
     );
   }
 
   Widget _buildToggle(bool isOn, VoidCallback onTap) {
-    return CupertinoSwitch(
+    return Switch(
       value: isOn,
       onChanged: (_) => onTap(),
-      activeColor: AppColors.primaryBlue,
+      activeTrackColor: AppColors.primaryBlue.withOpacity(0.5),
+      activeThumbColor: AppColors.primaryBlue,
     );
   }
 
@@ -284,9 +317,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 icon: Icons.description_rounded,
                 iconColor: const Color(0xFFFF8A65),
                 title: '개인정보 처리방침',
-                onTap: () {
-                  // TODO: 개인정보 처리방침
-                },
+                onTap: () => context.push(AppRoute.privacyPolicy.path),
               ),
             ],
           ),
@@ -349,6 +380,82 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
       ),
     );
+  }
+
+  // ── 로그아웃 버튼 ──
+
+  Widget _buildLogoutButton() {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: context.rs(10)),
+      child: CupertinoButton(
+        padding: EdgeInsets.symmetric(
+          horizontal: context.rs(16),
+          vertical: context.rh(14),
+        ),
+        color: AppColors.error,
+        borderRadius: BorderRadius.circular(context.rs(24)),
+        onPressed: _handleLogout,
+        child: Text(
+          '로그아웃',
+          style: AppFonts.scaled(
+            context,
+            TextStyle(
+              fontFamily: AppFonts.fontFamily,
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              height: 22 / 16,
+              color: AppColors.white,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _handleLogout() async {
+    final shouldLogout = await showCupertinoDialog<bool>(
+      context: context,
+      builder: (context) => CupertinoAlertDialog(
+        title: const Text('로그아웃'),
+        content: const Text('정말 로그아웃하시겠습니까?'),
+        actions: [
+          CupertinoDialogAction(
+            isDefaultAction: true,
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('취소'),
+          ),
+          CupertinoDialogAction(
+            isDestructiveAction: true,
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('로그아웃'),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldLogout != true) return;
+
+    try {
+      await supabase.auth.signOut();
+      if (!mounted) return;
+      context.go(AppRoute.login.path);
+    } catch (e) {
+      if (!mounted) return;
+      await showCupertinoDialog(
+        context: context,
+        builder: (context) => CupertinoAlertDialog(
+          title: const Text('오류'),
+          content: Text('로그아웃 중 오류가 발생했습니다: $e'),
+          actions: [
+            CupertinoDialogAction(
+              isDefaultAction: true,
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('확인'),
+            ),
+          ],
+        ),
+      );
+    }
   }
 }
 

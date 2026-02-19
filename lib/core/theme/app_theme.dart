@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:myapp/core/theme/app_motion.dart';
 import 'package:myapp/core/theme/responsive.dart';
 
 /// Figma DK-Project에서 추출한 디자인 토큰.
@@ -8,20 +9,26 @@ import 'package:myapp/core/theme/responsive.dart';
 /// 위젯에서 직접 [Color] / [TextStyle] 리터럴을 사용하지 않도록 한다.
 abstract final class AppColors {
   // ── Neutral ──
-  static const background = Color(0xFFF8FAFF);
+  static const background = Color(0xFFF8FAFF); // Figma Neutral/200 #f8faff
   static const white = Color(0xFFFFFFFF);
-  static const border = Color(0xFFEBEFF6);
+  static const border = Color(0xFFEBEFF6); // Figma Neutral Colors/300 #ebeff6
   static const borderLight = Color(0xFFF6F8FC);
-  static const hint = Color(0xFFB4B9C9);
+  static const hint = Color(0xFFB4B9C9); // Figma Neutral/500 #b4b9c9
   static const textSecondary = Color(0xFF868DA6);
-  static const navInactive = Color(0xFF6D758F);
-  static const textPrimary = Color(0xFF353E5C);
+  static const navInactive = Color(0xFF6D758F); // Figma Neutral/600 #6d758f
+  static const textPrimary = Color(0xFF353E5C); // Figma Neutral/700 #353e5c
   static const textDark = Color(0xFF1A1A1A);
+  /// Figma Neutral/800 #19213d (약관 등 온보딩 화면 제목·본문 진한 글자)
+  static const textDarkFigma = Color(0xFF19213D);
 
   // ── Brand ──
   static const primaryBlue = Color(0xFF0B66FF);
   static const primaryBlue500 = Color(0xFF3D80FF);
+  /// 연한 파란 테두리 (약관 전체동의 박스 등). Figma 스크린 기준 #AECBFF 유사.
+  static const primaryBlueLight = Color(0xFFAECBFF);
   static const error = Color(0xFFEF4444);
+  /// 성공/활성화 SnackBar 등 (직관적 피드백용)
+  static const success = Color(0xFF22C55E);
 
   // ── Timetable / Calendar ──
   static const timetableBg = Color(0xFFD2DDFF);
@@ -33,6 +40,35 @@ abstract final class AppColors {
   static const navShadowInner = Color(0x146D758F);
   static const cardShadow = Color(0x0D000000);
   static const buttonShadow = Color(0x260B66FF);
+
+  /// M3 surface 계층 (카드/컨테이너 강조용). 기존 white 대신 사용 권장.
+  static const surfaceContainerLowest = Color(0xFFF8FAFF);
+  static const surfaceContainerLow = Color(0xFFF2F5FA);
+  static const surfaceContainer = Color(0xFFECF0F7);
+  static const surfaceContainerHigh = Color(0xFFE6EBF4);
+  static const surfaceContainerHighest = Color(0xFFE0E6F0);
+}
+
+/// Material 3 Shape 스케일 (트렌디한 큰 라운드).
+abstract final class AppShapes {
+  AppShapes._();
+
+  static const double radiusExtraSmall = 4;
+  static const double radiusSmall = 12;
+  static const double radiusMedium = 16;
+  static const double radiusLarge = 20;
+  static const double radiusExtraLarge = 28;
+
+  static BorderRadius get borderRadiusExtraSmall =>
+      BorderRadius.circular(radiusExtraSmall);
+  static BorderRadius get borderRadiusSmall =>
+      BorderRadius.circular(radiusSmall);
+  static BorderRadius get borderRadiusMedium =>
+      BorderRadius.circular(radiusMedium);
+  static BorderRadius get borderRadiusLarge =>
+      BorderRadius.circular(radiusLarge);
+  static BorderRadius get borderRadiusExtraLarge =>
+      BorderRadius.circular(radiusExtraLarge);
 }
 
 /// Figma 기반 텍스트 스타일 토큰.
@@ -246,16 +282,99 @@ abstract final class AppFonts {
   }
 }
 
-/// 앱 전역 [ThemeData]. [MaterialApp]의 `theme`에 전달한다.
+/// 앱 전역 [ThemeData]. Material 3 스타일 적용.
 /// textTheme에 decoration: none을 명시해 Material 미제공 구간에서도 노란 밑줄이 나오지 않게 한다.
 ThemeData buildAppTheme() {
   const noUnderline = TextStyle(decoration: TextDecoration.none);
+  final colorScheme = ColorScheme.fromSeed(
+    seedColor: AppColors.primaryBlue,
+    surface: AppColors.background,
+    brightness: Brightness.light,
+  );
+
   return ThemeData(
+    useMaterial3: true,
     fontFamily: AppFonts.fontFamily,
     scaffoldBackgroundColor: AppColors.background,
-    colorScheme: ColorScheme.fromSeed(
-      seedColor: AppColors.primaryBlue,
-      surface: AppColors.background,
+    colorScheme: colorScheme,
+    // M3 Shape: 트렌디한 큰 라운드 (카드·버튼·입력 등)
+    cardTheme: CardThemeData(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: AppShapes.borderRadiusMedium,
+        side: const BorderSide(color: AppColors.borderLight, width: 1),
+      ),
+      color: AppColors.white,
+      clipBehavior: Clip.antiAlias,
+      margin: EdgeInsets.zero,
+    ),
+    elevatedButtonTheme: ElevatedButtonThemeData(
+      style: ElevatedButton.styleFrom(
+        elevation: 0,
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+        shape: RoundedRectangleBorder(
+          borderRadius: AppShapes.borderRadiusMedium,
+        ),
+      ),
+    ),
+    filledButtonTheme: FilledButtonThemeData(
+      style: FilledButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+        shape: RoundedRectangleBorder(
+          borderRadius: AppShapes.borderRadiusMedium,
+        ),
+      ),
+    ),
+    inputDecorationTheme: InputDecorationTheme(
+      filled: true,
+      fillColor: AppColors.surfaceContainerLowest,
+      border: OutlineInputBorder(
+        borderRadius: AppShapes.borderRadiusMedium,
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: AppShapes.borderRadiusMedium,
+        borderSide: const BorderSide(color: AppColors.borderLight),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: AppShapes.borderRadiusMedium,
+        borderSide: const BorderSide(color: AppColors.primaryBlue, width: 2),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: AppShapes.borderRadiusMedium,
+        borderSide: const BorderSide(color: AppColors.error),
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+    ),
+    chipTheme: ChipThemeData(
+      shape: RoundedRectangleBorder(
+        borderRadius: AppShapes.borderRadiusExtraLarge,
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+    ),
+    appBarTheme: AppBarTheme(
+      elevation: 0,
+      scrolledUnderElevation: 0,
+      centerTitle: true,
+      surfaceTintColor: Colors.transparent,
+    ),
+    bottomNavigationBarTheme: BottomNavigationBarThemeData(
+      elevation: 0,
+      type: BottomNavigationBarType.fixed,
+    ),
+    listTileTheme: ListTileThemeData(
+      shape: RoundedRectangleBorder(
+        borderRadius: AppShapes.borderRadiusMedium,
+      ),
+    ),
+    dialogTheme: DialogThemeData(
+      shape: RoundedRectangleBorder(
+        borderRadius: AppShapes.borderRadiusLarge,
+      ),
+      elevation: 0,
+    ),
+    dividerTheme: const DividerThemeData(
+      color: AppColors.border,
+      thickness: 1,
     ),
     textTheme: TextTheme(
       displayLarge: noUnderline,
@@ -274,7 +393,43 @@ ThemeData buildAppTheme() {
       labelMedium: noUnderline,
       labelSmall: noUnderline,
     ),
+    pageTransitionsTheme: PageTransitionsTheme(
+      builders: {
+        for (final platform in TargetPlatform.values)
+          platform: _M3PageTransitionsBuilder(),
+      },
+    ),
   );
+}
+
+/// Material 3 Shared Axis(수평) + Fade 스타일 페이지 전환.
+/// [AppMotion] duration/curve 적용.
+class _M3PageTransitionsBuilder extends PageTransitionsBuilder {
+  @override
+  Widget buildTransitions<T>(
+    PageRoute<T> route,
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) {
+    final curve = CurvedAnimation(
+      parent: animation,
+      curve: AppMotion.pageTransitionCurve,
+      reverseCurve: AppMotion.curveAccelerated,
+    );
+    final offsetTween = Tween<Offset>(
+      begin: const Offset(0.05, 0),
+      end: Offset.zero,
+    );
+    return SlideTransition(
+      position: offsetTween.animate(curve),
+      child: FadeTransition(
+        opacity: curve,
+        child: child,
+      ),
+    );
+  }
 }
 
 /// Cupertino 전역 테마. 화이트·블루 유지, iOS 스타일 적용.

@@ -62,7 +62,17 @@ Deno.serve(async (req: Request) => {
   const schul = getEnvVar('NEIS_SD_SCHUL_CODE') || '7430030';
 
   const url = new URL(req.url);
-  const dateParam = url.searchParams.get('date') || url.searchParams.get('MLSV_YMD');
+  let dateParam = url.searchParams.get('date') || url.searchParams.get('MLSV_YMD');
+  if ((!dateParam || dateParam.trim() === '') && req.method === 'POST') {
+    try {
+      const body = await req.clone().json() as Record<string, unknown> | null;
+      if (body && (body.date != null || body.MLSV_YMD != null)) {
+        dateParam = String(body.date ?? body.MLSV_YMD ?? '');
+      }
+    } catch {
+      // ignore
+    }
+  }
   const mlsvYmd = parseDate(dateParam);
   const date = mlsvYmd || parseDate(new Date().toISOString().slice(0, 10));
 

@@ -28,7 +28,12 @@ class AsyncBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (loading) {
-      return const Center(child: CupertinoActivityIndicator(radius: 12));
+      return Center(
+        child: CircularProgressIndicator(
+          strokeWidth: 2,
+          color: Theme.of(context).colorScheme.primary,
+        ),
+      );
     }
 
     if (error != null) {

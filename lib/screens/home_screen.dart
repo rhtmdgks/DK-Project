@@ -31,9 +31,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return CupertinoPageScaffold(
+    return Scaffold(
       backgroundColor: AppColors.background,
-      child: Material(
+      resizeToAvoidBottomInset: false,
+      body: Material(
         type: MaterialType.transparency,
         child: Column(
           children: [

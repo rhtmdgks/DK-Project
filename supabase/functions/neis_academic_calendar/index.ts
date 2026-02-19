@@ -53,8 +53,8 @@ Deno.serve(async (req: Request) => {
     return jsonResponse({ error: 'server_config', message: 'NEIS API key not configured' }, 500);
   }
 
-  const atpt = getEnvVar('NEIS_ATPT_OFCDC_SC_CODE') || '';
-  const schul = getEnvVar('NEIS_SD_SCHUL_CODE') || '';
+  const atpt = getEnvVar('NEIS_ATPT_OFCDC_SC_CODE') || 'G10';
+  const schul = getEnvVar('NEIS_SD_SCHUL_CODE') || '7430030';
 
   const url = new URL(req.url);
   const fromParam = url.searchParams.get('from') || url.searchParams.get('AA_FROM_YMD');

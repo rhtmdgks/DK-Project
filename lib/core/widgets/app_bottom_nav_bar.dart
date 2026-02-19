@@ -31,27 +31,27 @@ class AppBottomNavBar extends StatelessWidget {
     final bottomPadding = context.safeArea.bottom;
     final hPad = context.rs(28);
     final vPad = context.rh(12);
-    final radius = context.rs(24);
+    final theme = Theme.of(context);
 
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.white,
+        color: theme.colorScheme.surface,
         borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(radius),
-          topRight: Radius.circular(radius),
+          topLeft: Radius.circular(AppShapes.radiusExtraLarge),
+          topRight: Radius.circular(AppShapes.radiusExtraLarge),
         ),
         border: const Border(
           top: BorderSide(color: AppColors.borderLight),
         ),
-        boxShadow: const [
+        boxShadow: [
           BoxShadow(
-            color: AppColors.navShadowOuter,
-            offset: Offset(0, -8),
+            color: theme.colorScheme.shadow.withValues(alpha: 0.08),
+            offset: const Offset(0, -8),
             blurRadius: 28,
           ),
           BoxShadow(
             color: AppColors.navShadowInner,
-            offset: Offset(0, -2),
+            offset: const Offset(0, -2),
             blurRadius: 12,
           ),
         ],
