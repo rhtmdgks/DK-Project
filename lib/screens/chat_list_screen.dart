@@ -72,12 +72,12 @@ class _ChatListScreenState extends State<ChatListScreen> {
 
       // 1:1 채팅방의 경우 상대방 이름 가져오기
       final displayNames = <String, String>{};
-      for (final room in (roomRes as List)) {
+      for (final room in roomRes) {
         final roomMap = room as Map<String, dynamic>;
         final roomId = roomMap['id'] as String? ?? '';
         final roomType = roomMap['type'] as String? ?? 'group';
         
-        if (roomType == 'direct' && uid != null) {
+        if (roomType == 'direct') {
           try {
             final otherUserResult = await supabase.rpc(
               'get_direct_chat_other_user',
@@ -107,7 +107,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
 
       if (!mounted) return;
       setState(() {
-        _rooms = List<Map<String, dynamic>>.from(roomRes as List);
+        _rooms = List<Map<String, dynamic>>.from(roomRes);
         _roomDisplayNames = displayNames;
         _loading = false;
       });

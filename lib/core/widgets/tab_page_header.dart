@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:myapp/core/theme/app_theme.dart';
-import 'package:myapp/core/theme/responsive.dart';
 
 /// Material 3 Small App Bar 스타일의 탭 제목 헤더.
 ///

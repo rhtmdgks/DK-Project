@@ -1,10 +1,11 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:myapp/core/supabase_client.dart';
+import 'package:myapp/models/notification_item.dart';
+import 'package:myapp/services/notification_service.dart';
 
 /// 일정 알림: 매일 아침 8시에 오늘 일정을 알림 표시.
 ///
@@ -160,18 +161,12 @@ class ScheduleNotificationService {
                 
                 // 오늘 일정이면 즉시 알림
                 if (scheduleDate == today) {
-                  await _plugin.show(
-                    _notificationId + 1000, // 고유 ID
-                    '새 일정이 추가되었습니다',
-                    title,
-                    NotificationDetails(
-                      android: AndroidNotificationDetails(
-                        _channelId,
-                        _channelName,
-                        channelDescription: '일정 알림',
-                      ),
-                      iOS: const DarwinNotificationDetails(),
-                    ),
+                  await NotificationService.showNotification(
+                    id: _notificationId + 1000,
+                    title: '새 일정이 추가되었습니다',
+                    body: title,
+                    type: NotificationType.schedule,
+                    payload: 'schedule',
                   );
                 }
               } catch (_) {}
@@ -215,23 +210,17 @@ class ScheduleNotificationService {
       if (schedules.isEmpty) return;
 
       final count = schedules.length;
-      final firstSchedule = schedules[0] as Map<String, dynamic>;
+      final firstSchedule = schedules[0];
       final firstTitle = firstSchedule['title'] as String? ?? '일정';
 
-      await _plugin.show(
-        _notificationId,
-        '오늘의 일정',
-        count == 1
+      await NotificationService.showNotification(
+        id: _notificationId,
+        title: '오늘의 일정',
+        body: count == 1
             ? firstTitle
             : '$firstTitle 외 ${count - 1}개 일정이 있습니다',
-        NotificationDetails(
-          android: AndroidNotificationDetails(
-            _channelId,
-            _channelName,
-            channelDescription: '일정 알림',
-          ),
-          iOS: const DarwinNotificationDetails(),
-        ),
+        type: NotificationType.schedule,
+        payload: 'schedule',
       );
     } catch (_) {}
   }

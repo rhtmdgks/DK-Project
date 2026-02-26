@@ -1,18 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest_all.dart' as tz_data;
 
-import 'package:myapp/core/routing/app_router.dart';
+import 'package:myapp/models/notification_item.dart';
+import 'package:myapp/services/notification_service.dart';
 import 'package:myapp/services/weather_service.dart';
 
-/// 날씨 알림: 6시 30분에 현지 날씨를 반영한 알림 표시.
+/// 날씨 알림: 매일 AM 06:30에 알림이 뜨도록 예약.
 ///
 /// - 설정에서 "날씨 알림" ON + (선택) 위치 저장
-/// - 매일 6:30 로컬 시간에 알림 예약
-/// - 앱이 6:30 이후에 열리면 아직 오늘 알림을 안 띄웠을 때 날씨 조회 후 알림 표시
+/// - 매일 오전 6시 30분(로컬 시간)에 알림이 표시됨 (zonedSchedule)
+/// - 앱을 6:30 이후에 열었을 때 오늘 알림을 아직 안 받은 경우에만 보조로 표시 (폴백)
 class WeatherNotificationService {
   WeatherNotificationService._();
 
@@ -38,22 +38,6 @@ class WeatherNotificationService {
       tz.setLocalLocation(tz.getLocation('Asia/Seoul'));
     } catch (_) {}
 
-    const android = AndroidInitializationSettings('@mipmap/ic_launcher');
-    const ios = DarwinInitializationSettings(
-      requestAlertPermission: true,
-      requestBadgePermission: true,
-    );
-    await _plugin.initialize(
-      const InitializationSettings(android: android, iOS: ios),
-      onDidReceiveNotificationResponse: (NotificationResponse response) {
-        final payload = response.payload;
-        if (payload == 'announcement') {
-          final ctx = rootNavigatorKey.currentContext;
-          if (ctx != null) GoRouter.of(ctx).go('/?tab=notice');
-        }
-      },
-    );
-
     await _plugin
         .resolvePlatformSpecificImplementation<
             AndroidFlutterLocalNotificationsPlugin>()
@@ -66,7 +50,9 @@ class WeatherNotificationService {
         );
 
     _initialized = true;
-    if (await isWeatherEnabled()) await scheduleDailyNotification();
+    if (await isWeatherEnabled()) {
+      await scheduleDailyNotification();
+    }
   }
 
   static Future<bool> isWeatherEnabled() async {
@@ -146,12 +132,9 @@ class WeatherNotificationService {
       try {
         await scheduleDailyNotification();
       } catch (e) {
-        // 정확한 알람 권한 오류는 scheduleDailyNotification 내부에서 처리됨
-        // 다른 오류는 다시 throw
-        if (!e.toString().contains('exact_alarms_not_permitted')) {
-          await prefs.setBool(_keyWeatherEnabled, false);
-          rethrow;
-        }
+        debugPrint('날씨 알림 스케줄 등록 실패: $e');
+        await prefs.setBool(_keyWeatherEnabled, false);
+        rethrow;
       }
     } else {
       await _plugin.cancel(_notificationId);
@@ -164,72 +147,97 @@ class WeatherNotificationService {
     await prefs.setDouble(_keyWeatherLon, lon);
   }
 
+  /// 매일 AM 06:30에 날씨 알림이 뜨도록 예약 (로컬 시간 기준)
   static Future<void> scheduleDailyNotification() async {
+    // 기존 알림 취소
+    await _plugin.cancel(_notificationId);
+
     final now = tz.TZDateTime.now(tz.local);
     var scheduled = tz.TZDateTime(
       tz.local,
       now.year,
       now.month,
       now.day,
-      6,
-      30,
+      6,  // 오전 6시
+      30, // 30분
     );
+    
+    // 이미 오늘 6:30이 지났으면 내일로 설정
     if (scheduled.isBefore(now)) {
       scheduled = scheduled.add(const Duration(days: 1));
     }
+
+    debugPrint('날씨 알림 예약: ${scheduled.toString()}');
 
     try {
       await _plugin.zonedSchedule(
         _notificationId,
         '오늘 날씨',
-        '오늘 날씨를 확인해보세요.',
+        '날씨 정보를 확인하는 중...',
         scheduled,
-        NotificationDetails(
+        const NotificationDetails(
           android: AndroidNotificationDetails(
             _channelId,
             _channelName,
-            channelDescription: '6시 30분 날씨 알림',
+            channelDescription: '매일 오전 6시 30분 날씨 알림',
+            importance: Importance.high,
+            priority: Priority.high,
           ),
-          iOS: const DarwinNotificationDetails(),
+          iOS: DarwinNotificationDetails(
+            presentAlert: true,
+            presentBadge: true,
+            presentSound: true,
+          ),
         ),
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
         uiLocalNotificationDateInterpretation:
             UILocalNotificationDateInterpretation.absoluteTime,
+        matchDateTimeComponents: DateTimeComponents.time, // 매일 같은 시간에 반복
       );
     } catch (e) {
-      // Android 12 이상에서 정확한 알람 권한이 없는 경우
-      if (e.toString().contains('exact_alarms_not_permitted')) {
-        // 정확한 알람 권한이 없으면 부정확한 알람 모드로 폴백
+      debugPrint('날씨 알림 exact 예약 실패: $e');
+      // 정확한 알람 권한 없음 또는 기타 오류 시 inexact로 재시도
+      try {
         await _plugin.zonedSchedule(
           _notificationId,
           '오늘 날씨',
-          '오늘 날씨를 확인해보세요.',
+          '날씨 정보를 확인하는 중...',
           scheduled,
-          NotificationDetails(
+          const NotificationDetails(
             android: AndroidNotificationDetails(
               _channelId,
               _channelName,
-              channelDescription: '6시 30분 날씨 알림',
+              channelDescription: '매일 오전 6시 30분 날씨 알림',
+              importance: Importance.high,
+              priority: Priority.high,
             ),
-            iOS: const DarwinNotificationDetails(),
+            iOS: DarwinNotificationDetails(
+              presentAlert: true,
+              presentBadge: true,
+              presentSound: true,
+            ),
           ),
           androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
           uiLocalNotificationDateInterpretation:
               UILocalNotificationDateInterpretation.absoluteTime,
+          matchDateTimeComponents: DateTimeComponents.time,
         );
-      } else {
+        debugPrint('날씨 알림 inexact 예약 성공');
+      } catch (e2) {
+        debugPrint('날씨 알림 inexact 예약도 실패: $e2');
         rethrow;
       }
     }
   }
 
-  /// 앱이 포그라운드로 올라왔을 때 호출. 6:30 지났고 오늘 아직 안 띄웠으면 날씨 조회 후 알림.
+  /// (폴백) 앱을 6:30 이후에 열었을 때, 오늘 알림을 아직 안 받았으면 그때 날씨 조회 후 알림. 주 동작은 AM 06:30 스케줄.
   static Future<void> maybeShowWeatherNotificationIfNeeded() async {
     final prefs = await SharedPreferences.getInstance();
     final enabled = prefs.getBool(_keyWeatherEnabled) ?? false;
     if (!enabled) return;
 
     final now = DateTime.now();
+    // 오전 6시 30분 이후인지 확인
     if (now.hour < 6 || (now.hour == 6 && now.minute < 30)) return;
 
     final today =
@@ -246,30 +254,23 @@ class WeatherNotificationService {
         longitude: lon,
       );
       await prefs.setString(_keyLastShownDate, today);
-      await _plugin.show(
-        _notificationId,
-        '오늘 날씨',
-        message,
-        NotificationDetails(
-          android: AndroidNotificationDetails(
-            _channelId,
-            _channelName,
-          ),
-          iOS: const DarwinNotificationDetails(),
-        ),
+      
+      // NotificationService를 통해 알림 표시
+      await NotificationService.showNotification(
+        id: _notificationId,
+        title: '오늘 날씨',
+        body: message,
+        type: NotificationType.weather,
+        payload: 'weather',
       );
-    } catch (_) {
-      await _plugin.show(
-        _notificationId,
-        '오늘 날씨',
-        '날씨를 불러오지 못했어요. 앱에서 다시 확인해보세요.',
-        NotificationDetails(
-          android: AndroidNotificationDetails(
-            _channelId,
-            _channelName,
-          ),
-          iOS: const DarwinNotificationDetails(),
-        ),
+    } catch (e) {
+      debugPrint('날씨 정보 조회 실패: $e');
+      await NotificationService.showNotification(
+        id: _notificationId,
+        title: '오늘 날씨',
+        body: '날씨를 불러오지 못했어요. 앱에서 다시 확인해보세요.',
+        type: NotificationType.weather,
+        payload: 'weather',
       );
     }
   }

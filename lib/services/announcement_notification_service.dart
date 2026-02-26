@@ -1,10 +1,11 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:myapp/core/auth/auth_state.dart';
 import 'package:myapp/core/supabase_client.dart';
+import 'package:myapp/models/notification_item.dart';
+import 'package:myapp/services/notification_service.dart';
 
 /// 공지사항 알림: 새 공지사항이 생성되면 실시간으로 알림 표시.
 ///
@@ -24,6 +25,15 @@ class AnnouncementNotificationService {
   static const _keyNoticeEnabled = 'setting_notice';
 
   static RealtimeChannel? _channel;
+  static bool _initialized = false;
+
+  /// 초기화
+  static Future<void> initialize() async {
+    if (_initialized) return;
+
+    await _createNotificationChannel();
+    _initialized = true;
+  }
 
   /// 공지사항 알림 활성화 여부 확인
   static Future<bool> isNoticeEnabled() async {
@@ -187,28 +197,23 @@ class AnnouncementNotificationService {
             final stillEnabled = await isNoticeEnabled();
             if (!stillEnabled) return;
 
-            // 대상(학년·반) 필터
+            // 대상(학년·반) 필터 (백오피스는 target_class_number 사용)
             final targetGrade = _stringArg(newRow, 'target_grade') ??
                 _stringArg(newRow, 'target_audience') ??
                 _stringArg(newRow, 'target');
-            final targetClass = _intOrNull(newRow['target_class']);
+            final targetClass = _intOrNull(newRow['target_class_number']) ??
+                _intOrNull(newRow['target_class']);
             if (!await _shouldNotifyCurrentUser(targetGrade, targetClass)) return;
 
             final title = newRow['title'] as String? ?? '새 공지사항';
             final body = newRow['body'] as String?;
 
-            await _plugin.show(
-              _notificationId,
-              title,
-              body ?? '새로운 공지사항이 등록되었습니다.',
-              NotificationDetails(
-                android: AndroidNotificationDetails(
-                  _channelId,
-                  _channelName,
-                  channelDescription: '새 공지사항 알림',
-                ),
-                iOS: const DarwinNotificationDetails(),
-              ),
+            // NotificationService를 통해 알림 표시
+            await NotificationService.showNotification(
+              id: _notificationId,
+              title: title,
+              body: body ?? '새로운 공지사항이 등록되었습니다.',
+              type: NotificationType.announcement,
               payload: 'announcement',
             );
           },

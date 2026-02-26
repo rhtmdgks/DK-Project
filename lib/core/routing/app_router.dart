@@ -217,7 +217,7 @@ Future<String?> _handleRedirect(
     if (isOnLogin) return AppRoute.home.path;
 
     return null;
-  } catch (_, __) {
+  } catch (_) {
     // Cold start(아이콘 재실행) 시 네트워크/저장소 등 예외 시 로그인으로 폴백
     return AppRoute.login.path;
   }

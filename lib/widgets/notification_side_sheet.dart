@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:myapp/core/theme/app_motion.dart';
 import 'package:myapp/core/theme/app_theme.dart';
 import 'package:myapp/core/theme/responsive.dart';
+import 'package:myapp/models/notification_item.dart';
+import 'package:myapp/providers/notification_provider.dart';
+import 'package:provider/provider.dart';
 
 /// 알림 사이드 시트. 메인 페이지 알림 아이콘 탭 시 우측에서 슬라이드 인.
 ///
@@ -71,20 +75,24 @@ class _NotificationSideSheetContent extends StatelessWidget {
   Widget build(BuildContext context) {
     return SafeArea(
       left: false,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _buildHeader(context),
-          Divider(height: 1, color: AppColors.borderLight),
-          Expanded(
-            child: _buildBody(context),
-          ),
-        ],
+      child: Consumer<NotificationProvider>(
+        builder: (context, provider, _) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _buildHeader(context, provider),
+              Divider(height: 1, color: AppColors.borderLight),
+              Expanded(
+                child: _buildBody(context, provider),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
 
-  Widget _buildHeader(BuildContext context) {
+  Widget _buildHeader(BuildContext context, NotificationProvider provider) {
     return Padding(
       padding: EdgeInsets.symmetric(
         horizontal: context.rs(20),
@@ -97,7 +105,34 @@ class _NotificationSideSheetContent extends StatelessWidget {
             style: AppFonts.scaled(context, AppFonts.titleSemiBold)
                 .copyWith(color: AppColors.textDark),
           ),
+          if (provider.unreadCount > 0) ...[
+            SizedBox(width: context.rs(8)),
+            Container(
+              padding: EdgeInsets.symmetric(
+                horizontal: context.rs(8),
+                vertical: context.rh(2),
+              ),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.primary,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                '${provider.unreadCount}',
+                style: AppFonts.scaled(context, AppFonts.captionMedium)
+                    .copyWith(color: Colors.white),
+              ),
+            ),
+          ],
           const Spacer(),
+          if (provider.notifications.isNotEmpty)
+            TextButton(
+              onPressed: () => provider.markAllAsRead(),
+              child: Text(
+                '모두 읽음',
+                style: AppFonts.scaled(context, AppFonts.smallRegular)
+                    .copyWith(color: Theme.of(context).colorScheme.primary),
+              ),
+            ),
           IconButton(
             onPressed: () => Navigator.of(context).pop(),
             icon: Icon(
@@ -114,28 +149,8 @@ class _NotificationSideSheetContent extends StatelessWidget {
     );
   }
 
-  Widget _buildBody(BuildContext context) {
-    // 샘플 알림 목록 (추후 API 연동 시 교체)
-    const items = [
-      _NotificationItem(
-        title: '급식 출발 알림',
-        body: '오늘 점심 급식이 12시에 출발해요.',
-        time: '오전 11:45',
-        read: false,
-      ),
-      _NotificationItem(
-        title: '일정 알림',
-        body: '내일 09:00 수학 수행평가가 있어요.',
-        time: '어제',
-        read: true,
-      ),
-      _NotificationItem(
-        title: '공지사항',
-        body: '2026학년도 1학기 수강신청 안내가 등록되었어요.',
-        time: '2일 전',
-        read: true,
-      ),
-    ];
+  Widget _buildBody(BuildContext context, NotificationProvider provider) {
+    final items = provider.notifications;
 
     if (items.isEmpty) {
       return Center(
@@ -150,7 +165,8 @@ class _NotificationSideSheetContent extends StatelessWidget {
             SizedBox(height: context.rh(16)),
             Text(
               '알림이 없습니다',
-              style: AppFonts.scaled(context, AppFonts.bodyRegular),
+              style: AppFonts.scaled(context, AppFonts.bodyRegular)
+                  .copyWith(color: AppColors.textSecondary),
             ),
           ],
         ),
@@ -163,91 +179,115 @@ class _NotificationSideSheetContent extends StatelessWidget {
         vertical: context.rh(12),
       ),
       itemCount: items.length,
-      separatorBuilder: (_, __) => Divider(height: 1),
+      separatorBuilder: (_, __) => SizedBox(height: context.rh(8)),
       itemBuilder: (context, index) {
         final item = items[index];
         return _NotificationTile(
-          title: item.title,
-          body: item.body,
-          time: item.time,
-          read: item.read,
+          notification: item,
+          onTap: () {
+            provider.markAsRead(item.id);
+            // payload에 따라 화면 이동 처리 가능
+          },
+          onDismiss: () => provider.deleteNotification(item.id),
         );
       },
     );
   }
 }
 
-class _NotificationItem {
-  const _NotificationItem({
-    required this.title,
-    required this.body,
-    required this.time,
-    required this.read,
-  });
-
-  final String title;
-  final String body;
-  final String time;
-  final bool read;
-}
-
 class _NotificationTile extends StatelessWidget {
   const _NotificationTile({
-    required this.title,
-    required this.body,
-    required this.time,
-    required this.read,
+    required this.notification,
+    required this.onTap,
+    required this.onDismiss,
   });
 
-  final String title;
-  final String body;
-  final String time;
-  final bool read;
+  final NotificationItem notification;
+  final VoidCallback onTap;
+  final VoidCallback onDismiss;
+
+  String _formatTime(DateTime timestamp) {
+    final now = DateTime.now();
+    final diff = now.difference(timestamp);
+
+    if (diff.inMinutes < 1) {
+      return '방금 전';
+    } else if (diff.inHours < 1) {
+      return '${diff.inMinutes}분 전';
+    } else if (diff.inDays < 1) {
+      return DateFormat('HH:mm').format(timestamp);
+    } else if (diff.inDays == 1) {
+      return '어제';
+    } else if (diff.inDays < 7) {
+      return '${diff.inDays}일 전';
+    } else {
+      return DateFormat('MM/dd').format(timestamp);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: read
+    return Dismissible(
+      key: Key(notification.id),
+      direction: DismissDirection.endToStart,
+      onDismissed: (_) => onDismiss(),
+      background: Container(
+        alignment: Alignment.centerRight,
+        padding: EdgeInsets.only(right: context.rs(20)),
+        decoration: BoxDecoration(
+          color: Colors.red,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Icon(
+          Icons.delete_outline,
+          color: Colors.white,
+          size: context.rs(24),
+        ),
+      ),
+      child: Material(
+        color: notification.read
             ? Theme.of(context).colorScheme.surface
             : Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.4),
-      borderRadius: BorderRadius.circular(12),
-      child: InkWell(
-        onTap: () {},
         borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: EdgeInsets.all(context.rs(14)),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Text(
-                      title,
-                      style: AppFonts.scaled(context, AppFonts.smallMedium)
-                          .copyWith(
-                        color: AppColors.textDark,
-                        fontWeight: read ? FontWeight.w500 : FontWeight.w600,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: EdgeInsets.all(context.rs(14)),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        notification.title,
+                        style: AppFonts.scaled(context, AppFonts.smallMedium)
+                            .copyWith(
+                          color: AppColors.textDark,
+                          fontWeight: notification.read ? FontWeight.w500 : FontWeight.w600,
+                        ),
                       ),
                     ),
-                  ),
-                  Text(
-                    time,
-                    style: AppFonts.scaled(context, AppFonts.captionRegular),
-                  ),
-                ],
-              ),
-              SizedBox(height: context.rh(4)),
-              Text(
-                body,
-                style: AppFonts.scaled(context, AppFonts.smallRegular)
-                    .copyWith(color: AppColors.textSecondary),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
+                    Text(
+                      _formatTime(notification.timestamp),
+                      style: AppFonts.scaled(context, AppFonts.captionRegular)
+                          .copyWith(color: AppColors.textSecondary),
+                    ),
+                  ],
+                ),
+                SizedBox(height: context.rh(4)),
+                Text(
+                  notification.body,
+                  style: AppFonts.scaled(context, AppFonts.smallRegular)
+                      .copyWith(color: AppColors.textSecondary),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
           ),
         ),
       ),

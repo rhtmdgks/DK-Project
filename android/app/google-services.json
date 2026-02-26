@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "112030896352",
+    "project_id": "dk-project-d82af",
+    "storage_bucket": "dk-project-d82af.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+      "mobilesdk_app_id": "1:112030896352:android:a6a8bee4977eb14e108085",
+      "android_client_info": {
+        "package_name": "com.wearegoodwill.laon"
+      }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBp6rzKWohXoQ2QvmVgVrh-SN2yZkGpzaQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

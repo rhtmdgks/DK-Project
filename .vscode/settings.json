@@ -1,5 +1,9 @@
 {
   "IDX.agenticWorkspace": true,
   "cSpell.enabled": false,
-  "cSpell.ignorePaths": ["docs/**", "**/*.md"]
+  "cSpell.ignorePaths": [
+    "docs/**",
+    "**/*.md"
+  ],
+  "kiroAgent.configureMCP": "Enabled"
 }

@@ -81,7 +81,6 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _loading = true;
   String? _error;
   RealtimeChannel? _channel;
-  String? _roomDisplayName;
   bool _isDirectChat = false;
   String? _currentUserId;
   File? _pickedImage;
@@ -132,11 +131,11 @@ class _ChatScreenState extends State<ChatScreen> {
       final roomRes = roomResult as Map<String, dynamic>?;
 
       if (roomRes != null) {
-        final roomMap = roomRes as Map<String, dynamic>;
+        final roomMap = roomRes;
         final roomType = roomMap['type'] as String? ?? 'group';
         _isDirectChat = roomType == 'direct';
 
-        if (_isDirectChat && userId != null) {
+        if (_isDirectChat) {
           final otherUserResult = await supabase.rpc(
             'get_direct_chat_other_user',
             params: {
@@ -145,32 +144,12 @@ class _ChatScreenState extends State<ChatScreen> {
             },
           );
           if (otherUserResult != null) {
-            final otherUserMap = otherUserResult as Map<String, dynamic>;
-            final studentId = otherUserMap['student_id'] as String? ?? '';
-            final fullName = otherUserMap['full_name'] as String? ?? '알 수 없음';
-            final otherUserName = studentId.isEmpty
-                ? fullName
-                : '$studentId $fullName';
-            if (mounted) {
-              setState(() {
-                _roomDisplayName = otherUserName;
-              });
-            }
-          }
-        } else {
-          if (mounted) {
-            setState(() {
-              _roomDisplayName = roomMap['name'] as String? ?? '채팅방';
-            });
+            // 1:1 채팅 상대방 정보 로드됨 (필요 시 제목 등에 활용 가능)
           }
         }
       }
     } catch (_) {
-      if (mounted) {
-        setState(() {
-          _roomDisplayName = '채팅방';
-        });
-      }
+      // 실패 시 무시
     }
   }
 
@@ -511,7 +490,7 @@ class _ChatScreenState extends State<ChatScreen> {
           '사진/동영상 전송을 위해 서버(Supabase)에 run_on_remote_fix_chat_and_profiles.sql 적용이 필요합니다.',
         );
       } else {
-        _showErrorDialog('전송 실패', '${e.toString()}');
+        _showErrorDialog('전송 실패', e.toString());
       }
     }
   }
@@ -700,7 +679,7 @@ class _ChatScreenState extends State<ChatScreen> {
     final hasImage = attachmentUrl != null && !hasVideo;
 
     final effectiveAvatarUrl = (avatarUrl != null && avatarUrl.isNotEmpty)
-        ? avatarUrl!
+        ? avatarUrl
         : 'https://api.dicebear.com/9.x/notionists/png?seed=${senderId.isEmpty ? 'unknown' : senderId}';
 
     Widget avatar = SizedBox(
@@ -786,7 +765,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   maxHeight: 240,
                 ),
                 child: Image.network(
-                  attachmentUrl!,
+                  attachmentUrl,
                   fit: BoxFit.contain,
                   loadingBuilder: (_, child, progress) =>
                       progress == null
@@ -823,7 +802,7 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
             ),
           if (hasVideo)
-            _buildVideoPreview(context, attachmentUrl!, maxBubbleWidth, isMe),
+            _buildVideoPreview(context, attachmentUrl, maxBubbleWidth, isMe),
         ],
       ),
     );

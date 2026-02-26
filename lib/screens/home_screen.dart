@@ -8,6 +8,7 @@ import 'package:myapp/features/meal/meal_tab.dart';
 import 'package:myapp/features/notice_poll/notice_poll_tab.dart';
 import 'package:myapp/features/schedule/schedule_tab.dart';
 import 'package:myapp/features/suggestions/suggestions_tab.dart';
+import 'package:myapp/services/notification_service.dart';
 
 /// 메인 탭 네비게이션을 호스팅하는 루트 화면.
 ///
@@ -22,6 +23,15 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
   bool _handledNoticeTab = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // 로그인 직후 또는 앱 재실행 후 홈 진입 시 급식 출발 등 프로필 기반 Realtime 구독 갱신
+    NotificationService.onProfileChanged().catchError((Object e, StackTrace _) {
+      debugPrint('프로필 기반 알림 구독 갱신 실패: $e');
+    });
+  }
 
   static const _tabs = <Widget>[
     HomeTab(),

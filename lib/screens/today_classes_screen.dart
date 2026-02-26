@@ -1,12 +1,10 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:myapp/core/auth/auth_state.dart';
 import 'package:myapp/core/supabase_client.dart';
 import 'package:myapp/core/theme/app_theme.dart';
 import 'package:myapp/core/theme/responsive.dart';
-import 'package:myapp/core/utils/subject_theme_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// 오늘의 수업 더보기 페이지 (Figma node 388:2726).
@@ -21,7 +19,6 @@ class TodayClassesScreen extends StatefulWidget {
 }
 
 class _TodayClassesScreenState extends State<TodayClassesScreen> {
-  String? _fullName;
   DateTime _selectedDate = DateTime.now();
 
   /// 샘플 오늘의 수업 데이터 (추후 API 연동 시 교체).
@@ -60,12 +57,10 @@ class _TodayClassesScreenState extends State<TodayClassesScreen> {
 
   Future<void> _loadProfile() async {
     try {
-      AppProfile? profile;
-      
       // 세션이 있으면 기존 로직 사용
       final session = supabase.auth.currentSession;
       if (session != null) {
-        profile = await getCurrentProfile();
+        await getCurrentProfile();
       } else {
         // 세션이 없으면 SharedPreferences에서 user_id를 가져와서 직접 프로필 조회
         final prefs = await SharedPreferences.getInstance();
@@ -79,7 +74,7 @@ class _TodayClassesScreenState extends State<TodayClassesScreen> {
                 .eq('user_id', loggedInUserId)
                 .maybeSingle();
             if (row != null) {
-              profile = AppProfile.fromJson(row);
+              AppProfile.fromJson(row);
             }
           } catch (_) {
             // 프로필 조회 실패 시 무시
@@ -88,10 +83,8 @@ class _TodayClassesScreenState extends State<TodayClassesScreen> {
       }
       
       if (!mounted) return;
-      setState(() => _fullName = profile?.fullName);
     } catch (_) {
       if (!mounted) return;
-      setState(() => _fullName = null);
     }
   }
 
@@ -317,8 +310,6 @@ class _TodayClassesScreenState extends State<TodayClassesScreen> {
 
   /// 수업 카드 (첫 번째 카드: 흰색 배경 + 파란색 테두리)
   Widget _buildClassCard(_ClassItem item) {
-    final subjectTheme = SubjectThemeService.getThemeForSubject(item.name);
-
     return Container(
       padding: EdgeInsets.all(context.rs(16)),
       decoration: BoxDecoration(

@@ -12,8 +12,9 @@ import 'package:myapp/core/theme/responsive.dart';
 import 'package:myapp/core/utils/subject_theme_service.dart';
 import 'package:myapp/core/widgets/laon_icon.dart';
 import 'package:myapp/core/widgets/m3_carousel_scroll_physics.dart';
+import 'package:myapp/providers/notification_provider.dart';
 import 'package:myapp/widgets/notification_side_sheet.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Figma "App Wireframes > HOME" (node 296:5429) 홈 대시보드 탭.
@@ -164,9 +165,43 @@ class _HomeTabState extends State<HomeTab> {
             style: AppFonts.scaled(context, AppFonts.heading2Medium),
           ),
           const Spacer(),
-          _buildIconButton(
-            'assets/images/icon_bell.svg',
-            onTap: () => showNotificationSideSheet(context),
+          Consumer<NotificationProvider>(
+            builder: (context, provider, _) {
+              final hasUnread = provider.unreadCount > 0;
+              return Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  _buildIconButton(
+                    'assets/images/icon_bell.svg',
+                    onTap: () => showNotificationSideSheet(context),
+                  ),
+                  if (hasUnread)
+                    Positioned(
+                      right: -2,
+                      top: -2,
+                      child: Container(
+                        width: context.rs(10),
+                        height: context.rs(10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFF3B30), // iOS 스타일 빨간색
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: Theme.of(context).colorScheme.surface,
+                            width: 1.5,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFFFF3B30).withValues(alpha: 0.4),
+                              blurRadius: 4,
+                              offset: const Offset(0, 1),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
           ),
           SizedBox(width: context.rs(28)),
           _buildIconButton(
@@ -200,7 +235,6 @@ class _HomeTabState extends State<HomeTab> {
   // ── 2. 프로필 인사말 ──
 
   Widget _buildGreeting() {
-    final name = _fullName ?? (_isTeacher ? '선생님' : '학생');
     final avatarSize = context.rmin(64);
 
     return Padding(
@@ -466,24 +500,9 @@ class _HomeTabState extends State<HomeTab> {
     );
   }
 
-  // ── 4. 구분선 ──
-
-  Widget _buildDivider() {
-    return Container(
-      height: 1,
-      margin: EdgeInsets.symmetric(horizontal: context.rs(2)),
-      decoration: BoxDecoration(
-        color: AppColors.border,
-        borderRadius: BorderRadius.circular(80),
-      ),
-    );
-  }
-
   // ── 5. 다음 시간 과목 섹션 ──
 
   Widget _buildNextClassSection() {
-    final name = _fullName ?? '학생';
-
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: context.rs(26)),
       child: Column(
@@ -673,29 +692,6 @@ class _HomeTabState extends State<HomeTab> {
               ],
             ],
           ),
-    );
-  }
-
-  Widget _buildInfoRow(
-      BuildContext context, IconData icon, String text, double iconSize) {
-    return Row(
-      children: [
-        Icon(
-          icon,
-          size: iconSize,
-          color: AppColors.white.withValues(alpha: 0.85),
-        ),
-        SizedBox(width: context.rs(10)),
-        Expanded(
-          child: Text(
-            text,
-            style: AppFonts.scaled(
-              context,
-              AppFonts.display3Regular,
-            ).copyWith(color: AppColors.white),
-          ),
-        ),
-      ],
     );
   }
 

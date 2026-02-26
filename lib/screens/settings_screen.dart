@@ -11,7 +11,9 @@ import 'package:myapp/core/theme/app_theme.dart';
 import 'package:myapp/core/theme/responsive.dart';
 import 'package:myapp/services/announcement_notification_service.dart';
 import 'package:myapp/services/class_move_notification_service.dart';
+import 'package:myapp/services/meal_departure_realtime_service.dart';
 import 'package:myapp/services/meal_notification_service.dart';
+import 'package:myapp/services/notification_service.dart';
 import 'package:myapp/services/schedule_notification_service.dart';
 import 'package:myapp/services/weather_notification_service.dart';
 
@@ -93,6 +95,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (key == 'meal') {
       MealNotificationService.setMealEnabled(newValue)
           .catchError((Object e, StackTrace _) {});
+      MealDepartureRealtimeService.refreshSubscription()
+          .catchError((Object e, StackTrace _) {});
     } else if (key == 'schedule') {
       ScheduleNotificationService.setScheduleEnabled(newValue)
           .catchError((Object e, StackTrace _) {});
@@ -104,15 +108,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
           .catchError((Object e, StackTrace _) {});
     } else if (key == 'weather') {
       if (newValue) {
-        // 날씨 알림을 켤 때: 위치 권한 요청 (알림 권한은 위에서 이미 확인함)
         try {
-          // 위치 권한 확인 및 요청 (현재 위치의 날씨 정보를 가져오기 위해 필요)
           await _updateWeatherLocation();
-
-          // 알림 활성화 및 스케줄링 (알림 권한은 이미 확인했으므로 skip)
           await WeatherNotificationService.setWeatherEnabled(true, skipPermissionCheck: true);
         } catch (e) {
-          // 오류 발생 시 토글을 다시 false로 변경하고 사용자에게 알림
           if (mounted) {
             setState(() => _toggles[key] = false);
             await prefs.setBool('$_prefPrefix$key', false);
@@ -498,12 +497,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (shouldLogout != true) return;
 
     try {
+      // 실시간 알림 구독 해제
+      await NotificationService.onLogout();
+
       // Supabase 세션 로그아웃 시도 (실패해도 계속 진행)
       try {
         await supabase.auth.signOut();
-      } catch (_) {
-        // 세션이 없거나 signOut 실패해도 계속 진행
-      }
+      } catch (_) {}
 
       // SharedPreferences에서 로그인 상태 제거
       final prefs = await SharedPreferences.getInstance();

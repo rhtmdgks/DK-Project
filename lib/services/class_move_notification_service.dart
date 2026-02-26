@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/timezone.dart' as tz;
@@ -119,8 +118,8 @@ class ClassMoveNotificationService {
 
         // 이동 수업 찾기: 이전 수업과 다음 수업의 room이 다르면 이동 수업
         for (int i = 1; i < dayTimetable.length; i++) {
-          final prevEntry = dayTimetable[i - 1] as Map<String, dynamic>;
-          final currEntry = dayTimetable[i] as Map<String, dynamic>;
+          final prevEntry = dayTimetable[i - 1];
+          final currEntry = dayTimetable[i];
 
           final prevRoom = prevEntry['room'] as String?;
           final currRoom = currEntry['room'] as String?;

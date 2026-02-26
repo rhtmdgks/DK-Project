@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'dart:io';
 
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -10,6 +11,12 @@ import 'package:myapp/core/supabase_client.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  try {
+    await Firebase.initializeApp();
+  } catch (e) {
+    debugPrint('Firebase.initializeApp 실패 (FCM 비활성): $e');
+  }
 
   // 세로 모드만 허용
   await SystemChrome.setPreferredOrientations([
@@ -50,7 +57,7 @@ void main() async {
   // 릴리스에서 실제 사용 URL 확인용 (1순위 원인: URL/호스트가 비었거나 스킴 누락 시 DNS처럼 보이는 오류 발생)
   debugPrint('SUPABASE_URL=$url');
   debugPrint('HOST=${Uri.tryParse(url)?.host}');
-  debugPrint('SUPABASE from env=${fromEnv} (false=loaded from dart_defines.json)');
+  debugPrint('SUPABASE from env=$fromEnv (false=loaded from dart_defines.json)');
   if (url.isEmpty) {
     debugPrint('SUPABASE_URL is empty - check dart_defines.json in assets or --dart-define-from-file');
   }

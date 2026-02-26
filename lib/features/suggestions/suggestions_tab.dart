@@ -120,7 +120,7 @@ class _SuggestionsTabState extends State<SuggestionsTab>
           .eq('role', 'admin')
           .limit(1);
 
-      if (adminProfiles == null || (adminProfiles as List).isEmpty) {
+      if ((adminProfiles as List).isEmpty) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('관리자를 찾을 수 없습니다')),

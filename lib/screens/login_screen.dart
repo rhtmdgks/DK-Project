@@ -9,6 +9,7 @@ import 'package:myapp/core/supabase_client.dart';
 import 'package:myapp/core/theme/app_theme.dart';
 import 'package:myapp/core/theme/responsive.dart';
 import 'package:myapp/core/widgets/laon_icon.dart';
+import 'package:myapp/services/notification_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -95,7 +96,7 @@ class _LoginScreenState extends State<LoginScreen> {
           );
           print('RPC call completed');
           break;
-        } catch (rpcError, rpcStack) {
+        } catch (rpcError, _) {
           if (!isHostLookupError(rpcError)) {
             print('=== RPC CALL ERROR (non-DNS) ===');
             print('RPC Error: $rpcError');
@@ -263,7 +264,6 @@ class _LoginScreenState extends State<LoginScreen> {
       
       // 2. 세션 생성을 위해 signInWithPassword 시도
       // 백오피스 Auth 변경사항: 모든 사용자가 auth.users에 존재하므로 성공해야 함
-      bool sessionCreated = false;
       try {
         // 먼저 기본 이메일 형식 시도 (${studentId}@school.local)
         try {
@@ -276,7 +276,6 @@ class _LoginScreenState extends State<LoginScreen> {
           print('User ID: ${authResponse.user?.id}');
           print('User email: ${authResponse.user?.email}');
           print('Session: ${authResponse.session != null}');
-          sessionCreated = true;
         } catch (firstError) {
           // 기본 이메일 실패 시 백오피스 형식 시도 (${username}-${profileId}@laon.local)
           final profileId = profileData['id'] as String?;
@@ -294,7 +293,6 @@ class _LoginScreenState extends State<LoginScreen> {
               print('User email: ${authResponse.user?.email}');
               print('Session: ${authResponse.session != null}');
               print('사용된 이메일: $backofficeEmail');
-              sessionCreated = true;
             } catch (secondError) {
               // 두 형식 모두 실패
               print('=== SUPABASE AUTH ERROR (모든 형식 실패) ===');
@@ -328,20 +326,10 @@ class _LoginScreenState extends State<LoginScreen> {
         // 세션 생성 실패는 예상치 못한 상황이지만, 프로필 정보가 있으므로 계속 진행
         print('Session creation failed, but continuing with profile data from RPC');
         print('Note: 백오피스에서 auth.users를 생성했어야 하는데 실패했습니다.');
-        sessionCreated = false;
       }
 
       if (!mounted) {
         print('=== WIDGET NOT MOUNTED (after auth attempt) ===');
-        return;
-      }
-
-      if (profile == null) {
-        print('=== PROFILE IS NULL ===');
-        setState(() {
-          _error = '프로필을 찾을 수 없습니다';
-          _loading = false;
-        });
         return;
       }
 
@@ -358,6 +346,11 @@ class _LoginScreenState extends State<LoginScreen> {
         print('Prefs Error: $prefsError');
         // 에러가 발생해도 계속 진행
       }
+
+      // 급식 출발 등 프로필 기반 Realtime 구독 시작 (설정이 켜져 있으면 구독)
+      NotificationService.onProfileChanged().catchError((Object e, StackTrace _) {
+        debugPrint('프로필 기반 알림 구독 갱신 실패: $e');
+      });
 
       print('Step 9: Navigation...');
       print('mustChangePassword: ${profile.mustChangePassword}');

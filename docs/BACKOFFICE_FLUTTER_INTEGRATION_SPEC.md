@@ -1,0 +1,136 @@
+# 라온 백오피스 ↔ Flutter 앱 연동 최종 명세서
+
+이 문서는 **백오피스(DK-Project_Backoffice)** 와 **Flutter 학생 앱(DK-Project)** 간 데이터·동작 연동을 위한 최종 명세입니다. Flutter 에이전트는 이 명세에 맞춰 구현·수정하면 됩니다.
+
+---
+
+## 목차
+
+1. [실시간 급식 출발 알림](#1-실시간-급식-출발-알림)
+2. [시간표](#2-시간표)
+3. [공지사항·알림](#3-공지사항알림)
+4. [학사일정 (NEIS)](#4-학사일정-neis)
+5. [프로필(profiles) 필드 통일](#5-프로필profiles-필드-통일)
+6. [일정(schedule_items)](#6-일정schedule_items)
+7. [기타 테이블·API](#7-기타-테이블api)
+8. [Flutter 수정 체크리스트](#8-flutter-수정-체크리스트)
+
+---
+
+## 1. 실시간 급식 출발 알림
+
+### 백오피스 동작
+
+- **페이지**: 대시보드 카드 + 사이드바 「급식 출발 알림」 → `/meal-alert`
+- **전송**: 학년(1~3)·반(1~10) 선택 후 「급식 출발 알림 전송」 클릭
+- **방식**: Supabase Realtime Broadcast
+  - **채널**: `meal-departure:{학년}:{반}` (예: 1학년 3반 → `meal-departure:1:3`)
+  - **이벤트**: `meal-departure`
+  - **페이로드**: `{ message, body, grade, class_number, at }` (ISO 8601)
+
+### Flutter 구현 지시
+
+- 로그인 후 `AppProfile`의 `grade`(또는 `gradeOrFromStudentId`), `classNum`(또는 `classNumOrFromStudentId`)로 **해당 1개 채널만** 구독.
+- `supabase.channel('meal-departure:$grade:$classNum').onBroadcast(event: 'meal-departure', callback: ...).subscribe()`
+- 수신 시 `message`를 제목, `body`를 본문으로 `flutter_local_notifications`로 즉시 표시. 기존 `meal_notification` 채널 재사용 권장.
+- 알림 권한 요청·확인 후 표시. 로그아웃/프로필 변경 시 구독 해제.
+- 상세: `docs/MEAL_DEPARTURE_REALTIME_SPEC.md` 참고.
+
+---
+
+## 2. 시간표
+
+### 백오피스 동작
+
+- **timetable_master**: NEIS에서 불러온 **반·교시·과목**만 저장 (학년·반별). 학생별로 자동 부여하지 않음.
+- **timetable_entries**: **학생별** 시간표. 백오피스에서 학생 선택 후 요일·교시별로 과목(및 교실·선생님)을 **직접 추가/수정**. 과목 선택 리스트는 해당 학생 학년(·반)의 `timetable_master` 기준으로 노출.
+
+### Flutter 구현 지시
+
+- **읽기**: `timetable_entries` 테이블을 `user_id` = 현재 사용자로 조회. 구조 변경 없음.
+- **day_of_week**: 백오피스는 **1=월 ~ 5=금**만 사용. Flutter에서 이동 수업 등 요일별 처리 시 1=월, 2=화, …, 5=금으로 맞추면 됨 (일요일 0 등은 백오피스에 없음).
+- NEIS는 “마스터만 반영”이므로, Flutter는 계속 `timetable_entries`만 읽으면 됨.
+
+---
+
+## 3. 공지사항·알림
+
+### 백오피스 동작
+
+- **announcements** 테이블: `id`, `title`, `body`, `created_at`, **target_grade**, **target_class_number**
+- 공지 작성 시 대상 학년·반 선택. **컬럼명은 반드시 `target_class_number`** (반). `target_class` 아님.
+
+### Flutter 구현 지시
+
+- **Realtime 공지 알림**: `announcements` INSERT 구독 시 새 행의 **target_grade**, **target_class_number** 로 현재 사용자 학년·반과 비교.
+- **target_class_number** 사용 필수. (과거 `target_class` 사용 시 백오피스와 불일치하므로 `target_class_number` 우선, 없을 때만 `target_class` fallback 권장.)
+- 공지 목록 조회: `announcements` select 시 컬럼 `target_grade`, `target_class_number` 로 필터/표시하면 됨.
+
+---
+
+## 4. 학사일정 (NEIS)
+
+### 백오피스 동작
+
+- **neis_academic_events** 테이블: 백오피스가 NEIS 학사일정 API로 주기 동기화. `aa_ymd`, `event_nm`, `event_cntnt`, `synced_at` 등.
+- 공지 관리 화면에서 “NEIS 학사일정 동기화” 버튼 및 6시간마다 자동 동기화.
+
+### Flutter 구현 지시
+
+- **현재**: Edge Function `neis_academic_calendar` 호출로 학사일정 표시 가능. 그대로 두어도 됨.
+- **선택**: 동일 데이터 소스로 통일하려면 `neis_academic_events` 테이블을 select 해서 `aa_ymd` → 날짜, `event_nm` → 제목, `event_cntnt` → 내용으로 매핑해 표시할 수 있음. (Edge Function 유지 시 백오피스와 별도 소스라도 내용은 NEIS 기준으로 동일.)
+
+---
+
+## 5. 프로필(profiles) 필드 통일
+
+### 백오피스·DB
+
+- **profiles**: `grade`, `class_num`, `student_number` (학년, 반, 번호). 학번 `student_id`는 G+반(2자리)+번호(2자리) 등 규칙으로 생성.
+
+### Flutter 구현 지시
+
+- **grade**: `profiles.grade` (없으면 학번 추론).
+- **반**: `profiles.class_num` → `AppProfile.classNum` (DB 컬럼명이 `class_num`이면 그대로 매핑).
+- **번호**: DB에 `student_number`만 있을 수 있음. `AppProfile.numberInClass` 매핑 시 **`number_in_class` 없으면 `student_number` fallback** 권장. (`profiles.student_number` 와 호환)
+
+---
+
+## 6. 일정(schedule_items)
+
+### 백오피스·Flutter
+
+- **schedule_items**: 학교 일정. 백오피스에서 별도 관리하는 경우 구조 동일 유지.
+- Flutter: `schedule_items` select 및 Realtime 구독 등 기존 방식 유지.
+
+---
+
+## 7. 기타 테이블·API
+
+| 항목 | 백오피스 | Flutter |
+|------|----------|---------|
+| **polls / poll_votes** | 투표 관리 | 기존 조회·투표 유지 |
+| **suggestions** | 건의함 | 기존 연동 유지 |
+| **chat_rooms / chat_messages** | 채팅방 관리 | 기존 연동 유지 |
+| **bug_reports** | 버그 신고 | 기존 연동 유지 |
+
+---
+
+## 8. Flutter 수정 체크리스트
+
+- [ ] **급식 출발 알림**: `meal-departure:{grade}:{classNum}` Realtime 구독 및 로컬 알림 표시 (명세 1 참고).
+- [ ] **공지 알림**: `announcements` INSERT 구독 시 **target_class_number** 사용 (target_class fallback 가능). (명세 3)
+- [ ] **프로필**: `number_in_class` 없을 때 **student_number** 로 번호 매핑. (명세 5)
+- [ ] **시간표**: `timetable_entries` 조회, day_of_week 1=월~5=금 의미 유지. (명세 2)
+- [ ] (선택) 학사일정: `neis_academic_events` 테이블 조회로 전환 또는 Edge Function 유지. (명세 4)
+
+---
+
+## 참고: 백오피스 쪽 코드 위치
+
+- 급식 출발: `components/meal-alert/meal-alert-content.tsx`
+- 시간표: `components/timetables/timetables-content.tsx`, `app/api/neis-timetable/route.ts` (NEIS → timetable_master)
+- 공지: `components/announcements/announcements-content.tsx` (target_grade, target_class_number)
+- 학사일정 동기화: `app/api/neis-academic-sync/route.ts`, 테이블 `neis_academic_events`
+
+Flutter 앱은 **동일 Supabase 프로젝트**를 사용하므로, 위 테이블·컬럼·Realtime 채널 규칙에 맞추면 됩니다.
