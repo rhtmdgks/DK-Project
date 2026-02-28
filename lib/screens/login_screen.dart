@@ -103,10 +103,14 @@ class _LoginScreenState extends State<LoginScreen> {
             final errStr = rpcError.toString();
             final isNetworkError = errStr.contains('SocketException') ||
                 errStr.contains('Connection refused');
+            final isInvalidCredentials = errStr.contains('invalid_credentials') ||
+                errStr.contains('user_not_found_in_auth');
             setState(() {
               _error = isNetworkError
                   ? '서버에 연결할 수 없습니다.\n연결 주소: $supabaseHost'
-                  : 'RPC 호출 실패: $rpcError';
+                  : isInvalidCredentials
+                      ? '학번, 비밀번호가 맞지 않습니다. 다시 확인해주세요.'
+                      : 'RPC 호출 실패: $rpcError';
               _loading = false;
             });
             return;
@@ -132,6 +136,17 @@ class _LoginScreenState extends State<LoginScreen> {
                 break;
               } catch (fallbackError) {
                 debugPrint('Fallback RPC failed: $fallbackError');
+                final errStr = fallbackError.toString();
+                if (errStr.contains('invalid_credentials') ||
+                    errStr.contains('user_not_found_in_auth')) {
+                  if (mounted) {
+                    setState(() {
+                      _error = '학번, 비밀번호가 맞지 않습니다. 다시 확인해주세요.';
+                      _loading = false;
+                    });
+                  }
+                  return;
+                }
               }
             }
             final host = supabaseHost;
@@ -235,6 +250,17 @@ class _LoginScreenState extends State<LoginScreen> {
           _loading = false;
         });
         return;
+      }
+
+      // 로그인 시 발급한 세션 토큰 저장 (세션 없이 건의 등록 시 재인증 없이 사용, 019 마이그레이션 적용 시 포함)
+      final sessionTokenRaw = resultMap['session_token'] ?? resultMap['sessionToken'];
+      if (sessionTokenRaw != null) {
+        final tokenStr = sessionTokenRaw.toString().trim();
+        if (tokenStr.isNotEmpty) {
+          try {
+            await AuthRepository.instance.saveSessionToken(tokenStr);
+          } catch (_) {}
+        }
       }
 
       debugPrint('Step 6: Creating AppProfile from RPC data...');

@@ -13,6 +13,7 @@ import 'package:myapp/screens/settings_screen.dart';
 import 'package:myapp/screens/splash_screen.dart';
 import 'package:myapp/screens/suggestions_chat_screen.dart';
 import 'package:myapp/screens/terms_screen.dart';
+import 'package:myapp/screens/profile_screen.dart';
 import 'package:myapp/screens/today_classes_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -29,7 +30,8 @@ enum AppRoute {
   chatList('/chat'),
   chatRoom('/chat/:roomId'),
   suggestionsChat('/suggestions/chat'),
-  todayClasses('/today-classes');
+  todayClasses('/today-classes'),
+  profile('/profile');
 
   const AppRoute(this.path);
   final String path;
@@ -136,6 +138,11 @@ GoRouter createAppRouter() {
         path: AppRoute.todayClasses.path,
         pageBuilder: (_, state) =>
             _m3Page(state, const TodayClassesScreen()),
+      ),
+      GoRoute(
+        path: AppRoute.profile.path,
+        pageBuilder: (_, state) =>
+            _m3Page(state, const ProfileScreen()),
       ),
     ],
   );

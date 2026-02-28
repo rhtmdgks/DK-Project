@@ -2,8 +2,10 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:myapp/core/auth/auth_state.dart';
+import 'package:myapp/core/supabase_client.dart';
 import 'package:myapp/core/theme/app_theme.dart';
 import 'package:myapp/core/theme/responsive.dart';
+import 'package:myapp/core/utils/timetable_utils.dart';
 
 /// 오늘의 수업 더보기 페이지 (Figma node 388:2726).
 ///
@@ -18,39 +20,14 @@ class TodayClassesScreen extends StatefulWidget {
 
 class _TodayClassesScreenState extends State<TodayClassesScreen> {
   DateTime _selectedDate = DateTime.now();
-
-  /// 샘플 오늘의 수업 데이터 (추후 API 연동 시 교체).
-  static const _todayClasses = [
-    _ClassItem(
-      name: '화학',
-      chapter: '3교시 - 2층 창의융합실',
-      startTime: '08:30',
-      endTime: '09:20',
-      location: '2-창의융합실',
-      teacher: '김선생님',
-    ),
-    _ClassItem(
-      name: '수학Ⅱ',
-      chapter: '1단원: 함수',
-      startTime: '09:30',
-      endTime: '10:20',
-      location: '6-205',
-      teacher: '이선생님',
-    ),
-    _ClassItem(
-      name: '생명과학',
-      chapter: '3단원: 동물계',
-      startTime: '10:30',
-      endTime: '11:20',
-      location: '2-168',
-      teacher: '오신영 선생님',
-    ),
-  ];
+  List<_ClassItem> _todayClasses = [];
+  bool _timetableLoading = true;
 
   @override
   void initState() {
     super.initState();
     _loadProfile();
+    _loadTimetableForDate(_selectedDate);
   }
 
   Future<void> _loadProfile() async {
@@ -59,6 +36,61 @@ class _TodayClassesScreenState extends State<TodayClassesScreen> {
       if (!mounted) return;
     } catch (_) {
       if (!mounted) return;
+    }
+  }
+
+  Future<void> _loadTimetableForDate(DateTime date) async {
+    final uid = supabase.auth.currentUser?.id;
+    setState(() => _timetableLoading = true);
+    if (uid == null) {
+      if (!mounted) return;
+      setState(() {
+        _todayClasses = [];
+        _timetableLoading = false;
+      });
+      return;
+    }
+    final dayOfWeek = TimetableUtils.dayOfWeekForDb(date);
+    if (dayOfWeek == null) {
+      if (!mounted) return;
+      setState(() {
+        _todayClasses = [];
+        _timetableLoading = false;
+      });
+      return;
+    }
+    try {
+      final res = await supabase
+          .from('timetable_entries')
+          .select('subject, period, room, teacher')
+          .eq('user_id', uid)
+          .eq('day_of_week', dayOfWeek)
+          .order('period');
+      final list = List<Map<String, dynamic>>.from(res as List);
+      if (!mounted) return;
+      setState(() {
+        _todayClasses = list.map((e) {
+          final period = (e['period'] as num?)?.toInt() ?? 0;
+          final subject = (e['subject'] as String?)?.trim() ?? '(없음)';
+          final room = (e['room'] as String?)?.trim() ?? '';
+          final teacher = (e['teacher'] as String?)?.trim() ?? '';
+          return _ClassItem(
+            name: subject,
+            chapter: '$period교시${room.isNotEmpty ? ' - $room' : ''}',
+            startTime: TimetableUtils.startTimeString(period),
+            endTime: TimetableUtils.endTimeString(period),
+            location: room,
+            teacher: teacher.isEmpty ? '-' : teacher,
+          );
+        }).toList();
+        _timetableLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _todayClasses = [];
+        _timetableLoading = false;
+      });
     }
   }
 
@@ -150,7 +182,10 @@ class _TodayClassesScreenState extends State<TodayClassesScreen> {
             date.year == _selectedDate.year;
 
         return GestureDetector(
-          onTap: () => setState(() => _selectedDate = date),
+          onTap: () {
+            setState(() => _selectedDate = date);
+            _loadTimetableForDate(date);
+          },
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -194,6 +229,28 @@ class _TodayClassesScreenState extends State<TodayClassesScreen> {
 
   /// 타임라인 뷰
   Widget _buildTimeline() {
+    if (_timetableLoading) {
+      return Padding(
+        padding: EdgeInsets.only(top: context.rh(24)),
+        child: Center(
+          child: CircularProgressIndicator(color: AppColors.primaryBlue),
+        ),
+      );
+    }
+    if (_todayClasses.isEmpty) {
+      return Padding(
+        padding: EdgeInsets.only(top: context.rh(24)),
+        child: Center(
+          child: Text(
+            TimetableUtils.isWeekday(_selectedDate)
+                ? '등록된 수업이 없어요.'
+                : '주말에는 수업이 없어요.',
+            style: AppFonts.scaled(context, AppFonts.bodyRegular)
+                .copyWith(color: AppColors.textSecondary),
+          ),
+        ),
+      );
+    }
     return Stack(
       children: [
         // 왼쪽 타임라인 세로선
@@ -216,7 +273,7 @@ class _TodayClassesScreenState extends State<TodayClassesScreen> {
             final index = entry.key;
             final item = entry.value;
             final isFirst = index == 0;
-            
+
             return Padding(
               padding: EdgeInsets.only(
                 left: context.rs(0),
@@ -267,11 +324,9 @@ class _TodayClassesScreenState extends State<TodayClassesScreen> {
                     ),
                   ),
                   SizedBox(width: context.rs(16)),
-                  // 수업 카드
+                  // 수업 카드 (첫 번째만 파란 테두리 강조)
                   Expanded(
-                    child: isFirst
-                        ? _buildClassCard(item)
-                        : _buildPlaceholderCard(),
+                    child: _buildClassCard(item, isFirst: isFirst),
                   ),
                 ],
               ),
@@ -282,15 +337,15 @@ class _TodayClassesScreenState extends State<TodayClassesScreen> {
     );
   }
 
-  /// 수업 카드 (첫 번째 카드: 흰색 배경 + 파란색 테두리)
-  Widget _buildClassCard(_ClassItem item) {
+  /// 수업 카드 (첫 번째 카드: 흰색 배경 + 파란색 테두리, 나머지: 연한 테두리)
+  Widget _buildClassCard(_ClassItem item, {bool isFirst = true}) {
     return Container(
       padding: EdgeInsets.all(context.rs(16)),
       decoration: BoxDecoration(
         color: AppColors.white,
         border: Border.all(
-          color: AppColors.primaryBlue,
-          width: 1,
+          color: isFirst ? AppColors.primaryBlue : AppColors.borderLight,
+          width: isFirst ? 1.5 : 1,
         ),
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
@@ -337,20 +392,6 @@ class _TodayClassesScreenState extends State<TodayClassesScreen> {
             ],
           ),
         ],
-      ),
-    );
-  }
-
-  /// 플레이스홀더 카드 (회색 배경)
-  Widget _buildPlaceholderCard() {
-    return Container(
-      padding: EdgeInsets.all(context.rs(16)),
-      decoration: BoxDecoration(
-        color: AppColors.borderLight,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: SizedBox(
-        height: context.rh(80),
       ),
     );
   }

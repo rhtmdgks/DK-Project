@@ -782,12 +782,16 @@ class _ScheduleTabState extends State<ScheduleTab> {
     var end = start.add(const Duration(hours: 1));
     var allDay = false;
 
+    if (!mounted) return;
     try {
       final added = await showModalBottomSheet<bool>(
         context: context,
+        useRootNavigator: true,
         isScrollControlled: true,
         useSafeArea: true,
         backgroundColor: Colors.transparent,
+        isDismissible: true,
+        enableDrag: true,
         builder: (sheetContext) {
           return DraggableScrollableSheet(
             expand: false,
@@ -799,7 +803,7 @@ class _ScheduleTabState extends State<ScheduleTab> {
                 builder: (innerContext, setSheetState) {
                   return Container(
                     decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.surface,
+                      color: Theme.of(innerContext).colorScheme.surface,
                       borderRadius: BorderRadius.vertical(
                         top: Radius.circular(AppShapes.radiusLarge),
                       ),
@@ -810,9 +814,9 @@ class _ScheduleTabState extends State<ScheduleTab> {
                         children: [
                           // 드래그 핸들
                           Padding(
-                            padding: EdgeInsets.only(top: context.rh(12)),
+                            padding: EdgeInsets.only(top: innerContext.rh(12)),
                             child: Container(
-                              width: context.rs(36),
+                              width: innerContext.rs(36),
                               height: 4,
                               decoration: BoxDecoration(
                                 color: AppColors.hint.withValues(alpha: 0.5),
@@ -822,14 +826,14 @@ class _ScheduleTabState extends State<ScheduleTab> {
                           ),
                           Padding(
                             padding: EdgeInsets.symmetric(
-                              horizontal: context.rs(22),
-                              vertical: context.rh(16),
+                              horizontal: innerContext.rs(22),
+                              vertical: innerContext.rh(16),
                             ),
                             child: Row(
                               children: [
                                 Text(
                                   '개인 일정 추가',
-                                  style: AppFonts.scaled(context, AppFonts.titleBold),
+                                  style: AppFonts.scaled(innerContext, AppFonts.titleBold),
                                 ),
                                 const Spacer(),
                                 IconButton(
@@ -846,10 +850,10 @@ class _ScheduleTabState extends State<ScheduleTab> {
                             child: SingleChildScrollView(
                               controller: scrollController,
                               padding: EdgeInsets.fromLTRB(
-                                context.rs(22),
+                                innerContext.rs(22),
                                 0,
-                                context.rs(22),
-                                context.rh(24),
+                                innerContext.rs(22),
+                                innerContext.rh(24),
                               ),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -867,7 +871,7 @@ class _ScheduleTabState extends State<ScheduleTab> {
                                       border: Border.all(color: AppColors.border),
                                     ),
                                   ),
-                                  SizedBox(height: context.rh(12)),
+                                  SizedBox(height: innerContext.rh(12)),
                                   CupertinoTextField(
                                     controller: descController,
                                     placeholder: '설명 (선택)',
@@ -882,7 +886,7 @@ class _ScheduleTabState extends State<ScheduleTab> {
                                       border: Border.all(color: AppColors.border),
                                     ),
                                   ),
-                                  SizedBox(height: context.rh(12)),
+                                  SizedBox(height: innerContext.rh(12)),
                                   CheckboxListTile(
                                     title: const Text('하루 종일'),
                                     value: allDay,
@@ -909,10 +913,10 @@ class _ScheduleTabState extends State<ScheduleTab> {
                           ),
                           Padding(
                             padding: EdgeInsets.fromLTRB(
-                              context.rs(22),
+                              innerContext.rs(22),
                               0,
-                              context.rs(22),
-                              context.rh(24),
+                              innerContext.rs(22),
+                              innerContext.rh(24),
                             ),
                             child: Row(
                               children: [
@@ -922,33 +926,60 @@ class _ScheduleTabState extends State<ScheduleTab> {
                                     child: const Text('취소'),
                                   ),
                                 ),
-                                SizedBox(width: context.rs(12)),
+                                SizedBox(width: innerContext.rs(12)),
                                 Expanded(
                                   child: FilledButton(
                                     onPressed: () async {
                                       final uid = supabase.auth.currentUser?.id;
-                                      if (uid == null) return;
-
-                                      final title = titleController.text.trim();
-                                      if (title.isEmpty) {
-                                        ScaffoldMessenger.of(innerContext).showSnackBar(
-                                          const SnackBar(content: Text('제목을 입력해 주세요.')),
-                                        );
+                                      if (uid == null) {
+                                        if (innerContext.mounted) {
+                                          ScaffoldMessenger.of(innerContext).showSnackBar(
+                                            const SnackBar(
+                                              content: Text('로그인 세션이 없습니다. 로그아웃 후 다시 로그인해 주세요.'),
+                                              behavior: SnackBarBehavior.floating,
+                                            ),
+                                          );
+                                        }
                                         return;
                                       }
 
-                                      await supabase.from('personal_events').insert({
-                                        'user_id': uid,
-                                        'title': title,
-                                        'description': descController.text.trim().isEmpty
-                                            ? null
-                                            : descController.text.trim(),
-                                        'start_at': start.toIso8601String(),
-                                        'end_at': allDay ? null : end.toIso8601String(),
-                                        'all_day': allDay,
-                                      });
-                                      if (sheetContext.mounted) {
-                                        Navigator.of(sheetContext).pop(true);
+                                      final title = titleController.text.trim();
+                                      if (title.isEmpty) {
+                                        if (innerContext.mounted) {
+                                          ScaffoldMessenger.of(innerContext).showSnackBar(
+                                            const SnackBar(
+                                              content: Text('제목을 입력해 주세요.'),
+                                              behavior: SnackBarBehavior.floating,
+                                            ),
+                                          );
+                                        }
+                                        return;
+                                      }
+
+                                      try {
+                                        await supabase.from('personal_events').insert({
+                                          'user_id': uid,
+                                          'title': title,
+                                          'description': descController.text.trim().isEmpty
+                                              ? null
+                                              : descController.text.trim(),
+                                          'start_at': start.toIso8601String(),
+                                          'end_at': allDay ? null : end.toIso8601String(),
+                                          'all_day': allDay,
+                                        });
+                                        if (sheetContext.mounted) {
+                                          Navigator.of(sheetContext).pop(true);
+                                        }
+                                      } catch (e) {
+                                        if (innerContext.mounted) {
+                                          ScaffoldMessenger.of(innerContext).showSnackBar(
+                                            SnackBar(
+                                              content: Text('저장 실패: ${e.toString().split('\n').first}'),
+                                              behavior: SnackBarBehavior.floating,
+                                              backgroundColor: AppColors.error,
+                                            ),
+                                          );
+                                        }
                                       }
                                     },
                                     child: const Text('추가'),
@@ -969,6 +1000,7 @@ class _ScheduleTabState extends State<ScheduleTab> {
       );
 
       if (added == true) {
+        if (!mounted) return;
         _fetch();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -987,6 +1019,17 @@ class _ScheduleTabState extends State<ScheduleTab> {
           );
         }
       }
+    } catch (e, st) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('일정 추가 화면을 열 수 없습니다: ${e.toString().split('\n').first}'),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+      debugPrint('_showAddPersonalEventDialog error: $e\n$st');
     } finally {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         titleController.dispose();

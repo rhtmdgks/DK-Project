@@ -8,6 +8,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:myapp/core/auth/auth_repository.dart';
 import 'package:myapp/core/supabase_client.dart';
+import 'package:myapp/core/utils/avatar_url_resolver.dart';
 import 'package:myapp/core/theme/app_motion.dart';
 import 'package:myapp/core/widgets/dismiss_keyboard.dart';
 import 'package:myapp/core/theme/app_theme.dart';
@@ -641,7 +642,8 @@ class _ChatScreenState extends State<ChatScreen> {
     final isMe = senderId == _currentUserId;
     final displayName = _senderDisplayName(m);
     final timeStr = _formatTime(m['created_at'] as String?);
-    final avatarUrl = m['sender_avatar_url'] as String?;
+    final rawAvatarUrl = m['sender_avatar_url'] as String?;
+    final avatarUrl = resolveAvatarUrl(rawAvatarUrl);
     String? attachmentUrl = m['attachment_url'] as String?;
     if (attachmentUrl != null && attachmentUrl.isNotEmpty) {
       final path = attachmentUrl.startsWith('http') ? null : attachmentUrl.replaceFirst(RegExp(r'^/+'), '');

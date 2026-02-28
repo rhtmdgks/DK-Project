@@ -17,6 +17,12 @@ String generateAvatarUrl(String seed) {
   }).toString();
 }
 
+/// Image.network 등에서 바로 쓸 수 있는 PNG 아바타 URL (Flutter에서는 SVG 미지원 시 사용).
+String generateAvatarUrlPng(String seed) {
+  const baseUrl = 'https://api.dicebear.com/9.x/notionists/png';
+  return Uri.parse(baseUrl).replace(queryParameters: {'seed': seed}).toString();
+}
+
 /// 사용자 이름의 이니셜 추출
 /// 
 /// [name] - 사용자 이름

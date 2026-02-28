@@ -8,6 +8,7 @@ import 'package:myapp/core/auth/auth_state.dart';
 import 'package:myapp/core/routing/app_router.dart';
 import 'package:myapp/core/supabase_client.dart';
 import 'package:myapp/core/theme/app_theme.dart';
+import 'package:myapp/core/utils/timetable_utils.dart';
 import 'package:myapp/core/theme/responsive.dart';
 import 'package:myapp/core/utils/subject_theme_service.dart';
 import 'package:myapp/core/widgets/laon_icon.dart';
@@ -43,16 +44,9 @@ class _HomeTabState extends State<HomeTab> {
     return _isTeacher ? '$name 선생님' : '$name님';
   }
 
-
-  /// 샘플 오늘의 수업 데이터 (추후 API 연동 시 교체).
-  /// Figma 노드 41:1 기준: 카드 크기 148x119 (첫 번째는 149x119), cornerRadius 16
-  /// 색상, 아이콘, 장식 벡터는 [SubjectThemeService]를 통해 자동 할당됩니다.
-  static const _todayClasses = [
-    _SubjectCard(name: '수학Ⅱ', period: 1),
-    _SubjectCard(name: '생명과학', period: 2),
-    _SubjectCard(name: '국어', period: 3),
-    _SubjectCard(name: '영어', period: 4),
-  ];
+  /// 오늘의 수업: Supabase timetable_entries에서 로드 (오늘 요일 기준).
+  List<_SubjectCard>? _todayTimetableEntries;
+  bool _timetableLoading = true;
 
   /// 샘플 다음 시간 과목 데이터
   /// 아이콘과 색상은 [SubjectThemeService]를 통해 자동 할당됩니다.
@@ -70,6 +64,7 @@ class _HomeTabState extends State<HomeTab> {
     super.initState();
     _loadProfile();
     _loadGreeting();
+    _loadTodayTimetable();
   }
 
   @override
@@ -118,6 +113,54 @@ class _HomeTabState extends State<HomeTab> {
     } catch (_) {
       if (!mounted) return;
       setState(() => _dynamicGreeting = null);
+    }
+  }
+
+  Future<void> _loadTodayTimetable() async {
+    final uid = supabase.auth.currentUser?.id;
+    if (uid == null) {
+      if (!mounted) return;
+      setState(() {
+        _todayTimetableEntries = [];
+        _timetableLoading = false;
+      });
+      return;
+    }
+    final weekday = DateTime.now().weekday;
+    if (!TimetableUtils.isWeekday(DateTime.now())) {
+      if (!mounted) return;
+      setState(() {
+        _todayTimetableEntries = [];
+        _timetableLoading = false;
+      });
+      return;
+    }
+    try {
+      final res = await supabase
+          .from('timetable_entries')
+          .select('subject, period')
+          .eq('user_id', uid)
+          .eq('day_of_week', weekday)
+          .order('period');
+      final list = List<Map<String, dynamic>>.from(res as List);
+      if (!mounted) return;
+      setState(() {
+        _todayTimetableEntries = list
+            .map((e) => _SubjectCard(
+                  name: (e['subject'] as String? ?? '').trim().isEmpty
+                      ? '(없음)'
+                      : (e['subject'] as String).trim(),
+                  period: (e['period'] as num?)?.toInt() ?? 0,
+                ))
+            .toList();
+        _timetableLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _todayTimetableEntries = [];
+        _timetableLoading = false;
+      });
     }
   }
 
@@ -389,21 +432,61 @@ class _HomeTabState extends State<HomeTab> {
   static const double _firstCardWidth = 149; // 첫 번째 카드만 149
 
   Widget _buildTodayClassesList() {
+    final list = _todayTimetableEntries ?? [];
+    if (_timetableLoading) {
+      return SizedBox(
+        height: _cardHeight,
+        child: ListView(
+          scrollDirection: Axis.horizontal,
+          padding: EdgeInsets.symmetric(horizontal: context.rs(22)),
+          children: List.generate(4, (i) => Padding(
+            padding: EdgeInsets.only(right: i < 3 ? context.rs(12) : 0),
+            child: SizedBox(
+              width: i == 0 ? _firstCardWidth : _cardWidth,
+              height: _cardHeight,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: AppColors.borderLight,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
+            ),
+          )),
+        ),
+      );
+    }
+    if (list.isEmpty) {
+      return SizedBox(
+        height: _cardHeight,
+        child: Center(
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: context.rs(22)),
+            child: Text(
+              TimetableUtils.isWeekday(DateTime.now())
+                  ? '등록된 수업이 없어요.'
+                  : '주말에는 수업이 없어요.',
+              style: AppFonts.scaled(context, AppFonts.bodyRegular)
+                  .copyWith(color: AppColors.textSecondary),
+            ),
+          ),
+        ),
+      );
+    }
     return SizedBox(
       height: _cardHeight,
       child: ScrollConfiguration(
         behavior: M3CarouselScrollBehavior(),
         child: ListView.builder(
           scrollDirection: Axis.horizontal,
-          physics: const ClampingScrollPhysics(), // 양쪽 끝에서 스크롤 멈춤
+          physics: const ClampingScrollPhysics(),
           padding: EdgeInsets.symmetric(horizontal: context.rs(22)),
-          itemCount: _todayClasses.length,
+          itemCount: list.length,
           itemBuilder: (context, index) {
             return Padding(
               padding: EdgeInsets.only(
-                right: index < _todayClasses.length - 1 ? context.rs(12) : 0,
+                right: index < list.length - 1 ? context.rs(12) : 0,
               ),
-              child: _buildTodayClassCard(_todayClasses[index], index == 0),
+              child: _buildTodayClassCard(list[index], index == 0),
             );
           },
         ),

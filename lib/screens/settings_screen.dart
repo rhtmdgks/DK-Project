@@ -365,6 +365,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
           child: Column(
             children: [
               _buildLinkItem(
+                icon: Icons.person_rounded,
+                iconColor: AppColors.primaryBlue,
+                title: '내 정보',
+                onTap: () => context.push(AppRoute.profile.path),
+              ),
+              _buildItemDivider(),
+              _buildLinkItem(
                 icon: Icons.bug_report_rounded,
                 iconColor: const Color(0xFF66BB6A),
                 title: '버그 신고',

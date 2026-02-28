@@ -2,6 +2,8 @@
 
 이 문서는 **백오피스(DK-Project_Backoffice)** 와 **Flutter 학생 앱(DK-Project)** 간 데이터·동작 연동을 위한 최종 명세입니다. Flutter 에이전트는 이 명세에 맞춰 구현·수정하면 됩니다.
 
+**백오피스 프로젝트 경로:** `/Users/edmond104/Documents/GitHub/DK-Project_Backoffice`
+
 ---
 
 ## 목차
@@ -12,8 +14,9 @@
 4. [학사일정 (NEIS)](#4-학사일정-neis)
 5. [프로필(profiles) 필드 통일](#5-프로필profiles-필드-통일)
 6. [일정(schedule_items)](#6-일정schedule_items)
-7. [기타 테이블·API](#7-기타-테이블api)
-8. [Flutter 수정 체크리스트](#8-flutter-수정-체크리스트)
+7. [투표 (polls)](#7-투표-polls)
+8. [기타 테이블·API](#8-기타-테이블api)
+9. [Flutter 수정 체크리스트](#9-flutter-수정-체크리스트)
 
 ---
 
@@ -88,6 +91,13 @@
 
 - **profiles**: `grade`, `class_num`, `student_number` (학년, 반, 번호). 학번 `student_id`는 G+반(2자리)+번호(2자리) 등 규칙으로 생성.
 
+### 프로필 사진(avatar_url) 연동 규칙
+
+- **avatar_url 저장 규칙**: `profiles.avatar_url`에는 **표시용 전체 공개 URL(https)** 만 저장한다. Storage 경로만 저장하지 않는다. (Flutter는 과거 경로 데이터 하위 호환을 위해 경로 → URL 해석을 적용하지만, 신규 저장은 항상 전체 URL 권장.)
+- **Storage 버킷**: 프로필 사진 업로드 시 Supabase Storage 버킷 이름은 **`avatars`** 를 사용한다. (마이그레이션 `029_avatars_bucket_and_avatar_png.sql`에서 생성.)
+- **백오피스 구현**: 프로필 사진 업로드 시 `avatars` 버킷에 업로드한 뒤, `profiles.avatar_url`에는 반드시 **공개 전체 URL**을 저장한다 (예: `getPublicUrl(path)` 결과). 경로만 저장하지 않기.
+- (선택) 백오피스 공용 유틸: "경로 → 공개 URL" 변환 시 `avatars` 버킷을 사용해 동일 규칙 적용.
+
 ### Flutter 구현 지시
 
 - **grade**: `profiles.grade` (없으면 학번 추론).
@@ -105,32 +115,52 @@
 
 ---
 
-## 7. 기타 테이블·API
+## 7. 투표 (polls)
+
+### 백오피스 동작
+
+- **경로**: `DK-Project_Backoffice/app/polls/page.tsx`, `components/polls/polls-content.tsx`
+- **CRUD**: 투표 생성(question, options), 수정, 삭제. `polls` 테이블에 직접 INSERT/UPDATE/DELETE (council/admin RLS).
+- **DB 컬럼**: `id`, `announcement_id`(선택), `question`, `options`(jsonb 배열), `ends_at`(선택), `created_at`
+- **ends_at** 설정 시 Flutter 앱에서 "N일 남음" 등 종료 시각 표시. 백오피스에서 투표 만들기/수정 시 종료일 입력 권장.
+
+### Flutter 구현 지시
+
+- **목록**: `polls` select + `poll_votes(option_index)` 로 득표율 계산. optional: `announcements(author_id, profiles(full_name))` 조인 시 게시자명 표시.
+- **Realtime**: `polls` 테이블 INSERT/UPDATE/DELETE 구독 시 목록 자동 갱신(백오피스에서 생성/수정/삭제 반영).
+- **투표 참여**: `poll_votes` INSERT (1인 1투표, DB UNIQUE 제약).
+
+---
+
+## 8. 기타 테이블·API
 
 | 항목 | 백오피스 | Flutter |
 |------|----------|---------|
-| **polls / poll_votes** | 투표 관리 | 기존 조회·투표 유지 |
+| **polls / poll_votes** | [투표 관리](#7-투표-polls) (위 섹션 참고) | 조회·투표·Realtime 구독 |
 | **suggestions** | 건의함 | 기존 연동 유지 |
 | **chat_rooms / chat_messages** | 채팅방 관리 | 기존 연동 유지 |
 | **bug_reports** | 버그 신고 | 기존 연동 유지 |
 
 ---
 
-## 8. Flutter 수정 체크리스트
+## 9. Flutter 수정 체크리스트
 
 - [ ] **급식 출발 알림**: `meal-departure:{grade}:{classNum}` Realtime 구독 및 로컬 알림 표시 (명세 1 참고).
 - [ ] **공지 알림**: `announcements` INSERT 구독 시 **target_class_number** 사용 (target_class fallback 가능). (명세 3)
 - [ ] **프로필**: `number_in_class` 없을 때 **student_number** 로 번호 매핑. (명세 5)
 - [ ] **시간표**: `timetable_entries` 조회, day_of_week 1=월~5=금 의미 유지. (명세 2)
+- [x] **투표**: `polls` Realtime 구독(INSERT/UPDATE/DELETE) 시 목록 갱신, 작성자명(author_name) 표시. (명세 7)
 - [ ] (선택) 학사일정: `neis_academic_events` 테이블 조회로 전환 또는 Edge Function 유지. (명세 4)
 
 ---
 
 ## 참고: 백오피스 쪽 코드 위치
 
+- **프로젝트 경로**: `/Users/edmond104/Documents/GitHub/DK-Project_Backoffice`
 - 급식 출발: `components/meal-alert/meal-alert-content.tsx`
 - 시간표: `components/timetables/timetables-content.tsx`, `app/api/neis-timetable/route.ts` (NEIS → timetable_master)
 - 공지: `components/announcements/announcements-content.tsx` (target_grade, target_class_number)
+- **투표**: `app/polls/page.tsx`, `components/polls/polls-content.tsx`
 - 학사일정 동기화: `app/api/neis-academic-sync/route.ts`, 테이블 `neis_academic_events`
 
 Flutter 앱은 **동일 Supabase 프로젝트**를 사용하므로, 위 테이블·컬럼·Realtime 채널 규칙에 맞추면 됩니다.
