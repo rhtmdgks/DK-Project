@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:myapp/core/auth/auth_state.dart';
+import 'package:myapp/repositories/notification_settings_repository.dart';
 import 'package:myapp/core/supabase_client.dart';
 import 'package:myapp/models/notification_item.dart';
 import 'package:myapp/services/fcm_token_service.dart';
@@ -27,8 +27,6 @@ class MealDepartureRealtimeService {
   static const _androidChannelName = '급식 출발 알림';
   static const _notificationId = 2000;
 
-  static const _keyEnabled = 'setting_meal';
-
   static RealtimeChannel? _channel;
   static bool _initialized = false;
   static int? _subscribedGrade;
@@ -51,14 +49,11 @@ class MealDepartureRealtimeService {
     _initialized = true;
   }
 
-  static Future<bool> isEnabled() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool(_keyEnabled) ?? false;
-  }
+  static Future<bool> isEnabled() async =>
+      NotificationSettingsRepository.instance.getMealEnabled();
 
   static Future<void> setEnabled(bool enabled) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_keyEnabled, enabled);
+    await NotificationSettingsRepository.instance.setMealEnabled(enabled);
 
     if (enabled) {
       await startListening();

@@ -1,5 +1,6 @@
 /// DiceBear API를 사용한 아바타 생성 유틸리티
 /// 공식 문서: https://www.dicebear.com/how-to-use/http-api/
+library;
 
 /// 사용자 식별자를 기반으로 일관된 notionists 스타일 아바타 URL 생성
 /// 
@@ -27,8 +28,11 @@ String getInitials(String? name) {
   final parts = name.trim().split(RegExp(r'\s+'));
   
   if (parts.length == 1) {
-    return parts[0].substring(0, parts[0].length > 2 ? 2 : parts[0].length).toUpperCase();
+    return parts[0]
+        .substring(0, parts[0].length > 2 ? 2 : parts[0].length)
+        .toUpperCase();
   }
   
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
+

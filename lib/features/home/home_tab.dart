@@ -15,7 +15,6 @@ import 'package:myapp/core/widgets/m3_carousel_scroll_physics.dart';
 import 'package:myapp/providers/notification_provider.dart';
 import 'package:myapp/widgets/notification_side_sheet.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 /// Figma "App Wireframes > HOME" (node 296:5429) 홈 대시보드 탭.
 ///
@@ -36,6 +35,7 @@ class _HomeTabState extends State<HomeTab> {
   String? _avatarUrl;
   String? _role;
   bool _loading = true;
+  String? _dynamicGreeting;
 
   bool get _isTeacher => _role == 'teacher';
   String get _nameWithHonorific {
@@ -69,6 +69,7 @@ class _HomeTabState extends State<HomeTab> {
   void initState() {
     super.initState();
     _loadProfile();
+    _loadGreeting();
   }
 
   @override
@@ -78,33 +79,7 @@ class _HomeTabState extends State<HomeTab> {
 
   Future<void> _loadProfile() async {
     try {
-      AppProfile? profile;
-      
-      // 세션이 있으면 기존 로직 사용
-      final session = supabase.auth.currentSession;
-      if (session != null) {
-        profile = await getCurrentProfile();
-      } else {
-        // 세션이 없으면 SharedPreferences에서 user_id를 가져와서 직접 프로필 조회
-        final prefs = await SharedPreferences.getInstance();
-        final loggedInUserId = prefs.getString('logged_in_user_id');
-        
-        if (loggedInUserId != null) {
-          try {
-            final row = await supabase
-                .from('profiles')
-                .select()
-                .eq('user_id', loggedInUserId)
-                .maybeSingle();
-            if (row != null) {
-              profile = AppProfile.fromJson(row);
-            }
-          } catch (_) {
-            // 프로필 조회 실패 시 무시
-          }
-        }
-      }
-      
+      final profile = await getCurrentProfile();
       if (!mounted) return;
       setState(() {
         _fullName = profile?.fullName;
@@ -118,12 +93,43 @@ class _HomeTabState extends State<HomeTab> {
     }
   }
 
+  Future<void> _loadGreeting() async {
+    try {
+      final res = await supabase
+          .from('greeting_messages')
+          .select('text')
+          .eq('is_active', true)
+          .order('sort_order', ascending: true)
+          .order('created_at', ascending: false);
+
+      final list = List<Map<String, dynamic>>.from(res as List);
+      if (!mounted) return;
+
+      if (list.isEmpty) {
+        setState(() => _dynamicGreeting = null);
+        return;
+      }
+
+      final random = Random();
+      final picked =
+          list[random.nextInt(list.length)]['text'] as String? ?? '';
+      setState(() => _dynamicGreeting =
+          picked.trim().isEmpty ? null : picked.trim());
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _dynamicGreeting = null);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return SafeArea(
       bottom: false,
       child: RefreshIndicator(
-        onRefresh: _loadProfile,
+        onRefresh: () async {
+          await _loadProfile();
+          await _loadGreeting();
+        },
         child: _loading
             ? Center(
                 child: CircularProgressIndicator(
@@ -698,18 +704,10 @@ class _HomeTabState extends State<HomeTab> {
   // ── Helpers ──
 
   String _greetingMessage() {
-    final messages = [
-      '설날 지나고 힘드시죠? 오늘도 힘내봐요!',
-      '오늘도 찾아온 새로운 하루. 쌈@뽕하게 이겨내요..!',
-      '오늘 하루 절반 지났어요. 화이팅!',
-      '오늘도 수고 많았어요!',
-      '아직 이른 시간이에요. 좋은 꿈 꾸세요!',
-      '새로운 하루를 시작해봐요!',
-      '오늘도 멋진 하루 보내세요!',
-    ];
-    
-    final random = Random();
-    return messages[random.nextInt(messages.length)];
+    if (_dynamicGreeting != null && _dynamicGreeting!.isNotEmpty) {
+      return _dynamicGreeting!;
+    }
+    return '오늘도 좋은 하루 되세요!';
   }
 }
 

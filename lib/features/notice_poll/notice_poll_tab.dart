@@ -1,11 +1,12 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:myapp/core/supabase_client.dart';
+import 'package:myapp/core/auth/auth_repository.dart';
 import 'package:myapp/core/theme/app_theme.dart';
 import 'package:myapp/core/theme/responsive.dart';
 import 'package:myapp/core/widgets/async_body.dart';
 import 'package:myapp/core/widgets/m3_list.dart';
 import 'package:myapp/core/widgets/tab_page_header.dart';
+import 'package:myapp/features/notice_poll/notice_poll_viewmodel.dart';
 
 /// [createdAt] ISO 문자열을 "2월 18일" 형식으로 포맷.
 String _formatDate(String? createdAt) {
@@ -32,78 +33,26 @@ class NoticePollTab extends StatefulWidget {
 class _NoticePollTabState extends State<NoticePollTab>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-
-  bool _loadingAnnouncements = false;
-  bool _loadingPolls = false;
-  String? _errorAnnouncements;
-  String? _errorPolls;
-  List<Map<String, dynamic>> _announcements = [];
-  List<Map<String, dynamic>> _polls = [];
+  late NoticePollViewModel _viewModel;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    _fetchAnnouncements();
-    _fetchPolls();
+    _viewModel = NoticePollViewModel()..addListener(_onViewModelChanged);
+    _viewModel.fetchAnnouncements();
+    _viewModel.fetchPolls();
+  }
+
+  void _onViewModelChanged() {
+    if (mounted) setState(() {});
   }
 
   @override
   void dispose() {
+    _viewModel.removeListener(_onViewModelChanged);
     _tabController.dispose();
     super.dispose();
-  }
-
-  Future<void> _fetchAnnouncements() async {
-    setState(() {
-      _loadingAnnouncements = true;
-      _errorAnnouncements = null;
-    });
-
-    try {
-      final res = await supabase
-          .from('announcements')
-          .select()
-          .order('created_at', ascending: false);
-
-      if (!mounted) return;
-      setState(() {
-        _announcements = List<Map<String, dynamic>>.from(res as List);
-        _loadingAnnouncements = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _errorAnnouncements = e.toString();
-        _loadingAnnouncements = false;
-      });
-    }
-  }
-
-  Future<void> _fetchPolls() async {
-    setState(() {
-      _loadingPolls = true;
-      _errorPolls = null;
-    });
-
-    try {
-      final res = await supabase
-          .from('polls')
-          .select()
-          .order('created_at', ascending: false);
-
-      if (!mounted) return;
-      setState(() {
-        _polls = List<Map<String, dynamic>>.from(res as List);
-        _loadingPolls = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _errorPolls = e.toString();
-        _loadingPolls = false;
-      });
-    }
   }
 
   @override
@@ -161,13 +110,13 @@ class _NoticePollTabState extends State<NoticePollTab>
 
   Widget _buildAnnouncementsBody() {
     return AsyncBody(
-      loading: _loadingAnnouncements,
-      error: _errorAnnouncements,
-      isEmpty: _announcements.isEmpty,
-      onRetry: _fetchAnnouncements,
+      loading: _viewModel.loadingAnnouncements,
+      error: _viewModel.errorAnnouncements,
+      isEmpty: _viewModel.announcements.isEmpty,
+      onRetry: _viewModel.fetchAnnouncements,
       emptyMessage: '공지사항이 없습니다.',
       child: RefreshIndicator(
-        onRefresh: _fetchAnnouncements,
+        onRefresh: _viewModel.fetchAnnouncements,
         color: Theme.of(context).colorScheme.primary,
         child: ListView.separated(
           padding: EdgeInsets.fromLTRB(
@@ -176,10 +125,10 @@ class _NoticePollTabState extends State<NoticePollTab>
             context.rs(22),
             context.rh(16),
           ),
-          itemCount: _announcements.length,
+          itemCount: _viewModel.announcements.length,
           separatorBuilder: (_, __) => Divider(height: 1),
           itemBuilder: (context, i) {
-            final a = _announcements[i];
+            final a = _viewModel.announcements[i];
             final title = a['title'] as String? ?? '';
             final body = a['body'] as String? ?? '';
             final dateStr = _formatDate(a['created_at'] as String?);
@@ -213,10 +162,10 @@ class _NoticePollTabState extends State<NoticePollTab>
 
   Widget _buildPollsBody() {
     return AsyncBody(
-      loading: _loadingPolls,
-      error: _errorPolls,
-      isEmpty: _polls.isEmpty,
-      onRetry: _fetchPolls,
+      loading: _viewModel.loadingPolls,
+      error: _viewModel.errorPolls,
+      isEmpty: _viewModel.polls.isEmpty,
+      onRetry: _viewModel.fetchPolls,
       emptyMessage: '투표가 없습니다.',
       child: ListView.separated(
         padding: EdgeInsets.fromLTRB(
@@ -225,10 +174,10 @@ class _NoticePollTabState extends State<NoticePollTab>
           context.rs(22),
           context.rh(16),
         ),
-        itemCount: _polls.length,
+        itemCount: _viewModel.polls.length,
         separatorBuilder: (_, __) => Divider(height: 1),
         itemBuilder: (context, i) {
-          final poll = _polls[i];
+          final poll = _viewModel.polls[i];
           final question = poll['question'] as String? ?? '';
           final options = poll['options'] as List<dynamic>? ?? [];
           final optionCount = options.length;
@@ -249,40 +198,54 @@ class _NoticePollTabState extends State<NoticePollTab>
       isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => Container(
-        decoration: BoxDecoration(
-          color: Theme.of(ctx).colorScheme.surface,
-          borderRadius: BorderRadius.vertical(
-            top: Radius.circular(AppShapes.radiusLarge),
-          ),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SizedBox(height: context.rh(12)),
-            Container(
-              width: 40,
-              height: 4,
+      builder: (ctx) {
+        return DraggableScrollableSheet(
+          expand: false,
+          initialChildSize: 0.6,
+          minChildSize: 0.4,
+          maxChildSize: 0.9,
+          builder: (sheetContext, scrollController) {
+            return Container(
               decoration: BoxDecoration(
-                color: AppColors.border,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            Flexible(
-              child: SingleChildScrollView(
-                padding: EdgeInsets.all(context.rs(16)),
-                child: _PollCard(
-                  poll: poll,
-                  onVote: () {
-                    _fetchPolls();
-                    if (ctx.mounted) Navigator.of(ctx).pop();
-                  },
+                color: Theme.of(sheetContext).colorScheme.surface,
+                borderRadius: BorderRadius.vertical(
+                  top: Radius.circular(AppShapes.radiusLarge),
                 ),
               ),
-            ),
-          ],
-        ),
-      ),
+              child: SafeArea(
+                top: false,
+                child: Column(
+                  children: [
+                    SizedBox(height: context.rh(12)),
+                    Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: AppColors.border,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                    Expanded(
+                      child: SingleChildScrollView(
+                        controller: scrollController,
+                        padding: EdgeInsets.all(context.rs(16)),
+                        child: _PollCard(
+                          poll: poll,
+                          viewModel: _viewModel,
+                          onVote: () {
+                            _viewModel.fetchPolls();
+                            if (sheetContext.mounted) Navigator.of(sheetContext).pop();
+                          },
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 }
@@ -292,9 +255,14 @@ class _NoticePollTabState extends State<NoticePollTab>
 // ────────────────────────────────────────────────────────────
 
 class _PollCard extends StatefulWidget {
-  const _PollCard({required this.poll, required this.onVote});
+  const _PollCard({
+    required this.poll,
+    required this.viewModel,
+    required this.onVote,
+  });
 
   final Map<String, dynamic> poll;
+  final NoticePollViewModel viewModel;
   final VoidCallback onVote;
 
   @override
@@ -314,18 +282,13 @@ class _PollCardState extends State<_PollCard> {
   }
 
   Future<void> _loadVoteStatus() async {
-    final uid = supabase.auth.currentUser?.id;
+    final uid = await AuthRepository.instance.getUserId();
     if (uid == null) return;
 
     final pollId = widget.poll['id'] as String?;
     if (pollId == null) return;
 
-    final res = await supabase
-        .from('poll_votes')
-        .select()
-        .eq('poll_id', pollId)
-        .eq('user_id', uid)
-        .maybeSingle();
+    final res = await widget.viewModel.getPollVote(pollId, uid);
 
     if (!mounted) return;
     setState(() {
@@ -335,8 +298,11 @@ class _PollCardState extends State<_PollCard> {
   }
 
   Future<void> _vote() async {
-    final uid = supabase.auth.currentUser?.id;
+    final uid = await AuthRepository.instance.getUserId();
     if (uid == null || _selectedIndex == null) return;
+
+    final pollId = widget.poll['id'] as String?;
+    if (pollId == null) return;
 
     setState(() {
       _loading = true;
@@ -344,11 +310,7 @@ class _PollCardState extends State<_PollCard> {
     });
 
     try {
-      await supabase.from('poll_votes').insert({
-        'poll_id': widget.poll['id'],
-        'user_id': uid,
-        'option_index': _selectedIndex,
-      });
+      await widget.viewModel.vote(pollId, uid, _selectedIndex!);
 
       if (!mounted) return;
       setState(() {
@@ -422,7 +384,9 @@ class _PollCardState extends State<_PollCard> {
                     padding: EdgeInsets.only(top: context.rh(8)),
                     child: RadioListTile<int>(
                       value: idx,
+                      // ignore: deprecated_member_use
                       groupValue: _selectedIndex ?? -1,
+                      // ignore: deprecated_member_use
                       onChanged: _voted
                           ? null
                           : (int? v) {

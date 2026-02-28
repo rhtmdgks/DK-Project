@@ -1,5 +1,5 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:myapp/repositories/notification_settings_repository.dart';
 import 'package:timezone/timezone.dart' as tz;
 
 /// 급식 출발 알림: 매일 급식 시간 전에 알림 표시.
@@ -17,8 +17,6 @@ class MealNotificationService {
   static const _channelName = '급식 출발 알림';
   static const _notificationIdLunch = 3;
   static const _notificationIdDinner = 4;
-
-  static const _keyMealEnabled = 'setting_meal';
 
   static bool _initialized = false;
 
@@ -44,15 +42,12 @@ class MealNotificationService {
   }
 
   /// 급식 알림 활성화 여부 확인
-  static Future<bool> isMealEnabled() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool(_keyMealEnabled) ?? false;
-  }
+  static Future<bool> isMealEnabled() async =>
+      NotificationSettingsRepository.instance.getMealEnabled();
 
   /// 급식 알림 활성화/비활성화
   static Future<void> setMealEnabled(bool enabled) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_keyMealEnabled, enabled);
+    await NotificationSettingsRepository.instance.setMealEnabled(enabled);
 
     if (enabled) {
       await scheduleMealNotifications();

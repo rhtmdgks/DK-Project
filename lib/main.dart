@@ -27,7 +27,7 @@ void main() async {
   // 릴리스에서 URL이 빠지지 않으려면: flutter build apk --dart-define-from-file=dart_defines.json
   var url = const String.fromEnvironment('SUPABASE_URL', defaultValue: '');
   var anonKey = const String.fromEnvironment('SUPABASE_ANON_KEY', defaultValue: '');
-  var fromEnv = url.isNotEmpty && anonKey.isNotEmpty;
+  final fromEnv = url.isNotEmpty && anonKey.isNotEmpty;
 
   if (url.isEmpty || anonKey.isEmpty) {
     try {

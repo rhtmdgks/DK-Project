@@ -2,12 +2,12 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:myapp/core/auth/auth_repository.dart';
 import 'package:myapp/core/routing/app_router.dart';
 import 'package:myapp/core/supabase_client.dart';
 import 'package:myapp/core/widgets/dismiss_keyboard.dart';
 import 'package:myapp/core/theme/app_theme.dart';
 import 'package:myapp/core/theme/responsive.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 /// 첫 로그인 시 비밀번호 변경 화면. 반응형 대응.
 class PasswordChangeScreen extends StatefulWidget {
@@ -55,13 +55,7 @@ class _PasswordChangeScreenState extends State<PasswordChangeScreen> {
     });
 
     try {
-      // 현재 사용자 ID 가져오기 (세션이 있으면 사용, 없으면 SharedPreferences에서)
-      String? userId = supabase.auth.currentUser?.id;
-      if (userId == null) {
-        final prefs = await SharedPreferences.getInstance();
-        userId = prefs.getString('logged_in_user_id');
-      }
-      
+      final userId = await AuthRepository.instance.getUserId();
       if (userId == null) {
         throw Exception('사용자 ID를 가져올 수 없습니다');
       }
@@ -72,7 +66,7 @@ class _PasswordChangeScreenState extends State<PasswordChangeScreen> {
           await supabase.auth.updateUser(UserAttributes(password: newPw));
         } catch (authError) {
           // auth.users 업데이트 실패해도 profiles 테이블 업데이트는 계속 진행
-          print('Auth password update failed (continuing): $authError');
+          debugPrint('Auth password update failed (continuing): $authError');
         }
       }
       
@@ -88,7 +82,7 @@ class _PasswordChangeScreenState extends State<PasswordChangeScreen> {
       if (!mounted) return;
       context.go(AppRoute.home.path);
     } catch (e) {
-      print('Password change error: $e');
+      debugPrint('Password change error: $e');
       if (!mounted) return;
       setState(() {
         _error = '비밀번호 변경에 실패했습니다: ${e.toString()}';

@@ -6,12 +6,12 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:myapp/core/auth/auth_repository.dart';
 import 'package:myapp/core/supabase_client.dart';
 import 'package:myapp/core/theme/app_motion.dart';
 import 'package:myapp/core/widgets/dismiss_keyboard.dart';
 import 'package:myapp/core/theme/app_theme.dart';
 import 'package:myapp/core/theme/responsive.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 /// 발신자 표시 이름 (학번 + 이름)
@@ -97,11 +97,7 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _loadCurrentUserId() async {
-    String? userId = supabase.auth.currentUser?.id;
-    if (userId == null) {
-      final prefs = await SharedPreferences.getInstance();
-      userId = prefs.getString('logged_in_user_id');
-    }
+    final userId = await AuthRepository.instance.getUserId();
     if (mounted) {
       setState(() {
         _currentUserId = userId;
@@ -111,14 +107,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Future<void> _loadRoomInfo() async {
     try {
-      String? userId = _currentUserId;
-      if (userId == null) {
-        userId = supabase.auth.currentUser?.id;
-        if (userId == null) {
-          final prefs = await SharedPreferences.getInstance();
-          userId = prefs.getString('logged_in_user_id');
-        }
-      }
+      final userId = _currentUserId ?? await AuthRepository.instance.getUserId();
 
       final roomResult = await supabase.rpc(
         'get_chat_room',
@@ -167,14 +156,7 @@ class _ChatScreenState extends State<ChatScreen> {
       _error = null;
     });
     try {
-      String? userId = _currentUserId;
-      if (userId == null) {
-        userId = supabase.auth.currentUser?.id;
-        if (userId == null) {
-          final prefs = await SharedPreferences.getInstance();
-          userId = prefs.getString('logged_in_user_id');
-        }
-      }
+      final userId = _currentUserId ?? await AuthRepository.instance.getUserId();
 
       if (userId == null) {
         if (!mounted) return;
@@ -196,7 +178,7 @@ class _ChatScreenState extends State<ChatScreen> {
       if (!mounted) return;
 
       final messagesList = result as List<dynamic>? ?? [];
-      var messages = messagesList
+      final messages = messagesList
           .map((m) => Map<String, dynamic>.from(m as Map))
           .toList();
       await _enrichMessageSenders(messages);
@@ -409,11 +391,7 @@ class _ChatScreenState extends State<ChatScreen> {
     final hasVideo = _pickedVideo != null;
     if (content.isEmpty && !hasImage && !hasVideo) return;
 
-    String? uid = supabase.auth.currentUser?.id;
-    if (uid == null) {
-      final prefs = await SharedPreferences.getInstance();
-      uid = prefs.getString('logged_in_user_id');
-    }
+    final uid = await AuthRepository.instance.getUserId();
     if (uid == null) {
       _showErrorDialog('전송 불가', '로그인 정보가 없어 전송할 수 없습니다.');
       return;
@@ -682,7 +660,7 @@ class _ChatScreenState extends State<ChatScreen> {
         ? avatarUrl
         : 'https://api.dicebear.com/9.x/notionists/png?seed=${senderId.isEmpty ? 'unknown' : senderId}';
 
-    Widget avatar = SizedBox(
+    final avatar = SizedBox(
       width: context.rs(36),
       height: context.rs(36),
       child: ClipOval(
@@ -703,7 +681,7 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
     );
 
-    Widget nameAndTime = Row(
+    final nameAndTime = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         if (isMe && timeStr.isNotEmpty)
@@ -732,7 +710,7 @@ class _ChatScreenState extends State<ChatScreen> {
       ],
     );
 
-    Widget bubble = Container(
+    final bubble = Container(
       constraints: BoxConstraints(maxWidth: maxBubbleWidth),
       padding: EdgeInsets.symmetric(
         horizontal: context.rs(12),
@@ -932,7 +910,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 SizedBox(width: context.rs(8)),
                 CupertinoButton(
                   padding: EdgeInsets.zero,
-                  minSize: 0,
+                  minimumSize: Size.zero,
                   onPressed: _sending
                       ? null
                       : () {

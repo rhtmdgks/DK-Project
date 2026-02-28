@@ -172,7 +172,7 @@ class _MealTabState extends State<MealTab> {
               children: [
                 CupertinoButton(
                   padding: EdgeInsets.zero,
-                  minSize: 0,
+                  minimumSize: Size.zero,
                   onPressed: () {
                     setState(() {
                       _viewMonth = DateTime(year, month - 1);
@@ -201,7 +201,7 @@ class _MealTabState extends State<MealTab> {
                 ),
                 CupertinoButton(
                   padding: EdgeInsets.zero,
-                  minSize: 0,
+                  minimumSize: Size.zero,
                   onPressed: () {
                     setState(() {
                       _viewMonth = DateTime(year, month + 1);

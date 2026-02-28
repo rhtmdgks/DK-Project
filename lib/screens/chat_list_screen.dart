@@ -1,12 +1,12 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:myapp/core/auth/auth_repository.dart';
 import 'package:myapp/core/routing/app_router.dart';
 import 'package:myapp/core/supabase_client.dart';
 import 'package:myapp/core/theme/app_theme.dart';
 import 'package:myapp/core/theme/responsive.dart';
 import 'package:myapp/core/widgets/async_body.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 /// 사용자가 참여 중인 채팅방 목록 화면. 반응형 대응.
 class ChatListScreen extends StatefulWidget {
@@ -35,13 +35,8 @@ class _ChatListScreenState extends State<ChatListScreen> {
     });
 
     try {
-      // 세션이 없으면 SharedPreferences에서 user_id 가져오기
-      String? uid = supabase.auth.currentUser?.id;
-      if (uid == null) {
-        final prefs = await SharedPreferences.getInstance();
-        uid = prefs.getString('logged_in_user_id');
-      }
-      
+      final uid = await AuthRepository.instance.getUserId();
+
       if (uid == null) {
         if (!mounted) return;
         setState(() {

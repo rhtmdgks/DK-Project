@@ -7,6 +7,7 @@ import 'package:myapp/providers/notification_provider.dart';
 import 'package:myapp/services/announcement_notification_service.dart';
 import 'package:myapp/services/class_move_notification_service.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:myapp/services/suggestions_chat_notification_service.dart';
 import 'package:myapp/services/fcm_token_service.dart';
 import 'package:myapp/services/meal_departure_realtime_service.dart';
 import 'package:myapp/services/meal_notification_service.dart';
@@ -75,6 +76,13 @@ class NotificationService {
       debugPrint('이동 수업 알림 서비스 초기화 실패: $e');
     }
 
+    // 건의함 채팅 실시간 알림 구독
+    try {
+      await SuggestionsChatNotificationService.startListening();
+    } catch (e) {
+      debugPrint('건의함 채팅 알림 서비스 초기화/구독 실패: $e');
+    }
+
     // 공지사항 실시간 구독 시작
     try {
       await AnnouncementNotificationService.startListening();
@@ -138,6 +146,11 @@ class NotificationService {
     } catch (e) {
       debugPrint('급식 출발 알림 구독 중지 실패: $e');
     }
+    try {
+      await SuggestionsChatNotificationService.stopListening();
+    } catch (e) {
+      debugPrint('건의함 채팅 알림 구독 중지 실패: $e');
+    }
   }
 
   /// 알림 탭 시 처리
@@ -145,11 +158,16 @@ class NotificationService {
     final payload = response.payload;
     if (payload == null) return;
 
-    // payload에 따라 적절한 화면으로 이동
     final context = _getNavigatorContext();
     if (context == null) return;
 
-    // 모든 알림은 홈 화면으로 이동 (추후 각 화면이 추가되면 수정)
+    // payload에 따라 적절한 화면으로 이동
+    if (payload == 'suggestions_chat') {
+      context.push(AppRoute.suggestionsChat.path);
+      return;
+    }
+
+    // 기본값: 홈 화면으로 이동
     context.push(AppRoute.home.path);
   }
 

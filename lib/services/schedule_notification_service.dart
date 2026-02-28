@@ -1,5 +1,5 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:myapp/repositories/notification_settings_repository.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -21,8 +21,6 @@ class ScheduleNotificationService {
   static const _channelId = 'schedule_notification';
   static const _channelName = '일정 알림';
   static const _notificationId = 5;
-
-  static const _keyScheduleEnabled = 'setting_schedule';
 
   static RealtimeChannel? _channel;
   static bool _initialized = false;
@@ -50,15 +48,12 @@ class ScheduleNotificationService {
   }
 
   /// 일정 알림 활성화 여부 확인
-  static Future<bool> isScheduleEnabled() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool(_keyScheduleEnabled) ?? false;
-  }
+  static Future<bool> isScheduleEnabled() async =>
+      NotificationSettingsRepository.instance.getScheduleEnabled();
 
   /// 일정 알림 활성화/비활성화
   static Future<void> setScheduleEnabled(bool enabled) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_keyScheduleEnabled, enabled);
+    await NotificationSettingsRepository.instance.setScheduleEnabled(enabled);
 
     if (enabled) {
       await scheduleDailyNotification();

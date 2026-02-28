@@ -1,5 +1,5 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:myapp/repositories/notification_settings_repository.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:myapp/core/auth/auth_state.dart';
@@ -22,8 +22,6 @@ class AnnouncementNotificationService {
   static const _channelName = '공지사항 알림';
   static const _notificationId = 2;
 
-  static const _keyNoticeEnabled = 'setting_notice';
-
   static RealtimeChannel? _channel;
   static bool _initialized = false;
 
@@ -36,10 +34,8 @@ class AnnouncementNotificationService {
   }
 
   /// 공지사항 알림 활성화 여부 확인
-  static Future<bool> isNoticeEnabled() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool(_keyNoticeEnabled) ?? false;
-  }
+  static Future<bool> isNoticeEnabled() async =>
+      NotificationSettingsRepository.instance.getNoticeEnabled();
 
   /// 공지사항 알림 채널 생성 (Android)
   static Future<void> _createNotificationChannel() async {

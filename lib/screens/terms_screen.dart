@@ -357,7 +357,7 @@ class _TermsScreenState extends State<TermsScreen> {
           if (onDetailTap != null)
             CupertinoButton(
               padding: EdgeInsets.zero,
-              minSize: 0,
+              minimumSize: Size.zero,
               onPressed: onDetailTap,
               child: Icon(
                 CupertinoIcons.chevron_right,
@@ -368,7 +368,7 @@ class _TermsScreenState extends State<TermsScreen> {
           else if (onExpandTap != null)
             CupertinoButton(
               padding: EdgeInsets.zero,
-              minSize: 0,
+              minimumSize: Size.zero,
               onPressed: onExpandTap,
               child: Icon(
                 isExpanded ? CupertinoIcons.chevron_down : CupertinoIcons.chevron_right,

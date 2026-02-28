@@ -1,0 +1,8 @@
+# Android App Bundle(AAB) / APK 서명용 설정 예시
+# 이 파일을 복사하여 key.properties 로 저장한 뒤, 아래 값을 채우세요.
+# key.properties 와 *.keystore, *.jks 파일은 절대 버전 관리에 올리지 마세요.
+
+storePassword=비밀번호
+keyPassword=비밀번호
+keyAlias=upload
+storeFile=upload-keystore.jks

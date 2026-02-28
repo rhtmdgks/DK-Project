@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:myapp/repositories/notification_settings_repository.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest_all.dart' as tz_data;
@@ -23,7 +24,6 @@ class WeatherNotificationService {
   static const _channelName = '날씨 알림';
   static const _notificationId = 1;
 
-  static const _keyWeatherEnabled = 'weather_notification_enabled';
   static const _keyWeatherLat = 'weather_lat';
   static const _keyWeatherLon = 'weather_lon';
   static const _keyLastShownDate = 'weather_last_shown_date';
@@ -55,10 +55,8 @@ class WeatherNotificationService {
     }
   }
 
-  static Future<bool> isWeatherEnabled() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool(_keyWeatherEnabled) ?? false;
-  }
+  static Future<bool> isWeatherEnabled() async =>
+      NotificationSettingsRepository.instance.getWeatherEnabled();
 
   /// Android & iOS 알림 권한 요청
   static Future<bool> requestNotificationPermission() async {
@@ -114,17 +112,14 @@ class WeatherNotificationService {
   /// 
   /// [skipPermissionCheck]: true이면 알림 권한 확인을 건너뜀 (호출하는 쪽에서 이미 확인한 경우)
   static Future<void> setWeatherEnabled(bool enabled, {bool skipPermissionCheck = false}) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_keyWeatherEnabled, enabled);
+    await NotificationSettingsRepository.instance.setWeatherEnabled(enabled);
     if (enabled) {
-      // Android 13 이상에서 알림 권한 확인 및 요청 (skipPermissionCheck가 false인 경우만)
       if (!skipPermissionCheck) {
         final hasPermission = await isNotificationPermissionGranted();
         if (!hasPermission) {
           final granted = await requestNotificationPermission();
           if (!granted) {
-            // 권한이 거부되면 설정을 다시 false로 변경
-            await prefs.setBool(_keyWeatherEnabled, false);
+            await NotificationSettingsRepository.instance.setWeatherEnabled(false);
             throw Exception('알림 권한이 필요합니다. 설정에서 알림 권한을 허용해주세요.');
           }
         }
@@ -133,7 +128,7 @@ class WeatherNotificationService {
         await scheduleDailyNotification();
       } catch (e) {
         debugPrint('날씨 알림 스케줄 등록 실패: $e');
-        await prefs.setBool(_keyWeatherEnabled, false);
+        await NotificationSettingsRepository.instance.setWeatherEnabled(false);
         rethrow;
       }
     } else {
@@ -232,9 +227,10 @@ class WeatherNotificationService {
 
   /// (폴백) 앱을 6:30 이후에 열었을 때, 오늘 알림을 아직 안 받았으면 그때 날씨 조회 후 알림. 주 동작은 AM 06:30 스케줄.
   static Future<void> maybeShowWeatherNotificationIfNeeded() async {
-    final prefs = await SharedPreferences.getInstance();
-    final enabled = prefs.getBool(_keyWeatherEnabled) ?? false;
+    final enabled = await NotificationSettingsRepository.instance.getWeatherEnabled();
     if (!enabled) return;
+
+    final prefs = await SharedPreferences.getInstance();
 
     final now = DateTime.now();
     // 오전 6시 30분 이후인지 확인

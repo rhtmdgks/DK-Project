@@ -307,7 +307,7 @@ class _ScheduleTabState extends State<ScheduleTab> {
             children: [
               CupertinoButton(
                 padding: EdgeInsets.zero,
-                minSize: 0,
+                minimumSize: Size.zero,
                 onPressed: () {
                   setState(() {
                     _viewMonth = DateTime(year, month - 1);
@@ -337,7 +337,7 @@ class _ScheduleTabState extends State<ScheduleTab> {
               ),
               CupertinoButton(
                 padding: EdgeInsets.zero,
-                minSize: 0,
+                minimumSize: Size.zero,
                 onPressed: () {
                   setState(() {
                     _viewMonth = DateTime(year, month + 1);
@@ -789,171 +789,179 @@ class _ScheduleTabState extends State<ScheduleTab> {
         useSafeArea: true,
         backgroundColor: Colors.transparent,
         builder: (sheetContext) {
-          return StatefulBuilder(
-            builder: (sheetContext, setSheetState) {
-              return Container(
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surface,
-                  borderRadius: BorderRadius.vertical(
-                    top: Radius.circular(AppShapes.radiusLarge),
-                  ),
-                ),
-                child: SafeArea(
-                  top: false,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // 드래그 핸들
-                      Padding(
-                        padding: EdgeInsets.only(top: context.rh(12)),
-                        child: Container(
-                          width: context.rs(36),
-                          height: 4,
-                          decoration: BoxDecoration(
-                            color: AppColors.hint.withValues(alpha: 0.5),
-                            borderRadius: BorderRadius.circular(2),
-                          ),
-                        ),
+          return DraggableScrollableSheet(
+            expand: false,
+            initialChildSize: 0.7,
+            minChildSize: 0.4,
+            maxChildSize: 0.95,
+            builder: (ctx, scrollController) {
+              return StatefulBuilder(
+                builder: (innerContext, setSheetState) {
+                  return Container(
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surface,
+                      borderRadius: BorderRadius.vertical(
+                        top: Radius.circular(AppShapes.radiusLarge),
                       ),
-                      Padding(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: context.rs(22),
-                          vertical: context.rh(16),
-                        ),
-                        child: Row(
-                          children: [
-                            Text(
-                              '개인 일정 추가',
-                              style: AppFonts.scaled(context, AppFonts.titleBold),
-                            ),
-                            const Spacer(),
-                            IconButton(
-                              onPressed: () => Navigator.of(sheetContext).pop(false),
-                              icon: const Icon(Icons.close),
-                              style: IconButton.styleFrom(
-                                foregroundColor: AppColors.textSecondary,
+                    ),
+                    child: SafeArea(
+                      top: false,
+                      child: Column(
+                        children: [
+                          // 드래그 핸들
+                          Padding(
+                            padding: EdgeInsets.only(top: context.rh(12)),
+                            child: Container(
+                              width: context.rs(36),
+                              height: 4,
+                              decoration: BoxDecoration(
+                                color: AppColors.hint.withValues(alpha: 0.5),
+                                borderRadius: BorderRadius.circular(2),
                               ),
                             ),
-                          ],
-                        ),
-                      ),
-                      Flexible(
-                        child: SingleChildScrollView(
-                          padding: EdgeInsets.fromLTRB(
-                            context.rs(22),
-                            0,
-                            context.rs(22),
-                            context.rh(24),
                           ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              CupertinoTextField(
-                                controller: titleController,
-                                placeholder: '제목',
-                                padding: EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 12,
+                          Padding(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: context.rs(22),
+                              vertical: context.rh(16),
+                            ),
+                            child: Row(
+                              children: [
+                                Text(
+                                  '개인 일정 추가',
+                                  style: AppFonts.scaled(context, AppFonts.titleBold),
                                 ),
-                                decoration: BoxDecoration(
-                                  color: Theme.of(sheetContext).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                                  borderRadius: BorderRadius.circular(AppShapes.radiusSmall),
-                                  border: Border.all(color: AppColors.border),
+                                const Spacer(),
+                                IconButton(
+                                  onPressed: () => Navigator.of(sheetContext).pop(false),
+                                  icon: const Icon(Icons.close),
+                                  style: IconButton.styleFrom(
+                                    foregroundColor: AppColors.textSecondary,
+                                  ),
                                 ),
-                              ),
-                              SizedBox(height: context.rh(12)),
-                              CupertinoTextField(
-                                controller: descController,
-                                placeholder: '설명 (선택)',
-                                maxLines: 3,
-                                padding: EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 12,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Theme.of(sheetContext).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                                  borderRadius: BorderRadius.circular(AppShapes.radiusSmall),
-                                  border: Border.all(color: AppColors.border),
-                                ),
-                              ),
-                              SizedBox(height: context.rh(12)),
-                              CheckboxListTile(
-                                title: const Text('하루 종일'),
-                                value: allDay,
-                                onChanged: (value) => setSheetState(() => allDay = value ?? false),
-                                contentPadding: EdgeInsets.zero,
-                              ),
-                              _buildDateTimeTile(
-                                dialogContext: sheetContext,
-                                label: '시작',
-                                dateTime: start,
-                                onChanged: (dt) => setSheetState(() => start = dt),
-                                enabled: !allDay,
-                              ),
-                              _buildDateTimeTile(
-                                dialogContext: sheetContext,
-                                label: '종료',
-                                dateTime: end,
-                                onChanged: (dt) => setSheetState(() => end = dt),
-                                enabled: !allDay,
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
-                        ),
-                      ),
-                      Padding(
-                        padding: EdgeInsets.fromLTRB(
-                          context.rs(22),
-                          0,
-                          context.rs(22),
-                          context.rh(24),
-                        ),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: OutlinedButton(
-                                onPressed: () => Navigator.of(sheetContext).pop(false),
-                                child: const Text('취소'),
+                          Expanded(
+                            child: SingleChildScrollView(
+                              controller: scrollController,
+                              padding: EdgeInsets.fromLTRB(
+                                context.rs(22),
+                                0,
+                                context.rs(22),
+                                context.rh(24),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  CupertinoTextField(
+                                    controller: titleController,
+                                    placeholder: '제목',
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 12,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Theme.of(innerContext).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                                      borderRadius: BorderRadius.circular(AppShapes.radiusSmall),
+                                      border: Border.all(color: AppColors.border),
+                                    ),
+                                  ),
+                                  SizedBox(height: context.rh(12)),
+                                  CupertinoTextField(
+                                    controller: descController,
+                                    placeholder: '설명 (선택)',
+                                    maxLines: 3,
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 12,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Theme.of(innerContext).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                                      borderRadius: BorderRadius.circular(AppShapes.radiusSmall),
+                                      border: Border.all(color: AppColors.border),
+                                    ),
+                                  ),
+                                  SizedBox(height: context.rh(12)),
+                                  CheckboxListTile(
+                                    title: const Text('하루 종일'),
+                                    value: allDay,
+                                    onChanged: (value) => setSheetState(() => allDay = value ?? false),
+                                    contentPadding: EdgeInsets.zero,
+                                  ),
+                                  _buildDateTimeTile(
+                                    dialogContext: innerContext,
+                                    label: '시작',
+                                    dateTime: start,
+                                    onChanged: (dt) => setSheetState(() => start = dt),
+                                    enabled: !allDay,
+                                  ),
+                                  _buildDateTimeTile(
+                                    dialogContext: innerContext,
+                                    label: '종료',
+                                    dateTime: end,
+                                    onChanged: (dt) => setSheetState(() => end = dt),
+                                    enabled: !allDay,
+                                  ),
+                                ],
                               ),
                             ),
-                            SizedBox(width: context.rs(12)),
-                            Expanded(
-                              child: FilledButton(
-                                onPressed: () async {
-                                  final uid = supabase.auth.currentUser?.id;
-                                  if (uid == null) return;
+                          ),
+                          Padding(
+                            padding: EdgeInsets.fromLTRB(
+                              context.rs(22),
+                              0,
+                              context.rs(22),
+                              context.rh(24),
+                            ),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: OutlinedButton(
+                                    onPressed: () => Navigator.of(sheetContext).pop(false),
+                                    child: const Text('취소'),
+                                  ),
+                                ),
+                                SizedBox(width: context.rs(12)),
+                                Expanded(
+                                  child: FilledButton(
+                                    onPressed: () async {
+                                      final uid = supabase.auth.currentUser?.id;
+                                      if (uid == null) return;
 
-                                  final title = titleController.text.trim();
-                                  if (title.isEmpty) {
-                                    ScaffoldMessenger.of(sheetContext).showSnackBar(
-                                      const SnackBar(content: Text('제목을 입력해 주세요.')),
-                                    );
-                                    return;
-                                  }
+                                      final title = titleController.text.trim();
+                                      if (title.isEmpty) {
+                                        ScaffoldMessenger.of(innerContext).showSnackBar(
+                                          const SnackBar(content: Text('제목을 입력해 주세요.')),
+                                        );
+                                        return;
+                                      }
 
-                                  await supabase.from('personal_events').insert({
-                                    'user_id': uid,
-                                    'title': title,
-                                    'description': descController.text.trim().isEmpty
-                                        ? null
-                                        : descController.text.trim(),
-                                    'start_at': start.toIso8601String(),
-                                    'end_at': allDay ? null : end.toIso8601String(),
-                                    'all_day': allDay,
-                                  });
-                                  if (sheetContext.mounted) {
-                                    Navigator.of(sheetContext).pop(true);
-                                  }
-                                },
-                                child: const Text('추가'),
-                              ),
+                                      await supabase.from('personal_events').insert({
+                                        'user_id': uid,
+                                        'title': title,
+                                        'description': descController.text.trim().isEmpty
+                                            ? null
+                                            : descController.text.trim(),
+                                        'start_at': start.toIso8601String(),
+                                        'end_at': allDay ? null : end.toIso8601String(),
+                                        'all_day': allDay,
+                                      });
+                                      if (sheetContext.mounted) {
+                                        Navigator.of(sheetContext).pop(true);
+                                      }
+                                    },
+                                    child: const Text('추가'),
+                                  ),
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                ),
+                    ),
+                  );
+                },
               );
             },
           );

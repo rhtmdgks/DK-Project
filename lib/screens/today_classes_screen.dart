@@ -2,10 +2,8 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:myapp/core/auth/auth_state.dart';
-import 'package:myapp/core/supabase_client.dart';
 import 'package:myapp/core/theme/app_theme.dart';
 import 'package:myapp/core/theme/responsive.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 /// 오늘의 수업 더보기 페이지 (Figma node 388:2726).
 ///
@@ -57,31 +55,7 @@ class _TodayClassesScreenState extends State<TodayClassesScreen> {
 
   Future<void> _loadProfile() async {
     try {
-      // 세션이 있으면 기존 로직 사용
-      final session = supabase.auth.currentSession;
-      if (session != null) {
-        await getCurrentProfile();
-      } else {
-        // 세션이 없으면 SharedPreferences에서 user_id를 가져와서 직접 프로필 조회
-        final prefs = await SharedPreferences.getInstance();
-        final loggedInUserId = prefs.getString('logged_in_user_id');
-        
-        if (loggedInUserId != null) {
-          try {
-            final row = await supabase
-                .from('profiles')
-                .select()
-                .eq('user_id', loggedInUserId)
-                .maybeSingle();
-            if (row != null) {
-              AppProfile.fromJson(row);
-            }
-          } catch (_) {
-            // 프로필 조회 실패 시 무시
-          }
-        }
-      }
-      
+      await getCurrentProfile();
       if (!mounted) return;
     } catch (_) {
       if (!mounted) return;

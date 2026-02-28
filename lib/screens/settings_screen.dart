@@ -3,10 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:myapp/core/auth/auth_repository.dart';
 import 'package:myapp/core/routing/app_router.dart';
-import 'package:myapp/core/supabase_client.dart';
+import 'package:myapp/repositories/notification_settings_repository.dart';
 import 'package:myapp/core/theme/app_theme.dart';
 import 'package:myapp/core/theme/responsive.dart';
 import 'package:myapp/services/announcement_notification_service.dart';
@@ -40,8 +40,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     'weather': false,
   };
 
-  static const _prefPrefix = 'setting_';
-
   @override
   void initState() {
     super.initState();
@@ -49,31 +47,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _loadToggles() async {
-    final prefs = await SharedPreferences.getInstance();
-    final weatherOn = await WeatherNotificationService.isWeatherEnabled();
+    final repo = NotificationSettingsRepository.instance;
+    final mealOn = await repo.getMealEnabled();
+    final scheduleOn = await repo.getScheduleEnabled();
+    final classMoveOn = await repo.getClassMoveEnabled();
+    final noticeOn = await repo.getNoticeEnabled();
+    final weatherOn = await repo.getWeatherEnabled();
     if (!mounted) return;
     setState(() {
-      for (final key in _toggles.keys) {
-        if (key == 'weather') {
-          _toggles[key] = weatherOn;
-        } else {
-          _toggles[key] = prefs.getBool('$_prefPrefix$key') ?? _toggles[key]!;
-        }
-      }
+      _toggles['meal'] = mealOn;
+      _toggles['schedule'] = scheduleOn;
+      _toggles['class_move'] = classMoveOn;
+      _toggles['notice'] = noticeOn;
+      _toggles['weather'] = weatherOn;
     });
   }
 
   Future<void> _onToggle(String key, bool newValue) async {
     setState(() => _toggles[key] = newValue);
-    final prefs = await SharedPreferences.getInstance();
-    
+
     // 알림을 켤 때는 알림 권한 확인 및 요청 (모든 알림 타입에 공통)
     if (newValue) {
       final hasNotificationPermission = await WeatherNotificationService.isNotificationPermissionGranted();
       if (!hasNotificationPermission) {
         final notificationGranted = await WeatherNotificationService.requestNotificationPermission();
         if (!notificationGranted) {
-          // 권한이 거부되면 토글을 다시 false로 변경
           if (mounted) {
             setState(() => _toggles[key] = false);
             ScaffoldMessenger.of(context).showSnackBar(
@@ -89,9 +87,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       }
     }
 
-    await prefs.setBool('$_prefPrefix$key', newValue);
-
-    // 각 알림 타입별 서비스 시작/중지
+    // 각 알림 타입별 서비스 시작/중지 (서비스가 NotificationSettingsRepository에 저장)
     if (key == 'meal') {
       MealNotificationService.setMealEnabled(newValue)
           .catchError((Object e, StackTrace _) {});
@@ -112,17 +108,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
           await _updateWeatherLocation();
           await WeatherNotificationService.setWeatherEnabled(true, skipPermissionCheck: true);
         } catch (e) {
-          if (mounted) {
-            setState(() => _toggles[key] = false);
-            await prefs.setBool('$_prefPrefix$key', false);
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(e.toString().replaceAll('Exception: ', '')),
-                backgroundColor: AppColors.error,
-                duration: const Duration(seconds: 3),
-              ),
-            );
-          }
+          if (mounted) setState(() => _toggles[key] = false);
+          await NotificationSettingsRepository.instance.setWeatherEnabled(false);
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(e.toString().replaceAll('Exception: ', '')),
+              backgroundColor: AppColors.error,
+              duration: const Duration(seconds: 3),
+            ),
+          );
         }
       } else {
         // 날씨 알림을 끌 때
@@ -141,7 +136,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
     try {
       final pos = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.medium,
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.medium,
+        ),
       );
       await WeatherNotificationService.saveLocation(pos.latitude, pos.longitude);
     } catch (_) {}
@@ -329,7 +326,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Switch(
       value: isOn,
       onChanged: (_) => onTap(),
-      activeTrackColor: AppColors.primaryBlue.withOpacity(0.5),
+      activeTrackColor: AppColors.primaryBlue.withValues(alpha: 0.5),
       activeThumbColor: AppColors.primaryBlue,
     );
   }
@@ -500,15 +497,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       // 실시간 알림 구독 해제
       await NotificationService.onLogout();
 
-      // Supabase 세션 로그아웃 시도 (실패해도 계속 진행)
-      try {
-        await supabase.auth.signOut();
-      } catch (_) {}
-
-      // SharedPreferences에서 로그인 상태 제거
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove('logged_in');
-      await prefs.remove('logged_in_user_id');
+      await AuthRepository.instance.logout();
 
       if (!mounted) return;
       

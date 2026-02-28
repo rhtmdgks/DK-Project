@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:myapp/core/auth/auth_state.dart';
+import 'package:myapp/core/auth/auth_repository.dart';
 import 'package:myapp/core/theme/app_motion.dart';
-import 'package:myapp/core/supabase_client.dart';
 import 'package:myapp/screens/chat_list_screen.dart';
 import 'package:myapp/screens/chat_screen.dart';
 import 'package:myapp/screens/home_screen.dart';
@@ -38,10 +37,6 @@ enum AppRoute {
 
 /// SharedPreferences 키: 약관 동의 여부. [TermsScreen]에서 true로 저장한다.
 const String kTermsAgreedKey = 'terms_agreed';
-
-/// SharedPreferences 키: 로그인 상태 (profiles 테이블 기반 인증 사용 시).
-const String kLoggedInKey = 'logged_in';
-const String kLoggedInUserIdKey = 'logged_in_user_id';
 
 /// 알림 탭 등 외부에서 홈 탭 이동 시 사용 (예: 공지사항 알림 → 공지/투표 탭).
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -165,44 +160,17 @@ Future<String?> _handleRedirect(
     // 스플래시는 리다이렉트 우회
     if (location == AppRoute.splash.path) return null;
 
-    final session = supabase.auth.currentSession;
     final isOnLogin = location == AppRoute.login.path;
+    final loggedIn = await AuthRepository.instance.isLoggedIn();
 
-    // 세션이 없으면 SharedPreferences에서 로그인 상태 확인 (profiles 테이블 기반 인증)
-    final loggedIn = prefs.getBool(kLoggedInKey) ?? false;
-    final loggedInUserId = prefs.getString(kLoggedInUserIdKey);
-
-    // 미인증 → 로그인 페이지가 아니면 로그인으로 이동
-    if (session == null && !loggedIn) {
+    if (!loggedIn) {
       return isOnLogin ? null : AppRoute.login.path;
     }
 
-    // 세션이 있으면 기존 로직 사용, 없으면 SharedPreferences 기반으로 프로필 조회 시도
-    AppProfile? profile;
-    if (session != null) {
-      profile = await getCurrentProfile();
-    } else if (loggedIn && loggedInUserId != null) {
-      // 세션 없이도 프로필 조회 시도 (RLS 정책이 허용하는 경우)
-      try {
-        final row = await supabase
-            .from('profiles')
-            .select()
-            .eq('user_id', loggedInUserId)
-            .maybeSingle();
-        if (row != null) {
-          profile = AppProfile.fromJson(row);
-        }
-      } catch (_) {
-        // 프로필 조회 실패 시 로그인 상태 초기화
-        await prefs.remove(kLoggedInKey);
-        await prefs.remove(kLoggedInUserIdKey);
-      }
-    }
+    final profile = await AuthRepository.instance.getCurrentProfile();
 
     if (profile == null) {
-      // 로그인 상태 초기화
-      await prefs.remove(kLoggedInKey);
-      await prefs.remove(kLoggedInUserIdKey);
+      await AuthRepository.instance.clearLoginState();
       return AppRoute.login.path;
     }
 

@@ -86,18 +86,31 @@ void showM3DetailSheet(
   required String body,
   String? secondary,
   List<Widget>? actions,
+  Widget? bodyWidget,
 }) {
   showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
     backgroundColor: Colors.transparent,
-    builder: (ctx) => _M3DetailSheetContent(
-      title: title,
-      body: body,
-      secondary: secondary,
-      actions: actions,
-    ),
+    builder: (ctx) {
+      return DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.6,
+        minChildSize: 0.4,
+        maxChildSize: 0.9,
+        builder: (sheetContext, scrollController) {
+          return _M3DetailSheetContent(
+            title: title,
+            body: body,
+            secondary: secondary,
+            actions: actions,
+            bodyWidget: bodyWidget,
+            scrollController: scrollController,
+          );
+        },
+      );
+    },
   );
 }
 
@@ -107,100 +120,108 @@ class _M3DetailSheetContent extends StatelessWidget {
     required this.body,
     this.secondary,
     this.actions,
+    this.bodyWidget,
+    required this.scrollController,
   });
 
   final String title;
   final String body;
   final String? secondary;
   final List<Widget>? actions;
+   final Widget? bodyWidget;
+  final ScrollController scrollController;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Container(
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.vertical(
-          top: Radius.circular(AppShapes.radiusLarge),
-        ),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          SizedBox(height: context.rh(12)),
-          Container(
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: AppColors.border,
-              borderRadius: BorderRadius.circular(2),
-            ),
+    return SafeArea(
+      top: false,
+      child: Container(
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          borderRadius: BorderRadius.vertical(
+            top: Radius.circular(AppShapes.radiusLarge),
           ),
-          Padding(
-            padding: EdgeInsets.fromLTRB(
-              context.rs(20),
-              context.rh(16),
-              context.rs(20),
-              context.rh(8),
+        ),
+        child: Column(
+          children: [
+            SizedBox(height: context.rh(12)),
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.border,
+                borderRadius: BorderRadius.circular(2),
+              ),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
+            Padding(
+              padding: EdgeInsets.fromLTRB(
+                context.rs(20),
+                context.rh(16),
+                context.rs(20),
+                context.rh(8),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          title,
+                          style: AppFonts.scaled(context, AppFonts.titleSemiBold)
+                              .copyWith(color: AppColors.textDark),
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        icon: const Icon(Icons.close),
+                      ),
+                    ],
+                  ),
+                  if (secondary != null && secondary!.isNotEmpty)
+                    Padding(
+                      padding: EdgeInsets.only(
+                        left: 0,
+                        right: 0,
+                        top: context.rh(4),
+                        bottom: 0,
+                      ),
                       child: Text(
-                        title,
-                        style: AppFonts.scaled(context, AppFonts.titleSemiBold)
-                            .copyWith(color: AppColors.textDark),
+                        secondary!,
+                        style: AppFonts.scaled(context, AppFonts.captionRegular),
                       ),
                     ),
-                    IconButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      icon: const Icon(Icons.close),
-                    ),
-                  ],
-                ),
-                if (secondary != null && secondary!.isNotEmpty)
-                  Padding(
-                    padding: EdgeInsets.only(
-                      left: 0,
-                      right: 0,
-                      top: context.rh(4),
-                      bottom: 0,
-                    ),
-                    child: Text(
-                      secondary!,
-                      style: AppFonts.scaled(context, AppFonts.captionRegular),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          Divider(height: 1, color: theme.dividerColor),
-          Flexible(
-            child: SingleChildScrollView(
-              padding: EdgeInsets.all(context.rs(20)),
-              child: Text(
-                body,
-                style: AppFonts.scaled(context, AppFonts.bodyRegular)
-                    .copyWith(color: AppColors.textPrimary),
+                ],
               ),
             ),
-          ),
-          if (actions != null && actions!.isNotEmpty) ...[
             Divider(height: 1, color: theme.dividerColor),
-            Padding(
-              padding: EdgeInsets.all(context.rs(16)),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: actions!,
+            Expanded(
+              child: SingleChildScrollView(
+                controller: scrollController,
+                padding: EdgeInsets.all(context.rs(20)),
+                child: bodyWidget ??
+                    Text(
+                      body,
+                      style: AppFonts.scaled(context, AppFonts.bodyRegular)
+                          .copyWith(color: AppColors.textPrimary),
+                    ),
               ),
             ),
+            if (actions != null && actions!.isNotEmpty) ...[
+              Divider(height: 1, color: theme.dividerColor),
+              Padding(
+                padding: EdgeInsets.all(context.rs(16)),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: actions!,
+                ),
+              ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }

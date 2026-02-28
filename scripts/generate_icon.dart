@@ -1,5 +1,4 @@
-import 'dart:io';
-import 'package:image/image.dart' as img;
+// ignore_for_file: avoid_print
 
 /// 로고 파일 역할:
 /// - laon_icon.svg: 앱 내부 로고 (스플래시, 로그인, 홈 등 → LaonIcon 위젯)

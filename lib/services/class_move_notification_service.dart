@@ -1,5 +1,5 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:myapp/repositories/notification_settings_repository.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest_all.dart' as tz_data;
 
@@ -20,8 +20,6 @@ class ClassMoveNotificationService {
   static const _channelId = 'class_move_notification';
   static const _channelName = '이동 수업 알림';
   static const _notificationIdBase = 6;
-
-  static const _keyClassMoveEnabled = 'setting_class_move';
 
   static bool _initialized = false;
 
@@ -65,15 +63,12 @@ class ClassMoveNotificationService {
   }
 
   /// 이동 수업 알림 활성화 여부 확인
-  static Future<bool> isClassMoveEnabled() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool(_keyClassMoveEnabled) ?? false;
-  }
+  static Future<bool> isClassMoveEnabled() async =>
+      NotificationSettingsRepository.instance.getClassMoveEnabled();
 
   /// 이동 수업 알림 활성화/비활성화
   static Future<void> setClassMoveEnabled(bool enabled) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_keyClassMoveEnabled, enabled);
+    await NotificationSettingsRepository.instance.setClassMoveEnabled(enabled);
 
     if (enabled) {
       await scheduleClassMoveNotifications();
@@ -134,7 +129,7 @@ class ClassMoveNotificationService {
               currPeriod <= _periodTimes.length) {
             // 수업 시작 시간 5분 전에 알림
             final periodTime = _periodTimes[currPeriod - 1];
-            var notificationTime = tz.TZDateTime(
+            final notificationTime = tz.TZDateTime(
               tz.local,
               targetDate.year,
               targetDate.month,
