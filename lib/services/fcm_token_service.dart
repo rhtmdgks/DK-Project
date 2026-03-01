@@ -52,6 +52,8 @@ class FcmTokenService {
         }
       }
       final token = await FirebaseMessaging.instance.getToken();
+      final platform = Platform.isIOS ? 'ios' : 'android';
+      debugPrint('FcmTokenService: getToken success (platform=$platform)');
       return token;
     } catch (e) {
       debugPrint('FcmTokenService: getToken failed $e');
@@ -75,6 +77,9 @@ class FcmTokenService {
 
     final token = await getToken();
     if (token == null || token.isEmpty) return;
+
+    final platform = Platform.isIOS ? 'ios' : 'android';
+    debugPrint('FcmTokenService: registerIfNeeded calling Edge Function (platform=$platform)');
 
     await _callRegister(
       action: 'register',
@@ -118,6 +123,7 @@ class FcmTokenService {
       body['token'] = token;
       body['grade'] = grade;
       body['class_number'] = classNumber;
+      body['platform'] = Platform.isIOS ? 'ios' : 'android';
     }
 
     try {
@@ -131,7 +137,7 @@ class FcmTokenService {
         final response = await request.close();
         await response.drain();
         if (response.statusCode >= 200 && response.statusCode < 300) {
-          debugPrint('FcmTokenService: $action ok');
+          debugPrint('FcmTokenService: $action ok (platform=${action == 'register' ? (Platform.isIOS ? 'ios' : 'android') : '-'})');
         } else {
           debugPrint('FcmTokenService: $action failed ${response.statusCode}');
         }

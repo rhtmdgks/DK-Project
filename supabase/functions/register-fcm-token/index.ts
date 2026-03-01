@@ -24,7 +24,7 @@ Deno.serve(async (req: Request) => {
     return jsonResponse({ error: "unauthorized" }, 401);
   }
 
-  let body: { action?: string; user_id?: string; token?: string; grade?: number; class_number?: number };
+  let body: { action?: string; user_id?: string; token?: string; grade?: number; class_number?: number; platform?: string };
   try {
     body = (await req.json()) as typeof body;
   } catch {
@@ -61,12 +61,17 @@ Deno.serve(async (req: Request) => {
     return jsonResponse({ error: "invalid_params", message: "grade(1-3) and class_number(1-10) required" }, 400);
   }
 
+  const platform = typeof body.platform === "string" && /^(ios|android)$/i.test(body.platform.trim())
+    ? body.platform.trim().toLowerCase()
+    : null;
+
   const { error } = await supabase.from("fcm_tokens").upsert(
     {
       user_id: userId.trim(),
       token: token.trim(),
       grade,
       class_number: classNumber,
+      ...(platform ? { platform } : {}),
       updated_at: new Date().toISOString(),
     },
     { onConflict: "user_id" }

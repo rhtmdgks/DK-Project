@@ -28,25 +28,28 @@ Figma 공식 Desktop MCP와 달리 **선택/문서/노드 정보를 읽고, Figm
 
 프로젝트 루트 `.cursor/mcp.json`에 TalkToFigma가 이미 추가되어 있으면 Cursor가 해당 MCP를 불러옵니다.
 
+현재 프로젝트에서는 **MCP 서버만** `npx`로 실행하도록 설정해 두었습니다 (Bun 경로 없이 동작).
+
 ```json
 {
   "mcpServers": {
     "TalkToFigma": {
-      "command": "bunx",
+      "command": "npx",
       "args": ["cursor-talk-to-figma-mcp@latest"]
     }
   }
 }
 ```
 
-(기존에 다른 MCP가 있으면 `TalkToFigma` 항목만 추가하면 됩니다.)
+- **WebSocket**은 별도 패키지(`cursor-talk-to-figma-socket`)이며 **Bun 필요** → 터미널에서 `bunx cursor-talk-to-figma-socket` 실행.
+- (기존에 다른 MCP가 있으면 `TalkToFigma` 항목만 추가하면 됩니다.)
 
 ---
 
-## 3. WebSocket 서버 실행
+## 3. WebSocket 서버 실행 (포트 3055)
 
 Figma와 통신하려면 **WebSocket 서버를 켜 둔 상태**여야 합니다.  
-Figma 플러그인에서 안내하는 대로 아래 명령을 터미널에서 실행하세요.
+**Bun이 필요합니다** (WebSocket 패키지가 Bun으로 동작).
 
 ```bash
 bunx cursor-talk-to-figma-socket
@@ -54,6 +57,8 @@ bunx cursor-talk-to-figma-socket
 
 실행되면 `WebSocket server running on port 3055` 로그가 나오고, Figma 플러그인에서 **Connect**로 접속할 수 있습니다.  
 (서버를 끄지 않으려면 해당 터미널을 닫지 말고 두거나, 백그라운드로 실행하세요.)
+
+- 포트 지정 시: `bunx cursor-talk-to-figma-socket --port 3055` (기본값이 3055임)
 
 ---
 
@@ -120,7 +125,36 @@ Figma에서 **Cursor MCP Plugin** 실행 후, 플러그인 UI에서 **채널 이
 
 ---
 
-## 8. 참고 링크
+## 8. 도구가 보이지 않을 때 (오류 시 점검 순서)
+
+TalkToFigma 도구(`join_channel`, `get_node_info` 등)가 Cursor에 **등록되지 않았다**고 나오면 아래 순서로 확인하세요.
+
+1. **Bun 설치** (WebSocket용)
+   ```bash
+   curl -fsSL https://bun.sh/install | bash
+   ```
+
+2. **WebSocket 서버 실행 (포트 3055)** — 터미널 하나에서 계속 켜 두기
+   ```bash
+   bunx cursor-talk-to-figma-socket
+   ```
+   → `WebSocket server running on port 3055` 확인.
+
+3. **Figma에서**
+   - 해당 파일 열기 (예: [DK-Project](https://www.figma.com/design/88esc758WVidgfK2f6w19A/DK-Project?node-id=847-4858))
+   - **Plugins → Cursor MCP Plugin** 실행
+   - 채널 이름 입력 (예: `dk-project`) 후 **Join** 클릭
+
+4. **Cursor 재시작**  
+   `.cursor/mcp.json`을 수정했다면, MCP를 다시 불러오려면 **Cursor를 완전히 종료했다가 다시 실행**하세요.
+
+5. 연결 후 Cursor에서
+   - `join_channel`로 같은 채널 이름(예: `dk-project`) 사용
+   - `get_node_info(nodeId: "847:4858")` 로 투표 페이지 노드 정보 조회 → 반환된 값을 기준으로 UI 구현
+
+---
+
+## 9. 참고 링크
 
 - [GitHub - grab/cursor-talk-to-figma-mcp](https://github.com/grab/cursor-talk-to-figma-mcp)
 - [Figma 커뮤니티 플러그인](https://www.figma.com/community/plugin/1485687494525374295/cursor-talk-to-figma-mcp-plugin)
