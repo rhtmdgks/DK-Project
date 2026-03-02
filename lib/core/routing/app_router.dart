@@ -13,6 +13,7 @@ import 'package:myapp/screens/settings_screen.dart';
 import 'package:myapp/screens/splash_screen.dart';
 import 'package:myapp/screens/suggestions_chat_screen.dart';
 import 'package:myapp/screens/terms_screen.dart';
+import 'package:myapp/screens/meal_departure_alert_screen.dart';
 import 'package:myapp/screens/profile_screen.dart';
 import 'package:myapp/screens/today_classes_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -25,6 +26,7 @@ enum AppRoute {
   passwordChange('/password-change'),
   home('/'),
   settings('/settings'),
+  mealDepartureAlert('/settings/meal-departure-alert'),
   privacyPolicy('/privacy'),
   bugReport('/bug-report'),
   chatList('/chat'),
@@ -106,6 +108,11 @@ GoRouter createAppRouter() {
       GoRoute(
         path: AppRoute.settings.path,
         pageBuilder: (_, state) => _m3Page(state, const SettingsScreen()),
+      ),
+      GoRoute(
+        path: AppRoute.mealDepartureAlert.path,
+        pageBuilder: (_, state) =>
+            _m3Page(state, const MealDepartureAlertScreen()),
       ),
       GoRoute(
         path: AppRoute.privacyPolicy.path,

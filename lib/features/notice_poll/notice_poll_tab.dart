@@ -568,7 +568,7 @@ class PollPostCard extends StatelessWidget {
                 children: [
                   GestureDetector(
                     behavior: HitTestBehavior.opaque,
-                    onTap: onLikeTap != null ? onLikeTap! : null,
+                    onTap: onLikeTap,
                     child: Padding(
                       padding: EdgeInsets.symmetric(
                         vertical: context.rh(10),

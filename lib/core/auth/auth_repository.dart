@@ -89,6 +89,8 @@ class AuthRepository {
         grade: profile.grade,
         classNum: profile.classNum,
         numberInClass: profile.numberInClass,
+        teacherSubjects: profile.teacherSubjects,
+        teacherRoles: profile.teacherRoles,
       );
     }
 

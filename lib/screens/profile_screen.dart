@@ -164,6 +164,40 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final grade = p.gradeOrFromStudentId;
     final classNum = p.classNumOrFromStudentId;
     final numberInClass = p.numberInClassOrFromStudentId;
+    final isTeacher = p.role == 'teacher';
+
+    final rows = <Widget>[
+      _buildInfoRow('학번', p.studentId.isEmpty ? '-' : p.studentId),
+      _buildInfoRow('이름', p.fullName ?? '-'),
+    ];
+
+    if (isTeacher) {
+      rows.add(_buildInfoRow(
+        '담당 과목',
+        (p.teacherSubjects != null && p.teacherSubjects!.isNotEmpty)
+            ? p.teacherSubjects!.join(', ')
+            : '-',
+      ));
+      rows.add(_buildInfoRow(
+        '담당 역할',
+        (p.teacherRoles != null && p.teacherRoles!.isNotEmpty)
+            ? p.teacherRoles!.join(', ')
+            : '-',
+      ));
+    } else {
+      rows.add(_buildInfoRow(
+        '학년',
+        grade != null ? '$grade학년' : '-',
+      ));
+      rows.add(_buildInfoRow(
+        '반',
+        classNum != null ? '$classNum반' : '-',
+      ));
+      rows.add(_buildInfoRow(
+        '번호',
+        numberInClass != null ? '$numberInClass번' : '-',
+      ));
+    }
 
     return Container(
       padding: EdgeInsets.all(context.rs(20)),
@@ -181,22 +215,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _buildInfoRow('학번', p.studentId.isEmpty ? '-' : p.studentId),
-          _buildInfoRow('이름', p.fullName ?? '-'),
-          _buildInfoRow(
-            '학년',
-            grade != null ? '$grade학년' : '-',
-          ),
-          _buildInfoRow(
-            '반',
-            classNum != null ? '$classNum반' : '-',
-          ),
-          _buildInfoRow(
-            '번호',
-            numberInClass != null ? '$numberInClass번' : '-',
-          ),
-        ],
+        children: rows,
       ),
     );
   }

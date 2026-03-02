@@ -5,6 +5,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:myapp/core/auth/auth_repository.dart';
+import 'package:myapp/core/auth/auth_state.dart';
 import 'package:myapp/core/routing/app_router.dart';
 import 'package:myapp/repositories/notification_settings_repository.dart';
 import 'package:myapp/core/theme/app_theme.dart';
@@ -40,10 +41,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
     'weather': false,
   };
 
+  /// 학생회(council)·교사(teacher)만 급식 출발 알림 발송 메뉴 노출
+  String? _role;
+
   @override
   void initState() {
     super.initState();
     _loadToggles();
+    _loadProfile();
+  }
+
+  Future<void> _loadProfile() async {
+    final profile = await getCurrentProfile();
+    if (!mounted) return;
+    setState(() => _role = profile?.role);
   }
 
   Future<void> _loadToggles() async {
@@ -384,6 +395,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 title: '개인정보 처리방침',
                 onTap: () => context.push(AppRoute.privacyPolicy.path),
               ),
+              if (_role == 'council' || _role == 'teacher') ...[
+                _buildItemDivider(),
+                _buildLinkItem(
+                  icon: Icons.lunch_dining_rounded,
+                  iconColor: const Color(0xFFFF9F43),
+                  title: '급식 출발 알림',
+                  onTap: () => context.push(AppRoute.mealDepartureAlert.path),
+                ),
+              ],
             ],
           ),
         ),

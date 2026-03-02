@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/cupertino.dart';
@@ -48,6 +49,9 @@ class _HomeTabState extends State<HomeTab> {
   List<_SubjectCard>? _todayTimetableEntries;
   bool _timetableLoading = true;
 
+  /// 현재 수업 갱신용. 1초마다 setState로 원·숫자가 자연스럽게 줄어들게 함.
+  Timer? _currentClassTimer;
+
   /// 샘플 다음 시간 과목 데이터
   /// 아이콘과 색상은 [SubjectThemeService]를 통해 자동 할당됩니다.
   static const _nextClass = _NextClassInfo(
@@ -65,10 +69,14 @@ class _HomeTabState extends State<HomeTab> {
     _loadProfile();
     _loadGreeting();
     _loadTodayTimetable();
+    _currentClassTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() {});
+    });
   }
 
   @override
   void dispose() {
+    _currentClassTimer?.cancel();
     super.dispose();
   }
 
@@ -172,6 +180,7 @@ class _HomeTabState extends State<HomeTab> {
         onRefresh: () async {
           await _loadProfile();
           await _loadGreeting();
+          await _loadTodayTimetable();
         },
         child: _loading
             ? Center(
@@ -188,6 +197,8 @@ class _HomeTabState extends State<HomeTab> {
                   _buildGreeting(),
                   SizedBox(height: context.rh(28)),
                   _buildTodayClassesSection(),
+                  SizedBox(height: context.rh(24)),
+                  _buildCurrentClassSection(),
                   SizedBox(height: context.rh(24)),
                   _buildNextClassSection(),
                   SizedBox(height: context.rh(32)),
@@ -425,11 +436,9 @@ class _HomeTabState extends State<HomeTab> {
     );
   }
 
-  /// 오늘의 수업 리스트 (가로 스크롤)
-  /// Figma 노드 41:1 기준: 카드 크기 148x119 (첫 번째는 149x119)
   static const double _cardHeight = 119;
   static const double _cardWidth = 148;
-  static const double _firstCardWidth = 149; // 첫 번째 카드만 149
+  static const double _firstCardWidth = 149;
 
   Widget _buildTodayClassesList() {
     final list = _todayTimetableEntries ?? [];
@@ -494,26 +503,17 @@ class _HomeTabState extends State<HomeTab> {
     );
   }
 
-  /// Figma 노드 41:1 디자인 기반 카드
-  /// 첫 번째 카드 (Mathematics): 149x119
-  ///   - 아이콘: x: -3663 (카드 x: -3679) = 16, y: 2311 (카드 y: 2295) = 16
-  ///   - 텍스트: x: -3663 = 16, y: 2374 (카드 y: 2295) = 79
-  ///   - 메뉴: x: -3566 (카드 x: -3679) = 113, right: 149 - 113 - 24 = 12
-  /// 세 번째 카드 (Geography): 148x119
-  ///   - 아이콘: x: -3498 (카드 x: -3514) = 16, y: 2311 (카드 y: 2295) = 16
-  ///   - 텍스트: x: -3498 = 16, y: 2374 (카드 y: 2295) = 79
-  ///   - 메뉴: x: -3402 (카드 x: -3514) = 112, right: 148 - 112 - 24 = 12
   Widget _buildTodayClassCard(_SubjectCard subject, bool isFirst) {
     final cardWidth = isFirst ? _firstCardWidth : _cardWidth;
     final theme = SubjectThemeService.getThemeForSubject(subject.name);
-    
+
     return SizedBox(
       width: cardWidth,
       height: _cardHeight,
       child: Container(
         decoration: BoxDecoration(
           color: theme.color,
-          borderRadius: BorderRadius.circular(16), // Figma cornerRadius 16
+          borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.1),
@@ -525,7 +525,6 @@ class _HomeTabState extends State<HomeTab> {
         clipBehavior: Clip.antiAlias,
         child: Stack(
           children: [
-            // 상단 왼쪽: 아이콘 (24x24, 위치: 16, 16)
             Positioned(
               left: context.rs(16),
               top: context.rs(16),
@@ -535,11 +534,10 @@ class _HomeTabState extends State<HomeTab> {
                 color: AppColors.white,
               ),
             ),
-            // 우측 상단: 벡터 장식 (vec1, vec2 활용, 우측 상단 일부만 보이도록)
             if (theme.decorationPath != null)
               Positioned(
-                right: -cardWidth * 0.6, // 벡터를 블록 밖으로 배치
-                top: -_cardHeight * 0.6, // 벡터를 블록 밖으로 배치
+                right: -cardWidth * 0.6,
+                top: -_cardHeight * 0.6,
                 child: SvgPicture.asset(
                   theme.decorationPath!,
                   width: cardWidth * 1.2,
@@ -548,9 +546,6 @@ class _HomeTabState extends State<HomeTab> {
                   alignment: Alignment.topRight,
                 ),
               ),
-            // 하단 왼쪽: 과목명
-            // 텍스트 y: 2374, 카드 y: 2295, 상대 위치: 79
-            // 카드 높이 119에서 79 위치 = bottom: 119 - 79 - 24 = 16
             Positioned(
               left: context.rs(16),
               bottom: context.rs(16),
@@ -559,20 +554,19 @@ class _HomeTabState extends State<HomeTab> {
                 style: AppFonts.scaled(context, AppFonts.titleSemiBold)
                     .copyWith(
                   color: AppColors.white,
-                  fontSize: context.rs(16), // Figma: 16px
-                  fontWeight: FontWeight.w600, // Figma: SemiBold 600
-                  height: 1.5, // Figma: lineHeightPx 24 / fontSize 16 = 1.5
+                  fontSize: context.rs(16),
+                  fontWeight: FontWeight.w600,
+                  height: 1.5,
                 ),
               ),
             ),
-            // 상단 오른쪽: 메뉴 아이콘 (24x24, right: 12) - 점 2개
             Positioned(
               right: context.rs(12),
               top: context.rs(16),
               child: GestureDetector(
                 onTap: () {},
                 child: SvgPicture.asset(
-                  'assets/icons/ellipsis_v_2dots.svg', // 점 2개 메뉴
+                  'assets/icons/ellipsis_v_2dots.svg',
                   width: context.rs(24),
                   height: context.rs(24),
                   colorFilter: const ColorFilter.mode(
@@ -582,9 +576,148 @@ class _HomeTabState extends State<HomeTab> {
                 ),
               ),
             ),
-            // 다음 시간 과목 블럭의 메뉴 아이콘도 점 2개로 변경
           ],
         ),
+      ),
+    );
+  }
+
+  // ── 4. 현재 수업 (남은 시간) 섹션 ──
+
+  static const int _durationSeconds = 50 * 60;
+
+  Widget _buildCurrentClassSection() {
+    if (!TimetableUtils.isWeekday(DateTime.now())) {
+      return const SizedBox.shrink();
+    }
+    final res = TimetableUtils.currentPeriodAndSecondsLeft(DateTime.now());
+    if (res.period == null || res.secondsLeft == null) {
+      return const SizedBox.shrink();
+    }
+    final list = _todayTimetableEntries ?? [];
+    _SubjectCard? subject;
+    for (final card in list) {
+      if (card.period == res.period) {
+        subject = card;
+        break;
+      }
+    }
+    if (subject == null) {
+      return const SizedBox.shrink();
+    }
+
+    final secondsLeft = res.secondsLeft!;
+    final theme = SubjectThemeService.getThemeForSubject(subject.name);
+    final startTime = TimetableUtils.startTimeString(res.period!);
+
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: context.rs(26)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '현재 수업',
+            style: AppFonts.scaled(context, AppFonts.sectionTitle),
+          ),
+          SizedBox(height: context.rh(2)),
+          Text(
+            '지금 진행 중인 수업이에요.',
+            style: AppFonts.scaled(context, AppFonts.display3Regular),
+          ),
+          SizedBox(height: context.rh(16)),
+          Container(
+            width: double.infinity,
+            padding: EdgeInsets.all(context.rs(16)),
+            decoration: BoxDecoration(
+              color: theme.color,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.1),
+                  offset: const Offset(0, 4),
+                  blurRadius: 12,
+                ),
+              ],
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        subject.name,
+                        style: AppFonts.scaled(context, AppFonts.titleSemiBold)
+                            .copyWith(
+                          color: AppColors.white,
+                          fontSize: context.rs(18),
+                          fontWeight: FontWeight.w600,
+                          height: 1.4,
+                        ),
+                      ),
+                      SizedBox(height: context.rh(4)),
+                      Text(
+                        '오늘 $startTime · ${res.period}교시',
+                        style: AppFonts.scaled(context, AppFonts.display3Regular)
+                            .copyWith(
+                          color: AppColors.white,
+                          fontSize: context.rs(14),
+                          fontWeight: FontWeight.w500,
+                          height: 1.4,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(width: context.rs(16)),
+                SizedBox(
+                  width: context.rs(72),
+                  height: context.rs(72),
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      SizedBox(
+                        width: context.rs(72),
+                        height: context.rs(72),
+                        child: CircularProgressIndicator(
+                          value: secondsLeft / _durationSeconds,
+                          strokeWidth: context.rs(5),
+                          backgroundColor: AppColors.white.withValues(alpha: 0.3),
+                          valueColor: const AlwaysStoppedAnimation<Color>(AppColors.white),
+                        ),
+                      ),
+                      Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            '${secondsLeft ~/ 60}',
+                            style: AppFonts.scaled(context, AppFonts.titleSemiBold)
+                                .copyWith(
+                              color: AppColors.white,
+                              fontSize: context.rs(22),
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          Text(
+                            '분 ${secondsLeft % 60}초 남음',
+                            style: AppFonts.scaled(context, AppFonts.display3Regular)
+                                .copyWith(
+                              color: AppColors.white,
+                              fontSize: context.rs(12),
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

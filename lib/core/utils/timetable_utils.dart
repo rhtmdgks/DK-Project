@@ -52,4 +52,36 @@ class TimetableUtils {
     if (!isWeekday(date)) return null;
     return date.weekday;
   }
+
+  /// 현재 시각이 어떤 교시의 수업 시간대 안에 있으면 해당 교시 번호(1-based)와
+  /// 종료까지 남은 분을 반환. 해당 없으면 period == null.
+  static ({int? period, int? minutesLeft}) currentPeriodAndMinutesLeft(DateTime now) {
+    final nowMinutes = now.hour * 60 + now.minute;
+    for (var i = 0; i < periodStartTimes.length; i++) {
+      final t = periodStartTimes[i];
+      final startMinutes = t[0] * 60 + t[1];
+      final endMinutes = startMinutes + durationMinutes;
+      if (nowMinutes >= startMinutes && nowMinutes < endMinutes) {
+        final minutesLeft = endMinutes - nowMinutes;
+        return (period: i + 1, minutesLeft: minutesLeft);
+      }
+    }
+    return (period: null, minutesLeft: null);
+  }
+
+  /// 현재 시각이 수업 시간대 안에 있으면 해당 교시(1-based)와 종료까지 남은 초를 반환.
+  /// 1초 단위 갱신으로 원·숫자가 자연스럽게 줄어들게 할 때 사용.
+  static ({int? period, int? secondsLeft}) currentPeriodAndSecondsLeft(DateTime now) {
+    final nowTotalSeconds = now.hour * 3600 + now.minute * 60 + now.second;
+    for (var i = 0; i < periodStartTimes.length; i++) {
+      final t = periodStartTimes[i];
+      final startMinutes = t[0] * 60 + t[1];
+      final endTotalSeconds = (startMinutes + durationMinutes) * 60;
+      if (nowTotalSeconds >= startMinutes * 60 && nowTotalSeconds < endTotalSeconds) {
+        final secondsLeft = endTotalSeconds - nowTotalSeconds;
+        return (period: i + 1, secondsLeft: secondsLeft);
+      }
+    }
+    return (period: null, secondsLeft: null);
+  }
 }

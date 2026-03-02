@@ -117,7 +117,7 @@ class AnnouncementRepository {
       final aid = p['author_id'] as String?;
       if (aid != null && aid.isNotEmpty) profileIds.add(aid);
     }
-    List<String> announcementIds = polls
+    final announcementIds = polls
         .map((p) => p['announcement_id'])
         .whereType<String>()
         .where((id) => id.isNotEmpty)

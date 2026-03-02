@@ -12,6 +12,8 @@ class AppProfile {
     this.grade,
     this.classNum,
     this.numberInClass,
+    this.teacherSubjects,
+    this.teacherRoles,
   });
 
   final String id;
@@ -27,6 +29,10 @@ class AppProfile {
   final int? classNum;
   /// 번. DB에 없으면 학번 4~5자리로 추론 가능.
   final int? numberInClass;
+  /// 교사 담당 과목 리스트.
+  final List<String>? teacherSubjects;
+  /// 교사 담당 역할 리스트 (소속 반, 교무부장 등).
+  final List<String>? teacherRoles;
 
   factory AppProfile.fromJson(Map<String, dynamic> json) {
     return AppProfile(
@@ -38,10 +44,21 @@ class AppProfile {
       fullName: json['full_name'] as String?,
       avatarUrl: json['avatar_url'] as String?,
       grade: _intOrNull(json['grade']),
-      classNum: _intOrNull(json['class_num']),
+      classNum: _intOrNull(json['class_number']) ?? _intOrNull(json['class_num']),
       numberInClass: _intOrNull(json['number_in_class']) ??
           _intOrNull(json['student_number']),
+      teacherSubjects: _stringListFromJson(json['teacher_subjects']),
+      teacherRoles: _stringListFromJson(json['teacher_roles']),
     );
+  }
+
+  static List<String>? _stringListFromJson(dynamic v) {
+    if (v == null) return null;
+    if (v is List) {
+      final list = v.map((e) => e?.toString().trim()).where((e) => e != null && e.isNotEmpty).cast<String>().toList();
+      return list.isEmpty ? null : list;
+    }
+    return null;
   }
 
   static int? _intOrNull(dynamic v) {
@@ -69,4 +86,6 @@ class AppProfile {
   }
 
   bool get isPrivileged => role == 'council' || role == 'admin';
+
+  bool get isTeacher => role == 'teacher';
 }

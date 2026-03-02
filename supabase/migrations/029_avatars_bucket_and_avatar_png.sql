@@ -6,6 +6,7 @@
 -- 3) 기존 SVG URL을 PNG로 일괄 변경.
 
 -- 1. avatars 스토리지 버킷
+
 INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 VALUES (
   'avatars',

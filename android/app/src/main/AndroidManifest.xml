@@ -31,7 +31,61 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <intent-filter>
+                <action android:name="es.antonborri.home_widget.action.LAUNCH" />
+            </intent-filter>
         </activity>
+        <receiver
+            android:name=".glance.MealDepartureWidgetReceiver"
+            android:exported="true"
+            android:label="급식 출발 알림">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/meal_departure_widget_info" />
+        </receiver>
+        <receiver
+            android:name=".glance.ClassTimeLeftWidgetReceiver"
+            android:exported="true"
+            android:label="이번 시간 남은 시간">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/class_time_left_widget_info" />
+        </receiver>
+        <receiver
+            android:name=".glance.TodayTimetableWidgetReceiver"
+            android:exported="true"
+            android:label="오늘의 시간표">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/today_timetable_widget_info" />
+        </receiver>
+        <receiver
+            android:name=".glance.MealDepartureCountdownWidgetReceiver"
+            android:exported="true"
+            android:label="급식 출발 카운트다운">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/meal_departure_countdown_widget_info" />
+        </receiver>
+        <receiver
+            android:name="es.antonborri.home_widget.HomeWidgetBackgroundReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="es.antonborri.home_widget.action.BACKGROUND" />
+            </intent-filter>
+        </receiver>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data
