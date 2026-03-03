@@ -141,6 +141,8 @@
 | TT-01 | 목록 조회 | user_id별 요일·교시별 시간표 | user_id, day_of_week, period, subject, room, teacher | ○ |
 | TT-02 | 수정 | 특정 사용자 시간표 셀 수정 | user_id, day_of_week, period, subject, room, teacher | ○ |
 
+**user_id 규칙**: TT-01/TT-02에서 `user_id`는 **auth.users.id**(해당 학생의 `profiles.user_id`)를 사용해야 한다. 학생을 `profiles.student_id` 또는 `profiles.id`로 선택한 뒤, 저장 시에는 반드시 `profiles.user_id`를 조회해 넣을 것. 앱은 `auth.uid()`로 조회하므로 일치해야 앱에 시간표가 표시된다.
+
 ---
 
 ### 3.12 개인 일정 (personal_events) — 선택

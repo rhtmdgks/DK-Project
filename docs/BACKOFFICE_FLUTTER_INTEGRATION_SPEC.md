@@ -47,6 +47,7 @@
 
 - **timetable_master**: NEIS에서 불러온 **반·교시·과목**만 저장 (학년·반별). 학생별로 자동 부여하지 않음.
 - **timetable_entries**: **학생별** 시간표. 백오피스에서 학생 선택 후 요일·교시별로 과목(및 교실·선생님)을 **직접 추가/수정**. 과목 선택 리스트는 해당 학생 학년(·반)의 `timetable_master` 기준으로 노출.
+- **저장 시 user_id 필수 규칙**: 학생별 시간표를 저장할 때 `timetable_entries.user_id`에는 **반드시** 해당 학생의 **auth.users.id**(즉 `profiles.user_id`)를 넣어야 한다. 학생 선택 시 UI에는 `profiles.student_id`(예: 10312) 또는 `profiles.id`로 조회할 수 있으나, INSERT/UPDATE 시에는 `profiles.user_id`를 조회해 `user_id` 컬럼에 사용해야 앱에서 해당 학생 로그인 시 시간표가 보인다. `profiles.id`를 `user_id`로 넣으면 안 된다.
 
 ### Flutter 구현 지시
 
