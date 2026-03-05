@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:myapp/core/auth/auth_repository.dart';
 import 'package:myapp/core/auth/auth_state.dart';
 import 'package:myapp/core/routing/app_router.dart';
+import 'package:myapp/repositories/account_repository.dart';
 import 'package:myapp/repositories/notification_settings_repository.dart';
 import 'package:myapp/core/theme/app_theme.dart';
 import 'package:myapp/core/theme/responsive.dart';
@@ -41,8 +42,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     'weather': false,
   };
 
-  /// 학생회(council)·교사(teacher)만 급식 출발 알림 발송 메뉴 노출
+  /// 학생회(council)·교사(teacher)만 급식 출발 알림 발송 메뉴 노출 및 일부 메뉴 제어
   String? _role;
+
+  bool _deletingAccount = false;
 
   @override
   void initState() {
@@ -181,17 +184,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
         type: MaterialType.transparency,
         child: SafeArea(
           child: ListView(
-          padding: EdgeInsets.symmetric(horizontal: context.rs(16)),
-          children: [
-                  SizedBox(height: context.rh(12)),
-                  _buildNotificationSection(),
-                  SizedBox(height: context.rh(16)),
-                  _buildOtherSection(),
-                  SizedBox(height: context.rh(24)),
-                  _buildLogoutButton(),
-            SizedBox(height: context.rh(32)),
-          ],
-        ),
+            padding: EdgeInsets.symmetric(horizontal: context.rs(16)),
+            children: [
+              SizedBox(height: context.rh(12)),
+              _buildNotificationSection(),
+              SizedBox(height: context.rh(24)),
+              _buildAccountSection(),
+              SizedBox(height: context.rh(24)),
+              _buildCommunitySection(),
+              SizedBox(height: context.rh(24)),
+              _buildLegalSection(),
+              SizedBox(height: context.rh(24)),
+              _buildSupportSection(),
+              SizedBox(height: context.rh(32)),
+              _buildLogoutButton(),
+              SizedBox(height: context.rh(32)),
+            ],
+          ),
       ),
     ),
     );
@@ -353,16 +362,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  // ── 기타 설정 섹션 ──
+  // ── Account 섹션 ──
 
-  Widget _buildOtherSection() {
+  Widget _buildAccountSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
           padding: EdgeInsets.only(left: context.rs(10)),
           child: Text(
-            '기타 설정',
+            '계정',
             style: AppFonts.scaled(context, _Styles.sectionTitle),
           ),
         ),
@@ -383,17 +392,136 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               _buildItemDivider(),
               _buildLinkItem(
-                icon: Icons.bug_report_rounded,
-                iconColor: const Color(0xFF66BB6A),
-                title: '버그 신고',
-                onTap: () => context.push(AppRoute.bugReport.path),
+                icon: Icons.delete_forever_rounded,
+                iconColor: AppColors.error,
+                title: '계정 삭제',
+                onTap: _handleDeleteAccount,
               ),
-              _buildItemDivider(),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ── Community 섹션 ──
+
+  Widget _buildCommunitySection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: EdgeInsets.only(left: context.rs(10)),
+          child: Text(
+            '커뮤니티',
+            style: AppFonts.scaled(context, _Styles.sectionTitle),
+          ),
+        ),
+        SizedBox(height: context.rh(12)),
+        Container(
+          decoration: BoxDecoration(
+            color: AppColors.borderLight,
+            borderRadius: BorderRadius.circular(context.rs(24)),
+          ),
+          padding: EdgeInsets.symmetric(vertical: context.rh(4)),
+          child: Column(
+            children: [
+              _buildLinkItem(
+                icon: Icons.block_flipped,
+                iconColor: AppColors.textSecondary,
+                title: '차단한 사용자',
+                onTap: () => context.push(AppRoute.blockedUsers.path),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ── Legal 섹션 ──
+
+  Widget _buildLegalSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: EdgeInsets.only(left: context.rs(10)),
+          child: Text(
+            '법적 고지',
+            style: AppFonts.scaled(context, _Styles.sectionTitle),
+          ),
+        ),
+        SizedBox(height: context.rh(12)),
+        Container(
+          decoration: BoxDecoration(
+            color: AppColors.borderLight,
+            borderRadius: BorderRadius.circular(context.rs(24)),
+          ),
+          padding: EdgeInsets.symmetric(vertical: context.rh(4)),
+          child: Column(
+            children: [
               _buildLinkItem(
                 icon: Icons.description_rounded,
                 iconColor: const Color(0xFFFF8A65),
                 title: '개인정보 처리방침',
                 onTap: () => context.push(AppRoute.privacyPolicy.path),
+              ),
+              _buildItemDivider(),
+              _buildLinkItem(
+                icon: Icons.rule_rounded,
+                iconColor: AppColors.primaryBlue,
+                title: '서비스 이용약관',
+                onTap: () => context.push(AppRoute.termsOfService.path),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ── Support 섹션 ──
+
+  Widget _buildSupportSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: EdgeInsets.only(left: context.rs(10)),
+          child: Text(
+            '지원',
+            style: AppFonts.scaled(context, _Styles.sectionTitle),
+          ),
+        ),
+        SizedBox(height: context.rh(12)),
+        Container(
+          decoration: BoxDecoration(
+            color: AppColors.borderLight,
+            borderRadius: BorderRadius.circular(context.rs(24)),
+          ),
+          padding: EdgeInsets.symmetric(vertical: context.rh(4)),
+          child: Column(
+            children: [
+              _buildLinkItem(
+                icon: Icons.support_agent_rounded,
+                iconColor: AppColors.primaryBlue,
+                title: '문의하기',
+                onTap: () => context.push(AppRoute.support.path),
+              ),
+              _buildItemDivider(),
+              _buildLinkItem(
+                icon: Icons.info_outline_rounded,
+                iconColor: AppColors.textSecondary,
+                title: '앱 정보',
+                onTap: () => context.push(AppRoute.appInfo.path),
+              ),
+              _buildItemDivider(),
+              _buildLinkItem(
+                icon: Icons.bug_report_rounded,
+                iconColor: const Color(0xFF66BB6A),
+                title: '버그 신고',
+                onTap: () => context.push(AppRoute.bugReport.path),
               ),
               if (_role == 'council' || _role == 'teacher') ...[
                 _buildItemDivider(),
@@ -495,6 +623,82 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _handleDeleteAccount() async {
+    if (_deletingAccount) return;
+
+    final confirmed = await showCupertinoDialog<bool>(
+      context: context,
+      builder: (context) => CupertinoAlertDialog(
+        title: const Text('계정 삭제'),
+        content: const Text(
+          '정말 계정을 영구적으로 삭제하시겠습니까?\n'
+          '삭제 후에는 계정과 프로필, 게시글 등 모든 데이터가 복구되지 않습니다.',
+        ),
+        actions: [
+          CupertinoDialogAction(
+            isDefaultAction: true,
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('취소'),
+          ),
+          CupertinoDialogAction(
+            isDestructiveAction: true,
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('계정 삭제'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    setState(() {
+      _deletingAccount = true;
+    });
+
+    try {
+      await AccountRepository.instance.deleteCurrentAccount();
+
+      // 계정이 삭제되면 알림 구독 정리 및 로컬 세션 로그아웃
+      await NotificationService.onLogout();
+      await AuthRepository.instance.logout();
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('계정이 삭제되었습니다. 이용해 주셔서 감사합니다.'),
+          backgroundColor: AppColors.success,
+        ),
+      );
+
+      context.go(AppRoute.login.path);
+    } catch (e) {
+      if (!mounted) return;
+      await showCupertinoDialog<void>(
+        context: context,
+        builder: (context) => CupertinoAlertDialog(
+          title: const Text('계정 삭제 실패'),
+          content: Text(
+            e.toString().replaceFirst('Exception: ', ''),
+          ),
+          actions: [
+            CupertinoDialogAction(
+              isDefaultAction: true,
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('확인'),
+            ),
+          ],
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _deletingAccount = false;
+        });
+      }
+    }
   }
 
   Future<void> _handleLogout() async {

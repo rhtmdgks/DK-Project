@@ -13,6 +13,9 @@ import 'package:myapp/core/theme/app_motion.dart';
 import 'package:myapp/core/widgets/dismiss_keyboard.dart';
 import 'package:myapp/core/theme/app_theme.dart';
 import 'package:myapp/core/theme/responsive.dart';
+import 'package:myapp/repositories/content_report_repository.dart';
+import 'package:myapp/repositories/user_block_repository.dart';
+import 'package:myapp/services/content_moderation_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 /// 발신자 표시 이름 (학번 + 이름)
@@ -87,11 +90,15 @@ class _ChatScreenState extends State<ChatScreen> {
   File? _pickedImage;
   File? _pickedVideo;
   bool _sending = false;
+  final _contentReportRepo = ContentReportRepository();
+  final _blockRepo = UserBlockRepository();
+  Set<String> _blockedUserIds = <String>{};
 
   @override
   void initState() {
     super.initState();
     _loadCurrentUserId();
+    _loadBlockedUsers();
     _loadRoomInfo();
     _fetchMessages();
     _subscribeRealtime();
@@ -103,6 +110,18 @@ class _ChatScreenState extends State<ChatScreen> {
       setState(() {
         _currentUserId = userId;
       });
+    }
+  }
+
+  Future<void> _loadBlockedUsers() async {
+    try {
+      final ids = await _blockRepo.fetchBlockedUserIds();
+      if (!mounted) return;
+      setState(() {
+        _blockedUserIds = ids;
+      });
+    } catch (_) {
+      // 차단 목록 조회 실패 시 무시
     }
   }
 
@@ -185,7 +204,13 @@ class _ChatScreenState extends State<ChatScreen> {
       await _enrichMessageSenders(messages);
       if (!mounted) return;
       setState(() {
-        _messages = messages;
+        _messages = messages
+            .where((m) {
+              final senderId = m['sender_id'] as String? ?? '';
+              if (senderId.isEmpty) return true;
+              return !_blockedUserIds.contains(senderId);
+            })
+            .toList();
         _loading = false;
       });
       _scrollToEnd();
@@ -261,6 +286,10 @@ class _ChatScreenState extends State<ChatScreen> {
             }
             if (!mounted) return;
             setState(() {
+              if (senderId != null &&
+                  _blockedUserIds.contains(senderId)) {
+                return;
+              }
               _messages.add(msg);
             });
             _scrollToEnd();
@@ -392,6 +421,17 @@ class _ChatScreenState extends State<ChatScreen> {
     final hasVideo = _pickedVideo != null;
     if (content.isEmpty && !hasImage && !hasVideo) return;
 
+    if (content.isNotEmpty) {
+      final moderation = ContentModerationService.checkText(content);
+      if (moderation.hasAbuse) {
+        _showErrorDialog(
+          '전송 불가',
+          '부적절한 표현이 포함되어 있어 메시지를 보낼 수 없습니다. 표현을 수정해 주세요.',
+        );
+        return;
+      }
+    }
+
     final uid = await AuthRepository.instance.getUserId();
     if (uid == null) {
       _showErrorDialog('전송 불가', '로그인 정보가 없어 전송할 수 없습니다.');
@@ -471,6 +511,131 @@ class _ChatScreenState extends State<ChatScreen> {
       } else {
         _showErrorDialog('전송 실패', e.toString());
       }
+    }
+  }
+
+  Future<void> _showReportSheet(Map<String, dynamic> message) async {
+    final id = message['id'] as String?;
+    if (id == null) return;
+
+    final controller = TextEditingController();
+    String? selectedReason;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          title: const Text('메시지 신고'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              DropdownButtonFormField<String>(
+                value: selectedReason,
+                decoration: const InputDecoration(
+                  labelText: '사유 선택',
+                ),
+                items: const [
+                  DropdownMenuItem(
+                    value: '욕설/비하',
+                    child: Text('욕설/비하'),
+                  ),
+                  DropdownMenuItem(
+                    value: '괴롭힘/따돌림',
+                    child: Text('괴롭힘/따돌림'),
+                  ),
+                  DropdownMenuItem(
+                    value: '스팸',
+                    child: Text('스팸'),
+                  ),
+                  DropdownMenuItem(
+                    value: '불법/위험 행위',
+                    child: Text('불법/위험 행위'),
+                  ),
+                  DropdownMenuItem(
+                    value: '기타',
+                    child: Text('기타 (직접 입력)'),
+                  ),
+                ],
+                onChanged: (v) {
+                  selectedReason = v;
+                },
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: controller,
+                maxLines: 2,
+                decoration: const InputDecoration(
+                  labelText: '상세 사유 (선택)',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('취소'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: const Text('신고'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true) return;
+
+    final baseReason = selectedReason ?? '기타';
+    final extra = controller.text.trim();
+    final reason =
+        extra.isEmpty ? baseReason : '$baseReason - $extra';
+
+    try {
+      await _contentReportRepo.reportContent(
+        contentType: 'chat_message',
+        contentId: id,
+        reason: reason,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('신고가 접수되었습니다.'),
+          backgroundColor: AppColors.success,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('신고 중 오류가 발생했습니다: $e'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
+  }
+
+  Future<void> _blockSender(String userId) async {
+    try {
+      await _blockRepo.blockByUserId(userId);
+      await _loadBlockedUsers();
+      await _fetchMessages();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('해당 사용자를 차단했습니다.'),
+          backgroundColor: AppColors.success,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('차단 중 오류가 발생했습니다: $e'),
+          backgroundColor: AppColors.error,
+        ),
+      );
     }
   }
 
@@ -789,39 +954,74 @@ class _ChatScreenState extends State<ChatScreen> {
 
     return Padding(
       padding: EdgeInsets.only(bottom: context.rh(12)),
-      child: Row(
-        mainAxisAlignment:
-            isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: isMe
-            ? [
-                Flexible(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      nameAndTime,
-                      SizedBox(height: context.rh(4)),
-                      bubble,
-                    ],
-                  ),
+      child: GestureDetector(
+        onLongPress: () {
+          showCupertinoModalPopup<void>(
+            context: context,
+            builder: (ctx) => CupertinoActionSheet(
+              title: const Text('메시지 옵션'),
+              actions: [
+                CupertinoActionSheetAction(
+                  onPressed: () {
+                    Navigator.of(ctx).pop();
+                    _showReportSheet(m);
+                  },
+                  child: const Text('신고하기'),
                 ),
-                SizedBox(width: context.rs(8)),
-                avatar,
-              ]
-            : [
-                avatar,
-                SizedBox(width: context.rs(8)),
-                Flexible(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      nameAndTime,
-                      SizedBox(height: context.rh(4)),
-                      bubble,
-                    ],
+                if (!isMe)
+                  CupertinoActionSheetAction(
+                    isDestructiveAction: true,
+                    onPressed: () {
+                      Navigator.of(ctx).pop();
+                      if (senderId.isNotEmpty) {
+                        _blockSender(senderId);
+                      }
+                    },
+                    child: const Text('이 사용자 차단'),
                   ),
-                ),
               ],
+              cancelButton: CupertinoActionSheetAction(
+                isDefaultAction: true,
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text('취소'),
+              ),
+            ),
+          );
+        },
+        child: Row(
+          mainAxisAlignment:
+              isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: isMe
+              ? [
+                  Flexible(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        nameAndTime,
+                        SizedBox(height: context.rh(4)),
+                        bubble,
+                      ],
+                    ),
+                  ),
+                  SizedBox(width: context.rs(8)),
+                  avatar,
+                ]
+              : [
+                  avatar,
+                  SizedBox(width: context.rs(8)),
+                  Flexible(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        nameAndTime,
+                        SizedBox(height: context.rh(4)),
+                        bubble,
+                      ],
+                    ),
+                  ),
+                ],
+        ),
       ),
     );
   }

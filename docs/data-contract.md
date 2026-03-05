@@ -9,12 +9,13 @@
 | profiles | 사용자(학생/교사/관리자) | 읽기 전용(본인) | CRUD, 계정 생성 |
 | announcements | 공지사항 | 읽기 | CRUD |
 | polls, poll_votes | 투표·투표 참여 | 읽기, 투표 | CRUD |
-| suggestions, suggestion_comments | 건의함·댓글 | 건의/댓글 등록, 읽기 | CRUD, 상태 변경 |
-| chat_rooms, chat_room_members, chat_messages | 채팅 | 방 참여, 메시지 전송, 읽기 | 방 생성/삭제, 읽기 |
+| suggestions, suggestion_comments | 건의함·댓글 | 건의/댓글 등록, 읽기, 신고 | CRUD, 상태 변경 |
+| chat_rooms, chat_room_members, chat_messages | 채팅 | 방 참여, 메시지 전송, 읽기, 신고 | 방 생성/삭제, 읽기 |
 | schedule_items | 학교 일정 | 읽기 | CRUD |
 | personal_events | 개인 일정 | 본인 CRUD | 읽기(선택) |
 | timetable_entries | 개인 시간표 | 본인 CRUD(또는 API) | CRUD |
 | bug_reports | 버그 신고 | 등록 | 조회·상태 변경 |
+| content_reports | 커뮤니티 신고 내역 | 앱에서 신고 생성 | 신고 검토·상태 변경 |
 | greetings | 응원 문구 | 읽기 | CRUD |
 | meal_departure_* | 급식 출발 관련 | 읽기/알림 | 설정·전송 |
 

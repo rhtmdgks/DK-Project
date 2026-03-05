@@ -2,19 +2,23 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:myapp/core/auth/auth_repository.dart';
 import 'package:myapp/core/theme/app_motion.dart';
+import 'package:myapp/screens/app_info_screen.dart';
+import 'package:myapp/screens/blocked_users_screen.dart';
+import 'package:myapp/screens/bug_report_screen.dart';
 import 'package:myapp/screens/chat_list_screen.dart';
 import 'package:myapp/screens/chat_screen.dart';
 import 'package:myapp/screens/home_screen.dart';
 import 'package:myapp/screens/login_screen.dart';
+import 'package:myapp/screens/meal_departure_alert_screen.dart';
 import 'package:myapp/screens/password_change_screen.dart';
 import 'package:myapp/screens/privacy_policy_screen.dart';
-import 'package:myapp/screens/bug_report_screen.dart';
+import 'package:myapp/screens/profile_screen.dart';
 import 'package:myapp/screens/settings_screen.dart';
 import 'package:myapp/screens/splash_screen.dart';
+import 'package:myapp/screens/support_screen.dart';
 import 'package:myapp/screens/suggestions_chat_screen.dart';
+import 'package:myapp/screens/terms_of_service_screen.dart';
 import 'package:myapp/screens/terms_screen.dart';
-import 'package:myapp/screens/meal_departure_alert_screen.dart';
-import 'package:myapp/screens/profile_screen.dart';
 import 'package:myapp/screens/today_classes_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -22,6 +26,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 enum AppRoute {
   splash('/splash'),
   terms('/terms'),
+  termsOfService('/legal/terms'),
   login('/login'),
   passwordChange('/password-change'),
   home('/'),
@@ -29,6 +34,9 @@ enum AppRoute {
   mealDepartureAlert('/settings/meal-departure-alert'),
   privacyPolicy('/privacy'),
   bugReport('/bug-report'),
+  support('/settings/support'),
+  appInfo('/settings/app-info'),
+  blockedUsers('/settings/blocked-users'),
   chatList('/chat'),
   chatRoom('/chat/:roomId'),
   suggestionsChat('/suggestions/chat'),
@@ -93,6 +101,11 @@ GoRouter createAppRouter() {
         pageBuilder: (_, state) => _m3Page(state, const TermsScreen()),
       ),
       GoRoute(
+        path: AppRoute.termsOfService.path,
+        pageBuilder: (_, state) =>
+            _m3Page(state, const TermsOfServiceScreen()),
+      ),
+      GoRoute(
         path: AppRoute.login.path,
         pageBuilder: (_, state) => _m3Page(state, const LoginScreen()),
       ),
@@ -118,6 +131,19 @@ GoRouter createAppRouter() {
         path: AppRoute.privacyPolicy.path,
         pageBuilder: (_, state) =>
             _m3Page(state, const PrivacyPolicyScreen()),
+      ),
+      GoRoute(
+        path: AppRoute.support.path,
+        pageBuilder: (_, state) => _m3Page(state, const SupportScreen()),
+      ),
+      GoRoute(
+        path: AppRoute.appInfo.path,
+        pageBuilder: (_, state) => _m3Page(state, const AppInfoScreen()),
+      ),
+      GoRoute(
+        path: AppRoute.blockedUsers.path,
+        pageBuilder: (_, state) =>
+            _m3Page(state, const BlockedUsersScreen()),
       ),
       GoRoute(
         path: AppRoute.bugReport.path,

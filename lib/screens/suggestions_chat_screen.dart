@@ -6,6 +6,9 @@ import 'package:myapp/core/theme/app_motion.dart';
 import 'package:myapp/core/widgets/dismiss_keyboard.dart';
 import 'package:myapp/core/theme/app_theme.dart';
 import 'package:myapp/core/theme/responsive.dart';
+import 'package:myapp/repositories/content_report_repository.dart';
+import 'package:myapp/repositories/user_block_repository.dart';
+import 'package:myapp/services/content_moderation_service.dart';
 
 /// 건의함 질문하기용 채팅방 ID (마이그레이션에서 생성한 고정 UUID)
 const String kSuggestionsChatRoomId =
@@ -31,6 +34,9 @@ class _SuggestionsChatScreenState extends State<SuggestionsChatScreen> {
   bool _joining = false;
   String? _error;
   RealtimeChannel? _channel;
+  final _contentReportRepo = ContentReportRepository();
+  final _blockRepo = UserBlockRepository();
+  Set<String> _blockedUserIds = <String>{};
 
   @override
   void initState() {
@@ -69,6 +75,7 @@ class _SuggestionsChatScreenState extends State<SuggestionsChatScreen> {
 
     if (!mounted) return;
     setState(() => _joining = false);
+    await _loadBlockedUsers();
     _fetchMessages();
     _subscribeRealtime();
   }
@@ -86,8 +93,15 @@ class _SuggestionsChatScreenState extends State<SuggestionsChatScreen> {
           .order('created_at', ascending: true);
 
       if (!mounted) return;
+      final raw = List<Map<String, dynamic>>.from(res as List);
       setState(() {
-        _messages = List<Map<String, dynamic>>.from(res as List);
+        _messages = raw
+            .where((m) {
+              final senderId = m['sender_id'] as String? ?? '';
+              if (senderId.isEmpty) return true;
+              return !_blockedUserIds.contains(senderId);
+            })
+            .toList();
         _loading = false;
       });
       _scrollToEnd();
@@ -115,8 +129,14 @@ class _SuggestionsChatScreenState extends State<SuggestionsChatScreen> {
           callback: (payload) {
             final newRow = payload.newRecord;
             if (newRow.isNotEmpty && mounted) {
+              final msg = Map<String, dynamic>.from(newRow);
+              final senderId = msg['sender_id'] as String? ?? '';
+              if (senderId.isNotEmpty &&
+                  _blockedUserIds.contains(senderId)) {
+                return;
+              }
               setState(() {
-                _messages.add(Map<String, dynamic>.from(newRow));
+                _messages.add(msg);
               });
               _scrollToEnd();
             }
@@ -140,6 +160,19 @@ class _SuggestionsChatScreenState extends State<SuggestionsChatScreen> {
   Future<void> _send() async {
     final content = _messageController.text.trim();
     if (content.isEmpty) return;
+
+    final moderation = ContentModerationService.checkText(content);
+    if (moderation.hasAbuse) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            '부적절한 표현이 포함되어 있어 메시지를 보낼 수 없습니다. 표현을 수정해 주세요.',
+          ),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
 
     final uid = supabase.auth.currentUser?.id;
     if (uid == null) return;
@@ -255,48 +288,83 @@ class _SuggestionsChatScreenState extends State<SuggestionsChatScreen> {
 
         return Padding(
           padding: EdgeInsets.only(bottom: context.rh(8)),
-          child: Row(
-            mainAxisAlignment:
-                isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              if (!isMe) _buildAvatar(),
-              if (!isMe) SizedBox(width: context.rs(8)),
-              Flexible(
-                child: Container(
-                  constraints: BoxConstraints(maxWidth: maxBubbleWidth),
-                  padding: EdgeInsets.symmetric(
-                    horizontal: context.rs(12),
-                    vertical: context.rh(10),
+          child: GestureDetector(
+            onLongPress: () {
+              showCupertinoModalPopup<void>(
+                context: context,
+                builder: (ctx) => CupertinoActionSheet(
+                  title: const Text('메시지 옵션'),
+                  actions: [
+                    CupertinoActionSheetAction(
+                      onPressed: () {
+                        Navigator.of(ctx).pop();
+                        _showReportSheet(m);
+                      },
+                      child: const Text('신고하기'),
+                    ),
+                    if (!isMe)
+                      CupertinoActionSheetAction(
+                        isDestructiveAction: true,
+                        onPressed: () {
+                          Navigator.of(ctx).pop();
+                          if (senderId.isNotEmpty) {
+                            _blockSender(senderId);
+                          }
+                        },
+                        child: const Text('이 사용자 차단'),
+                      ),
+                  ],
+                  cancelButton: CupertinoActionSheetAction(
+                    isDefaultAction: true,
+                    onPressed: () => Navigator.of(ctx).pop(),
+                    child: const Text('취소'),
                   ),
-                  decoration: BoxDecoration(
-                    color: isMe ? AppColors.primaryBlue : AppColors.white,
-                    borderRadius: BorderRadius.circular(bubbleRadius),
-                    border: isMe
-                        ? null
-                        : Border.all(color: AppColors.borderLight),
-                    boxShadow: isMe
-                        ? null
-                        : const [
-                            BoxShadow(
-                              color: AppColors.cardShadow,
-                              offset: Offset(0, 1),
-                              blurRadius: 4,
-                            ),
-                          ],
-                  ),
-                  child: Text(
-                    content,
-                    style: AppFonts.scaled(context, AppFonts.smallRegular)
-                        .copyWith(
-                      color: isMe ? AppColors.white : AppColors.textDark,
+                ),
+              );
+            },
+            child: Row(
+              mainAxisAlignment:
+                  isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                if (!isMe) _buildAvatar(),
+                if (!isMe) SizedBox(width: context.rs(8)),
+                Flexible(
+                  child: Container(
+                    constraints: BoxConstraints(maxWidth: maxBubbleWidth),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: context.rs(12),
+                      vertical: context.rh(10),
+                    ),
+                    decoration: BoxDecoration(
+                      color: isMe ? AppColors.primaryBlue : AppColors.white,
+                      borderRadius: BorderRadius.circular(bubbleRadius),
+                      border: isMe
+                          ? null
+                          : Border.all(color: AppColors.borderLight),
+                      boxShadow: isMe
+                          ? null
+                          : const [
+                              BoxShadow(
+                                color: AppColors.cardShadow,
+                                offset: Offset(0, 1),
+                                blurRadius: 4,
+                              ),
+                            ],
+                    ),
+                    child: Text(
+                      content,
+                      style: AppFonts.scaled(context, AppFonts.smallRegular)
+                          .copyWith(
+                        color: isMe ? AppColors.white : AppColors.textDark,
+                      ),
                     ),
                   ),
                 ),
-              ),
-              if (isMe) SizedBox(width: context.rs(8)),
-              if (isMe) _buildAvatar(),
-            ],
+                if (isMe) SizedBox(width: context.rs(8)),
+                if (isMe) _buildAvatar(),
+              ],
+            ),
           ),
         );
       },
@@ -350,5 +418,142 @@ class _SuggestionsChatScreenState extends State<SuggestionsChatScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _loadBlockedUsers() async {
+    try {
+      final ids = await _blockRepo.fetchBlockedUserIds();
+      if (!mounted) return;
+      setState(() {
+        _blockedUserIds = ids;
+      });
+    } catch (_) {
+      // ignore
+    }
+  }
+
+  Future<void> _showReportSheet(Map<String, dynamic> message) async {
+    final id = message['id'] as String?;
+    if (id == null) return;
+
+    final controller = TextEditingController();
+    String? selectedReason;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          title: const Text('메시지 신고'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              DropdownButtonFormField<String>(
+                value: selectedReason,
+                decoration: const InputDecoration(
+                  labelText: '사유 선택',
+                ),
+                items: const [
+                  DropdownMenuItem(
+                    value: '욕설/비하',
+                    child: Text('욕설/비하'),
+                  ),
+                  DropdownMenuItem(
+                    value: '괴롭힘/따돌림',
+                    child: Text('괴롭힘/따돌림'),
+                  ),
+                  DropdownMenuItem(
+                    value: '스팸',
+                    child: Text('스팸'),
+                  ),
+                  DropdownMenuItem(
+                    value: '불법/위험 행위',
+                    child: Text('불법/위험 행위'),
+                  ),
+                  DropdownMenuItem(
+                    value: '기타',
+                    child: Text('기타 (직접 입력)'),
+                  ),
+                ],
+                onChanged: (v) {
+                  selectedReason = v;
+                },
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: controller,
+                maxLines: 2,
+                decoration: const InputDecoration(
+                  labelText: '상세 사유 (선택)',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('취소'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: const Text('신고'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true) return;
+
+    final baseReason = selectedReason ?? '기타';
+    final extra = controller.text.trim();
+    final reason =
+        extra.isEmpty ? baseReason : '$baseReason - $extra';
+
+    try {
+      await _contentReportRepo.reportContent(
+        contentType: 'chat_message',
+        contentId: id,
+        reason: reason,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('신고가 접수되었습니다.'),
+          backgroundColor: AppColors.success,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('신고 중 오류가 발생했습니다: $e'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
+  }
+
+  Future<void> _blockSender(String userId) async {
+    try {
+      await _blockRepo.blockByUserId(userId);
+      await _loadBlockedUsers();
+      await _fetchMessages();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('해당 사용자를 차단했습니다.'),
+          backgroundColor: AppColors.success,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('차단 중 오류가 발생했습니다: $e'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
   }
 }

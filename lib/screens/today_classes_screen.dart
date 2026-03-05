@@ -333,7 +333,7 @@ class _TodayClassesScreenState extends State<TodayClassesScreen> {
     final suffix = h >= 12 ? 'PM' : 'AM';
     if (h > 12) h -= 12;
     if (h == 0) h = 12;
-    return '$h:${m} $suffix';
+    return '$h:$m $suffix';
   }
 
   /// 오늘 선택 시 현재 교시 번호(1-based), 아니면 null
@@ -341,7 +341,9 @@ class _TodayClassesScreenState extends State<TodayClassesScreen> {
     final now = DateTime.now();
     if (_selectedDate.year != now.year ||
         _selectedDate.month != now.month ||
-        _selectedDate.day != now.day) return null;
+        _selectedDate.day != now.day) {
+      return null;
+    }
     final res = TimetableUtils.currentPeriodAndSecondsLeft(now);
     return res.period;
   }

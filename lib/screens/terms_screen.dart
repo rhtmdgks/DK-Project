@@ -177,6 +177,19 @@ class _TermsScreenState extends State<TermsScreen> {
                   ),
                 ),
                 SizedBox(height: context.rh(20)),
+                Text(
+                  '라온에서는 욕설, 괴롭힘, 불법 행위를 포함한 게시물·채팅을 허용하지 않아요. '
+                  '위반 시 게시물 삭제 및 계정 제한 등 조치가 이루어질 수 있습니다. '
+                  '자세한 내용은 서비스 이용약관을 확인해 주세요.',
+                  style: TextStyle(
+                    fontFamily: AppFonts.fontFamily,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w400,
+                    height: 18 / 12,
+                    color: AppColors.navInactive,
+                  ),
+                ),
+                SizedBox(height: context.rh(20)),
                 _buildTermRow(
                   context,
                   '[필수] 라온 서비스 이용약관',
@@ -185,7 +198,7 @@ class _TermsScreenState extends State<TermsScreen> {
                     setState(() => _termService = !_termService);
                     _syncAllAgree();
                   },
-                  null,
+                  () => context.push(AppRoute.termsOfService.path),
                 ),
                 SizedBox(height: context.rh(24)),
                 _buildTermRow(

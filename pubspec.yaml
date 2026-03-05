@@ -48,6 +48,7 @@ dependencies:
   provider: ^6.1.1
   intl: ^0.20.2
   home_widget: ^0.9.0
+  package_info_plus: ^8.1.2
 
 dev_dependencies:
   flutter_test:
@@ -77,6 +78,7 @@ flutter:
     - assets/images/
     - assets/icons/
     - assets/privacy_policy.md
+    - assets/terms_of_service.md
 
   fonts:
     - family: Paperlogy
