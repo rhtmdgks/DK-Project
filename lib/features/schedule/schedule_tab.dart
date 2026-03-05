@@ -1,7 +1,9 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:myapp/core/auth/auth_state.dart';
+import 'package:myapp/core/auth/auth_repository.dart';
 import 'package:myapp/core/supabase_client.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:myapp/core/theme/app_theme.dart';
 import 'package:myapp/core/theme/responsive.dart';
 import 'package:myapp/core/widgets/async_body.dart';
@@ -79,16 +81,32 @@ class _ScheduleTabState extends State<ScheduleTab> {
           .select()
           .order('start_at', ascending: true);
 
-      // 개인 일정
-      final uid = supabase.auth.currentUser?.id;
+      // 개인 일정 (세션 또는 session_token 기반으로 조회)
+      final uid = await AuthRepository.instance.getUserId();
+      final session = supabase.auth.currentSession;
+      final sessionToken = await AuthRepository.instance.getSessionToken();
       List<Map<String, dynamic>> personalRes = [];
-      if (uid != null) {
+
+      if (session != null && uid != null && uid.isNotEmpty) {
+        // Supabase Auth 세션이 있는 경우: RLS(auth.uid() = user_id) 기준으로 직접 조회.
         final personalResRaw = await supabase
             .from('personal_events')
             .select()
             .eq('user_id', uid)
             .order('start_at', ascending: true);
         personalRes = List<Map<String, dynamic>>.from(personalResRaw as List);
+      } else if (session == null &&
+          sessionToken != null &&
+          sessionToken.isNotEmpty) {
+        // 세션은 없지만 session_token이 있는 경우: 전용 RPC로 조회.
+        final rpcRes = await supabase.rpc(
+          'get_personal_events_by_token',
+          params: {'p_session_token': sessionToken},
+        );
+        if (rpcRes is List) {
+          personalRes =
+              List<Map<String, dynamic>>.from(rpcRes.cast<Map<String, dynamic>>());
+        }
       }
 
       // NEIS 학사일정 (시도교육청·학교 코드는 Edge Function env, 급식과 동일)
@@ -930,7 +948,7 @@ class _ScheduleTabState extends State<ScheduleTab> {
                                 Expanded(
                                   child: FilledButton(
                                     onPressed: () async {
-                                      final uid = supabase.auth.currentUser?.id;
+                                      final uid = await AuthRepository.instance.getUserId();
                                       if (uid == null) {
                                         if (innerContext.mounted) {
                                           ScaffoldMessenger.of(innerContext).showSnackBar(
@@ -957,29 +975,81 @@ class _ScheduleTabState extends State<ScheduleTab> {
                                       }
 
                                       try {
-                                        await supabase.from('personal_events').insert({
-                                          'user_id': uid,
-                                          'title': title,
-                                          'description': descController.text.trim().isEmpty
-                                              ? null
-                                              : descController.text.trim(),
-                                          'start_at': start.toIso8601String(),
-                                          'end_at': allDay ? null : end.toIso8601String(),
-                                          'all_day': allDay,
-                                        });
+                                        final session = supabase.auth.currentSession;
+                                        final sessionToken = await AuthRepository.instance.getSessionToken();
+
+                                        if (session != null) {
+                                          // Supabase Auth 세션이 있는 경우: RLS(auth.uid() = user_id) 기준으로 직접 insert.
+                                          await supabase.from('personal_events').insert({
+                                            'user_id': uid,
+                                            'title': title,
+                                            'description': descController.text.trim().isEmpty
+                                                ? null
+                                                : descController.text.trim(),
+                                            'start_at': start.toIso8601String(),
+                                            'end_at': allDay ? null : end.toIso8601String(),
+                                            'all_day': allDay,
+                                          });
+                                        } else if (sessionToken != null && sessionToken.isNotEmpty) {
+                                          // 세션이 없지만 session_token이 있는 경우: 전용 RPC로 삽입 (profile_session_tokens 기반).
+                                          await supabase.rpc(
+                                            'insert_personal_event_by_token',
+                                            params: {
+                                              'p_session_token': sessionToken,
+                                              'p_title': title,
+                                              'p_description': descController.text.trim().isEmpty
+                                                  ? null
+                                                  : descController.text.trim(),
+                                              'p_start_at': start.toIso8601String(),
+                                              'p_end_at': allDay ? null : end.toIso8601String(),
+                                              'p_all_day': allDay,
+                                            },
+                                          );
+                                        } else {
+                                          if (innerContext.mounted) {
+                                            ScaffoldMessenger.of(innerContext).showSnackBar(
+                                              const SnackBar(
+                                                content: Text('로그인 정보가 만료되었습니다. 다시 로그인한 뒤 개인 일정을 추가해 주세요.'),
+                                                behavior: SnackBarBehavior.floating,
+                                                backgroundColor: AppColors.error,
+                                              ),
+                                            );
+                                          }
+                                          return;
+                                        }
+
                                         if (sheetContext.mounted) {
                                           Navigator.of(sheetContext).pop(true);
                                         }
+                                      } on PostgrestException catch (e) {
+                                        if (!innerContext.mounted) return;
+                                        // 개발용 상세 로그
+                                        // ignore: avoid_print
+                                        print('personal_events insert error: code=${e.code}, message=${e.message}, details=${e.details}');
+                                        final message = switch (e.code) {
+                                          // RLS/권한 문제
+                                          '42501' => '권한 문제로 일정을 저장하지 못했습니다. 관리자에게 문의해 주세요.',
+                                          // 정의되지 않은 함수 등 스키마 불일치
+                                          'PGRST204' || 'PGRST301' =>
+                                              '서버 설정이 아직 반영되지 않아 일정을 저장할 수 없습니다. 잠시 후 다시 시도해 주세요.',
+                                          _ => '일정을 저장하는 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.',
+                                        };
+                                        ScaffoldMessenger.of(innerContext).showSnackBar(
+                                          SnackBar(
+                                            content: Text(message),
+                                            behavior: SnackBarBehavior.floating,
+                                            backgroundColor: AppColors.error,
+                                          ),
+                                        );
                                       } catch (e) {
-                                        if (innerContext.mounted) {
-                                          ScaffoldMessenger.of(innerContext).showSnackBar(
-                                            SnackBar(
-                                              content: Text('저장 실패: ${e.toString().split('\n').first}'),
-                                              behavior: SnackBarBehavior.floating,
-                                              backgroundColor: AppColors.error,
-                                            ),
-                                          );
-                                        }
+                                        if (!innerContext.mounted) return;
+                                        ScaffoldMessenger.of(innerContext).showSnackBar(
+                                          const SnackBar(
+                                            content: Text('일정을 저장하는 중 알 수 없는 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.'),
+                                            behavior: SnackBarBehavior.floating,
+                                            backgroundColor: AppColors.error,
+                                          ),
+                                        );
                                       }
                                     },
                                     child: const Text('추가'),

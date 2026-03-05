@@ -14,6 +14,7 @@ import 'package:myapp/core/widgets/m3_list.dart';
 import 'package:myapp/repositories/content_report_repository.dart';
 import 'package:myapp/repositories/user_block_repository.dart';
 import 'package:myapp/services/content_moderation_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// FAB를 하단에서 살짝 위로 둔 커스텀 위치.
 class _LowerFabLocation extends FloatingActionButtonLocation {
@@ -149,10 +150,30 @@ class _SuggestionsTabState extends State<SuggestionsTab>
 
       if (!mounted) return;
       context.push('${AppRoute.chatList.path}/$roomId');
+    } on PostgrestException catch (e) {
+      if (!mounted) return;
+      if (e.code == 'P0001' &&
+          e.message.contains('cannot_chat_with_self')) {
+        // 관리자 계정이 자기 자신에게 채팅을 시도하는 경우 – 친절한 안내로 대체
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('관리자 계정에서는 이 버튼 대신 건의함 채팅 또는 기존 채팅방을 이용해 주세요.'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('채팅방을 여는 중 오류가 발생했습니다: ${e.message}'),
+          ),
+        );
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('오류: $e')),
+        SnackBar(
+          content: Text('채팅방을 여는 중 오류가 발생했습니다: $e'),
+        ),
       );
     }
   }
@@ -1557,15 +1578,17 @@ class _SuggestionDetailBodyWidgetState extends State<_SuggestionDetailBodyWidget
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       '내용',
                       style: AppFonts.scaled(ctx, AppFonts.captionMedium)
                           .copyWith(color: AppColors.textSecondary),
                     ),
+                    SizedBox(height: ctx.rh(4)),
                     Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
                       children: [
                         TextButton(
                           onPressed: widget.onReportSuggestion,

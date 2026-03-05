@@ -12,7 +12,17 @@ class SupportScreen extends StatelessWidget {
   Future<void> _launchEmail() async {
     final uri = Uri(
       scheme: 'mailto',
-      path: 'support@daedeokhs-laon.org',
+      path: 's.h.putrats@the-saena.ai',
+    );
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri);
+    }
+  }
+
+  Future<void> _launchPhone() async {
+    final uri = Uri(
+      scheme: 'tel',
+      path: '01042941083',
     );
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri);
@@ -58,20 +68,38 @@ class SupportScreen extends StatelessWidget {
                 Text(
                   'App: LAON\n'
                   'Developer: Edmond Ko\n'
-                  'Contact: support@daedeokhs-laon.org\n'
+                  'Phone: 010-4294-1083\n'
+                  'Email: s.h.putrats@the-saena.ai\n'
                   'Response time: Within 48 hours',
                   style: AppFonts.scaled(context, AppFonts.bodyRegular)
                       .copyWith(color: AppColors.textPrimary),
                 ),
                 SizedBox(height: context.rh(24)),
-                CupertinoButton(
-                  color: AppColors.primaryBlue,
-                  onPressed: _launchEmail,
-                  child: Text(
-                    '이메일 보내기',
-                    style: AppFonts.scaled(context, AppFonts.bodyMedium)
-                        .copyWith(color: AppColors.white),
-                  ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: CupertinoButton(
+                        color: AppColors.primaryBlue,
+                        onPressed: _launchPhone,
+                        child: Text(
+                          '전화 걸기',
+                          style: AppFonts.scaled(context, AppFonts.bodyMedium)
+                              .copyWith(color: AppColors.white),
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: context.rs(12)),
+                    Expanded(
+                      child: CupertinoButton.filled(
+                        onPressed: _launchEmail,
+                        child: Text(
+                          '이메일 보내기',
+                          style: AppFonts.scaled(context, AppFonts.bodyMedium)
+                              .copyWith(color: AppColors.white),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
                 SizedBox(height: context.rh(32)),
                 Text(
