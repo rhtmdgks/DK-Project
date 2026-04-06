@@ -1,4 +1,4 @@
-package com.wearegoodwill.laon.glance
+package com.goodwill.laon.glance
 
 import android.content.Context
 import android.net.Uri
@@ -21,7 +21,7 @@ import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
-import com.wearegoodwill.laon.MainActivity
+import com.goodwill.laon.MainActivity
 import es.antonborri.home_widget.HomeWidgetGlanceState
 import es.antonborri.home_widget.HomeWidgetGlanceStateDefinition
 import es.antonborri.home_widget.actionStartActivity

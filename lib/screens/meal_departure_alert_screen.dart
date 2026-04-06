@@ -284,7 +284,7 @@ class _MealDepartureAlertScreenState extends State<MealDepartureAlertScreen> {
                 try {
                   await HomeWidget.requestPinWidget(
                     qualifiedAndroidName:
-                        'com.wearegoodwill.laon.glance.MealDepartureWidgetReceiver',
+                        'com.goodwill.laon.glance.MealDepartureWidgetReceiver',
                   );
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(

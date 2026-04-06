@@ -1,4 +1,4 @@
-package com.wearegoodwill.laon.glance
+package com.goodwill.laon.glance
 
 import es.antonborri.home_widget.HomeWidgetGlanceWidgetReceiver
 

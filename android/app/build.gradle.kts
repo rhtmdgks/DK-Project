@@ -17,7 +17,7 @@ val keystoreProperties = if (keystorePropertiesFile.exists()) {
 } else null
 
 android {
-    namespace = "com.wearegoodwill.laon"
+    namespace = "com.goodwill.laon"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = "29.0.14206865"
 
@@ -40,7 +40,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.wearegoodwill.laon"
+        applicationId = "com.goodwill.laon"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
