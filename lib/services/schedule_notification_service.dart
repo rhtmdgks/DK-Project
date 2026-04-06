@@ -82,8 +82,8 @@ class ScheduleNotificationService {
     try {
       await _plugin.zonedSchedule(
         _notificationId,
-        '오늘의 일정',
-        '오늘 일정을 확인해보세요.',
+        '오늘 일정이 있어요!',
+        '오늘 일정들을 확인해보세요.',
         scheduled,
         NotificationDetails(
           android: AndroidNotificationDetails(
@@ -103,8 +103,8 @@ class ScheduleNotificationService {
       if (e.toString().contains('exact_alarms_not_permitted')) {
         await _plugin.zonedSchedule(
           _notificationId,
-          '오늘의 일정',
-          '오늘 일정을 확인해보세요.',
+          '오늘 일정이 있어요!',
+          '오늘 일정들을 확인해보세요.',
           scheduled,
           NotificationDetails(
             android: AndroidNotificationDetails(
@@ -144,7 +144,6 @@ class ScheduleNotificationService {
             final stillEnabled = await isScheduleEnabled();
             if (!stillEnabled) return;
 
-            final title = newRow['title'] as String? ?? '새 일정';
             final startAt = newRow['start_at'] as String?;
             
             if (startAt != null) {
@@ -156,10 +155,11 @@ class ScheduleNotificationService {
                 
                 // 오늘 일정이면 즉시 알림
                 if (scheduleDate == today) {
+                  final content = _buildScheduleNotificationContent([newRow]);
                   await NotificationService.showNotification(
                     id: _notificationId + 1000,
-                    title: '새 일정이 추가되었습니다',
-                    body: title,
+                    title: content.$1,
+                    body: content.$2,
                     type: NotificationType.schedule,
                     payload: 'schedule',
                   );
@@ -204,19 +204,33 @@ class ScheduleNotificationService {
 
       if (schedules.isEmpty) return;
 
-      final count = schedules.length;
-      final firstSchedule = schedules[0];
-      final firstTitle = firstSchedule['title'] as String? ?? '일정';
+      final content = _buildScheduleNotificationContent(schedules);
 
       await NotificationService.showNotification(
         id: _notificationId,
-        title: '오늘의 일정',
-        body: count == 1
-            ? firstTitle
-            : '$firstTitle 외 ${count - 1}개 일정이 있습니다',
+        title: content.$1,
+        body: content.$2,
         type: NotificationType.schedule,
         payload: 'schedule',
       );
     } catch (_) {}
+  }
+
+  static (String, String) _buildScheduleNotificationContent(
+    List<dynamic> schedules,
+  ) {
+    final firstSchedule = schedules.first;
+    final firstTitle = (firstSchedule['title'] as String?)?.trim();
+    final safeTitle = (firstTitle == null || firstTitle.isEmpty) ? '일정' : firstTitle;
+    final count = schedules.length;
+
+    if (count == 1) {
+      return ('오늘 $safeTitle 일정이 있어요!', '일정을 놓치지 않도록 확인해보세요.');
+    }
+
+    return (
+      '오늘 $safeTitle 일정이 있어요!',
+      '$safeTitle 일정 외 ${count - 1}건이 더 있어요.',
+    );
   }
 }

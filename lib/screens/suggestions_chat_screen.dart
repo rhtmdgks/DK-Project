@@ -448,7 +448,7 @@ class _SuggestionsChatScreenState extends State<SuggestionsChatScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               DropdownButtonFormField<String>(
-                value: selectedReason,
+                initialValue: selectedReason,
                 decoration: const InputDecoration(
                   labelText: '사유 선택',
                 ),

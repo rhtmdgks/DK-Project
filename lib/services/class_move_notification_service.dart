@@ -1,5 +1,6 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:myapp/repositories/notification_settings_repository.dart';
+import 'package:myapp/core/utils/timetable_utils.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest_all.dart' as tz_data;
 
@@ -23,20 +24,6 @@ class ClassMoveNotificationService {
 
   static bool _initialized = false;
 
-  // 기본 수업 시간표 (교시별 시작 시간, 분 단위)
-  static const _periodTimes = [
-    [9, 0],   // 1교시: 09:00
-    [10, 0],  // 2교시: 10:00
-    [11, 0],  // 3교시: 11:00
-    [12, 0],  // 4교시: 12:00
-    [13, 30], // 5교시: 13:30
-    [14, 30], // 6교시: 14:30
-    [15, 30], // 7교시: 15:30
-    [16, 30], // 8교시: 16:30
-    [17, 30], // 9교시: 17:30
-    [18, 30], // 10교시: 18:30
-  ];
-
   /// 초기화
   static Future<void> initialize() async {
     if (_initialized) return;
@@ -47,7 +34,8 @@ class ClassMoveNotificationService {
 
     await _plugin
         .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>()
+          AndroidFlutterLocalNotificationsPlugin
+        >()
         ?.createNotificationChannel(
           const AndroidNotificationChannel(
             _channelId,
@@ -86,10 +74,12 @@ class ClassMoveNotificationService {
     if (uid == null) return;
 
     try {
+      await _cancelScheduledNotifications();
+
       // 사용자의 시간표 조회
       final timetable = await supabase
           .from('timetable_entries')
-          .select()
+          .select('day_of_week, period, room, subject')
           .eq('user_id', uid)
           .order('day_of_week')
           .order('period');
@@ -97,12 +87,13 @@ class ClassMoveNotificationService {
       if (timetable.isEmpty) return;
 
       final now = tz.TZDateTime.now(tz.local);
-      final today = now.weekday % 7; // 0=일요일, 1=월요일, ..., 6=토요일
 
       // 오늘부터 일주일간의 이동 수업 알림 스케줄링
       for (int dayOffset = 0; dayOffset < 7; dayOffset++) {
-        final targetDay = (today + dayOffset) % 7;
         final targetDate = now.add(Duration(days: dayOffset));
+        final targetDay = TimetableUtils.dayOfWeekForDb(targetDate);
+
+        if (targetDay == null) continue;
 
         // 해당 요일의 시간표 필터링
         final dayTimetable = timetable.where((entry) {
@@ -126,9 +117,9 @@ class ClassMoveNotificationService {
               prevRoom.trim().isNotEmpty &&
               currRoom.trim().isNotEmpty &&
               prevRoom != currRoom &&
-              currPeriod <= _periodTimes.length) {
+              currPeriod <= TimetableUtils.periodStartTimes.length) {
             // 수업 시작 시간 5분 전에 알림
-            final periodTime = _periodTimes[currPeriod - 1];
+            final periodTime = TimetableUtils.periodStartTimes[currPeriod - 1];
             final notificationTime = tz.TZDateTime(
               tz.local,
               targetDate.year,
@@ -142,7 +133,8 @@ class ClassMoveNotificationService {
             if (notificationTime.isBefore(now)) continue;
 
             final subject = currEntry['subject'] as String? ?? '수업';
-            final notificationId = _notificationIdBase + (dayOffset * 100) + currPeriod;
+            final notificationId =
+                _notificationIdBase + (dayOffset * 100) + currPeriod;
 
             try {
               await _plugin.zonedSchedule(
@@ -177,7 +169,8 @@ class ClassMoveNotificationService {
                     ),
                     iOS: const DarwinNotificationDetails(),
                   ),
-                  androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+                  androidScheduleMode:
+                      AndroidScheduleMode.inexactAllowWhileIdle,
                   uiLocalNotificationDateInterpretation:
                       UILocalNotificationDateInterpretation.absoluteTime,
                 );
@@ -188,6 +181,18 @@ class ClassMoveNotificationService {
       }
     } catch (_) {
       // 오류 발생 시 무시 (시간표가 없거나 권한 문제 등)
+    }
+  }
+
+  static Future<void> _cancelScheduledNotifications() async {
+    for (int dayOffset = 0; dayOffset < 7; dayOffset++) {
+      for (
+        int period = 1;
+        period <= TimetableUtils.periodStartTimes.length;
+        period++
+      ) {
+        await _plugin.cancel(_notificationIdBase + (dayOffset * 100) + period);
+      }
     }
   }
 }

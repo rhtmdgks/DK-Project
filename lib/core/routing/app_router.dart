@@ -14,6 +14,7 @@ import 'package:myapp/screens/password_change_screen.dart';
 import 'package:myapp/screens/privacy_policy_screen.dart';
 import 'package:myapp/screens/profile_screen.dart';
 import 'package:myapp/screens/settings_screen.dart';
+import 'package:myapp/screens/class_photo_shares_screen.dart';
 import 'package:myapp/screens/splash_screen.dart';
 import 'package:myapp/screens/support_screen.dart';
 import 'package:myapp/screens/suggestions_chat_screen.dart';
@@ -41,7 +42,8 @@ enum AppRoute {
   chatRoom('/chat/:roomId'),
   suggestionsChat('/suggestions/chat'),
   todayClasses('/today-classes'),
-  profile('/profile');
+  profile('/profile'),
+  classPhotoShares('/class-photo-shares');
 
   const AppRoute(this.path);
   final String path;
@@ -176,6 +178,11 @@ GoRouter createAppRouter() {
         path: AppRoute.profile.path,
         pageBuilder: (_, state) =>
             _m3Page(state, const ProfileScreen()),
+      ),
+      GoRoute(
+        path: AppRoute.classPhotoShares.path,
+        pageBuilder: (_, state) =>
+            _m3Page(state, const ClassPhotoSharesScreen()),
       ),
     ],
   );

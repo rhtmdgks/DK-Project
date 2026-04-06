@@ -24,6 +24,15 @@ class WeatherNotificationService {
   static const _channelName = '날씨 알림';
   static const _notificationId = 1;
 
+  /// [zonedSchedule]은 실행 시 Dart가 돌지 않아 API를 붙일 수 없음 — 고정 멘트만 사용.
+  static const _scheduledTitle = '좋은 아침이에요';
+  static const _scheduledBody =
+      '오늘 기온과 강수는 앱을 열면 자세히 볼 수 있어요. 하루 준비에 참고해 보세요.';
+
+  static const _errorTitle = '날씨를 잠시 불러오지 못했어요';
+  static const _errorBody =
+      '네트워크 상태를 확인한 뒤, 앱에서 다시 한 번 확인해 주세요.';
+
   static const _keyWeatherLat = 'weather_lat';
   static const _keyWeatherLon = 'weather_lon';
   static const _keyLastShownDate = 'weather_last_shown_date';
@@ -167,8 +176,8 @@ class WeatherNotificationService {
     try {
       await _plugin.zonedSchedule(
         _notificationId,
-        '오늘 날씨',
-        '날씨 정보를 확인하는 중...',
+        _scheduledTitle,
+        _scheduledBody,
         scheduled,
         const NotificationDetails(
           android: AndroidNotificationDetails(
@@ -195,8 +204,8 @@ class WeatherNotificationService {
       try {
         await _plugin.zonedSchedule(
           _notificationId,
-          '오늘 날씨',
-          '날씨 정보를 확인하는 중...',
+          _scheduledTitle,
+          _scheduledBody,
           scheduled,
           const NotificationDetails(
             android: AndroidNotificationDetails(
@@ -245,17 +254,16 @@ class WeatherNotificationService {
     final lon = prefs.getDouble(_keyWeatherLon);
 
     try {
-      final message = await WeatherService.getMorningSummary(
+      final copy = await WeatherService.getMorningNotificationCopy(
         latitude: lat,
         longitude: lon,
       );
       await prefs.setString(_keyLastShownDate, today);
-      
-      // NotificationService를 통해 알림 표시
+
       await NotificationService.showNotification(
         id: _notificationId,
-        title: '오늘 날씨',
-        body: message,
+        title: copy.title,
+        body: copy.body,
         type: NotificationType.weather,
         payload: 'weather',
       );
@@ -263,8 +271,8 @@ class WeatherNotificationService {
       debugPrint('날씨 정보 조회 실패: $e');
       await NotificationService.showNotification(
         id: _notificationId,
-        title: '오늘 날씨',
-        body: '날씨를 불러오지 못했어요. 앱에서 다시 확인해보세요.',
+        title: _errorTitle,
+        body: _errorBody,
         type: NotificationType.weather,
         payload: 'weather',
       );

@@ -53,15 +53,8 @@ class NoticePollViewModel extends ChangeNotifier {
         final likeCounts = await _repo.getPollLikeCounts(ids);
         final commentCounts = await _repo.getPollCommentCounts(ids);
         final uid = await AuthRepository.instance.getUserId();
-        final token = await AuthRepository.instance.getSessionToken();
-        final Set<String> liked;
-        if (token != null) {
-          liked = (await _repo.getPollLikesByToken(token)).intersection(ids.toSet());
-        } else if (uid != null) {
-          liked = await _repo.getPollIdsLikedByUser(ids, uid);
-        } else {
-          liked = <String>{};
-        }
+        final Set<String> liked =
+            uid != null ? await _repo.getPollIdsLikedByUser(ids, uid) : <String>{};
         for (final p in _polls) {
           final id = p['id'] as String?;
           if (id == null) continue;
@@ -77,14 +70,9 @@ class NoticePollViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 투표 참여. session_token 우선, 없으면 Auth uid 사용.
+  /// 투표 참여. Auth uid 기준으로 수행.
   Future<void> vote(String pollId, int optionIndex) async {
-    final token = await AuthRepository.instance.getSessionToken();
     final uid = await AuthRepository.instance.getUserId();
-    if (token != null) {
-      await _repo.voteByToken(pollId: pollId, sessionToken: token, optionIndex: optionIndex);
-      return;
-    }
     if (uid != null) {
       await _repo.vote(pollId: pollId, userId: uid, optionIndex: optionIndex);
       return;
@@ -92,28 +80,21 @@ class NoticePollViewModel extends ChangeNotifier {
     throw Exception('로그인이 필요해요.');
   }
 
-  /// 이미 투표했는지 및 선택 인덱스 조회. session_token 우선.
+  /// 이미 투표했는지 및 선택 인덱스 조회.
   Future<Map<String, dynamic>?> getPollVote(String pollId) async {
-    final token = await AuthRepository.instance.getSessionToken();
     final uid = await AuthRepository.instance.getUserId();
-    if (token != null) {
-      return _repo.getPollVoteByToken(pollId, token);
-    }
     if (uid != null) {
       return _repo.getPollVote(pollId, uid);
     }
     return null;
   }
 
-  /// 좋아요 토글. session_token 또는 Auth uid 사용. 반환: true/false = 성공(좋아요 여부), null = 로그인 필요.
+  /// 좋아요 토글. Auth uid 사용. 반환: true/false = 성공(좋아요 여부), null = 로그인 필요.
   /// 성공 시 해당 투표만 로컬에서 갱신(하트·숫자만 바뀌고 목록 새로고침 없음).
   Future<bool?> togglePollLike(String pollId) async {
-    final token = await AuthRepository.instance.getSessionToken();
     final uid = await AuthRepository.instance.getUserId();
     bool? liked;
-    if (token != null) {
-      liked = await _repo.togglePollLikeByToken(pollId, token);
-    } else if (uid != null) {
+    if (uid != null) {
       liked = await _repo.togglePollLike(pollId, uid);
     } else {
       return null;
@@ -133,16 +114,11 @@ class NoticePollViewModel extends ChangeNotifier {
     return _repo.getPollComments(pollId);
   }
 
-  /// 댓글 작성. session_token 있으면 RPC 사용(RLS 통과), 없으면 프로필로 직접 insert. 둘 다 없으면 예외.
+  /// 댓글 작성. 프로필 기준으로 직접 insert.
   Future<void> addPollComment({
     required String pollId,
     required String content,
   }) async {
-    final token = await AuthRepository.instance.getSessionToken();
-    if (token != null) {
-      await _repo.addPollCommentByToken(pollId: pollId, sessionToken: token, content: content);
-      return;
-    }
     final profile = await AuthRepository.instance.getCurrentProfile();
     if (profile != null) {
       await _repo.addPollComment(pollId: pollId, authorId: profile.id, content: content);

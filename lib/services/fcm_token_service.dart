@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:firebase_core/firebase_core.dart';
@@ -9,7 +8,7 @@ import 'package:myapp/core/supabase_client.dart';
 
 /// FCM 토큰을 Supabase fcm_tokens에 등록/해제합니다.
 /// 급식 출발 알림 ON + 로그인 + 학년·반 있을 때만 등록합니다.
-/// 등록은 Edge Function register-fcm-token (X-FCM-Register-Secret) 사용.
+/// 등록은 Edge Function register-fcm-token (JWT 기반 식별) 사용.
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
@@ -18,11 +17,6 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 class FcmTokenService {
   FcmTokenService._();
-
-  static const _registerSecret = String.fromEnvironment(
-    'FCM_REGISTER_SECRET',
-    defaultValue: '',
-  );
 
   static bool _firebaseInitialized = false;
 
@@ -63,17 +57,7 @@ class FcmTokenService {
 
   /// 급식 출발 알림용 FCM 토큰 등록. (호출 측에서 알림 ON일 때만 호출)
   static Future<void> registerIfNeeded() async {
-    if (_registerSecret.isEmpty) {
-      debugPrint('FcmTokenService: FCM_REGISTER_SECRET 없음. 토큰 등록 스킵.');
-      return;
-    }
-
-    final profile = await getCurrentProfile();
-    if (profile == null) return;
-
-    final grade = profile.gradeOrFromStudentId;
-    final classNum = profile.classNumOrFromStudentId;
-    if (grade == null || classNum == null) return;
+    if (await getCurrentProfile() == null) return;
 
     final token = await getToken();
     if (token == null || token.isEmpty) return;
@@ -83,66 +67,42 @@ class FcmTokenService {
 
     await _callRegister(
       action: 'register',
-      userId: profile.userId,
       token: token,
-      grade: grade,
-      classNumber: classNum,
     );
   }
 
   /// 급식 출발 알림 OFF 또는 로그아웃 시 토큰 해제.
   static Future<void> unregisterIfNeeded() async {
-    if (_registerSecret.isEmpty) return;
+    if (await getCurrentProfile() == null) return;
 
-    final profile = await getCurrentProfile();
-    if (profile == null) return;
-
-    await _callRegister(action: 'unregister', userId: profile.userId);
+    await _callRegister(action: 'unregister');
   }
 
   static Future<void> _callRegister({
     required String action,
-    required String userId,
     String? token,
-    int? grade,
-    int? classNumber,
   }) async {
-    final baseUrl = supabaseBaseUrl;
-    final anonKey = supabaseAnonKey;
-    if (baseUrl == null || baseUrl.isEmpty || anonKey == null || anonKey.isEmpty) return;
-
-    final url = baseUrl.endsWith('/')
-        ? '${baseUrl}functions/v1/register-fcm-token'
-        : '$baseUrl/functions/v1/register-fcm-token';
-
     final body = <String, dynamic>{
       'action': action,
-      'user_id': userId,
     };
-    if (action == 'register' && token != null && grade != null && classNumber != null) {
+    if (action == 'register' && token != null) {
       body['token'] = token;
-      body['grade'] = grade;
-      body['class_number'] = classNumber;
       body['platform'] = Platform.isIOS ? 'ios' : 'android';
     }
 
     try {
-      final client = HttpClient();
-      try {
-        final request = await client.postUrl(Uri.parse(url));
-        request.headers.set('Content-Type', 'application/json');
-        request.headers.set('Authorization', 'Bearer $anonKey');
-        request.headers.set('X-FCM-Register-Secret', _registerSecret);
-        request.write(jsonEncode(body));
-        final response = await request.close();
-        await response.drain();
-        if (response.statusCode >= 200 && response.statusCode < 300) {
-          debugPrint('FcmTokenService: $action ok (platform=${action == 'register' ? (Platform.isIOS ? 'ios' : 'android') : '-'})');
-        } else {
-          debugPrint('FcmTokenService: $action failed ${response.statusCode}');
-        }
-      } finally {
-        client.close();
+      if (supabase.auth.currentSession?.accessToken == null) {
+        debugPrint('FcmTokenService: session accessToken 없음. $action 스킵.');
+        return;
+      }
+      final res = await supabase.functions.invoke(
+        'register-fcm-token',
+        body: body,
+      );
+      if (res.status >= 200 && res.status < 300) {
+        debugPrint('FcmTokenService: $action ok (platform=${action == 'register' ? (Platform.isIOS ? 'ios' : 'android') : '-'})');
+      } else {
+        debugPrint('FcmTokenService: $action failed ${res.status}');
       }
     } catch (e) {
       debugPrint('FcmTokenService: _callRegister failed $e');

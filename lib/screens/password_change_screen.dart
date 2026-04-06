@@ -33,6 +33,24 @@ class _PasswordChangeScreenState extends State<PasswordChangeScreen> {
     super.dispose();
   }
 
+  /// Supabase Auth·기타 예외를 화면용 문구로 변환한다.
+  String _mapPasswordChangeError(Object e) {
+    if (e is AuthException) {
+      if (e.code == 'same_password') {
+        return '새 비밀번호는 기존 비밀번호와 달라야 합니다.';
+      }
+      final m = e.message;
+      if (m.contains('different from the old') || m.contains('same_password')) {
+        return '새 비밀번호는 기존 비밀번호와 달라야 합니다.';
+      }
+    }
+    final s = e.toString();
+    if (s.contains('same_password') || s.contains('different from the old')) {
+      return '새 비밀번호는 기존 비밀번호와 달라야 합니다.';
+    }
+    return '비밀번호 변경에 실패했습니다: $s';
+  }
+
   Future<void> _submit() async {
     if (_submitted) return;
 
@@ -60,24 +78,14 @@ class _PasswordChangeScreenState extends State<PasswordChangeScreen> {
         throw Exception('사용자 ID를 가져올 수 없습니다');
       }
       
-      // 세션이 있으면 auth.users의 비밀번호도 업데이트 시도
-      if (supabase.auth.currentSession != null) {
-        try {
-          await supabase.auth.updateUser(UserAttributes(password: newPw));
-        } catch (authError) {
-          // auth.users 업데이트 실패해도 profiles 테이블 업데이트는 계속 진행
-          debugPrint('Auth password update failed (continuing): $authError');
-        }
+      // 비밀번호는 Supabase Auth(auth.users)에만 저장한다. profiles에는 password 컬럼이 없음.
+      if (supabase.auth.currentSession == null) {
+        throw Exception('세션이 없습니다');
       }
-      
-      // profiles 테이블의 password와 must_change_password 업데이트
-      await supabase.rpc(
-        'set_password_and_must_change_false',
-        params: {
-          'p_new_password': newPw,
-          'p_user_id': userId,
-        },
-      );
+      await supabase.auth.updateUser(UserAttributes(password: newPw));
+
+      // 첫 로그인 강제 변경 플래그 해제 (001_full_schema: set_must_change_password_false)
+      await supabase.rpc('set_must_change_password_false');
       
       if (!mounted) return;
       context.go(AppRoute.home.path);
@@ -85,7 +93,7 @@ class _PasswordChangeScreenState extends State<PasswordChangeScreen> {
       debugPrint('Password change error: $e');
       if (!mounted) return;
       setState(() {
-        _error = '비밀번호 변경에 실패했습니다: ${e.toString()}';
+        _error = _mapPasswordChangeError(e);
         _loading = false;
         _submitted = false;
       });

@@ -184,22 +184,6 @@ class AnnouncementRepository {
     });
   }
 
-  /// 투표 참여 (session_token 사용, 세션 없을 때). RPC 호출.
-  Future<void> voteByToken({
-    required String pollId,
-    required String sessionToken,
-    required int optionIndex,
-  }) async {
-    await _client.rpc(
-      'insert_poll_vote_by_token',
-      params: {
-        'p_poll_id': pollId,
-        'p_session_token': sessionToken,
-        'p_option_index': optionIndex,
-      },
-    );
-  }
-
   /// 사용자가 해당 투표에 참여했는지 및 선택 인덱스 조회 (세션 사용).
   Future<Map<String, dynamic>?> getPollVote(String pollId, String userId) async {
     final res = await _client
@@ -209,21 +193,6 @@ class AnnouncementRepository {
         .eq('user_id', userId)
         .maybeSingle();
     return res;
-  }
-
-  /// 해당 투표에서 내 선택 조회 (session_token 사용). 반환: { option_index: n } 또는 null.
-  Future<Map<String, dynamic>?> getPollVoteByToken(String pollId, String sessionToken) async {
-    final res = await _client.rpc(
-      'get_poll_vote_by_token',
-      params: {
-        'p_poll_id': pollId,
-        'p_session_token': sessionToken,
-      },
-    );
-    if (res == null) return null;
-    final map = res as Map<String, dynamic>?;
-    if (map == null || !map.containsKey('option_index')) return null;
-    return map;
   }
 
   // ── Poll likes ─────────────────────────────────────────────────────────
@@ -283,29 +252,6 @@ class AnnouncementRepository {
     return true;
   }
 
-  /// 좋아요 토글 (session_token 사용, 세션 없을 때). RPC 호출.
-  Future<bool> togglePollLikeByToken(String pollId, String sessionToken) async {
-    final res = await _client.rpc(
-      'toggle_poll_like',
-      params: {
-        'p_poll_id': pollId,
-        'p_session_token': sessionToken,
-      },
-    );
-    final map = res as Map<String, dynamic>?;
-    return map?['liked'] as bool? ?? false;
-  }
-
-  /// session_token으로 내가 좋아요한 poll_id 집합 (세션 없을 때).
-  Future<Set<String>> getPollLikesByToken(String sessionToken) async {
-    final res = await _client.rpc(
-      'get_poll_likes_by_token',
-      params: {'p_session_token': sessionToken},
-    );
-    if (res is! List) return {};
-    return res.map((e) => e.toString()).toSet();
-  }
-
   // ── Poll comments ───────────────────────────────────────────────────────
 
   /// 투표 댓글 목록 (created_at 오름차순). 작성자명·프로필 사진 포함. RPC 사용(RLS 무관).
@@ -351,19 +297,4 @@ class AnnouncementRepository {
     });
   }
 
-  /// 댓글 추가 (session_token 사용, 세션 없을 때). RPC 호출.
-  Future<void> addPollCommentByToken({
-    required String pollId,
-    required String sessionToken,
-    required String content,
-  }) async {
-    await _client.rpc(
-      'insert_poll_comment_by_token',
-      params: {
-        'p_poll_id': pollId,
-        'p_session_token': sessionToken,
-        'p_content': content.trim(),
-      },
-    );
-  }
 }

@@ -273,7 +273,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 icon: Icons.cloud_rounded,
                 iconColor: const Color(0xFF9C7CDB),
                 title: '날씨 알림',
-                description: '매일 6시 30분에 현지 날씨(비/구름/눈/맑음)를 알려줘요.',
+                description:
+                    '매일 6시 30분에 알려 드려요. 기온·최고/최저와 비·눈·맑음 안내를 받을 수 있어요.',
               ),
             ],
           ),
@@ -426,6 +427,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
           padding: EdgeInsets.symmetric(vertical: context.rh(4)),
           child: Column(
             children: [
+              _buildLinkItem(
+                icon: Icons.photo_library_outlined,
+                iconColor: const Color(0xFF7986CB),
+                title: '학급 사진 공유',
+                onTap: () => context.push(AppRoute.classPhotoShares.path),
+              ),
+              _buildItemDivider(),
               _buildLinkItem(
                 icon: Icons.block_flipped,
                 iconColor: AppColors.textSecondary,

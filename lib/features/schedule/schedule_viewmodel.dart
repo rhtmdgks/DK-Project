@@ -7,14 +7,19 @@ import 'package:myapp/repositories/schedule_repository.dart';
 /// UI는 이 ViewModel을 통해 [ScheduleRepository]만 사용한다.
 class ScheduleViewModel extends ChangeNotifier {
   ScheduleViewModel({ScheduleRepository? repository})
-      : _repo = repository ?? ScheduleRepository(),
-        _viewMonth = DateTime(DateTime.now().year, DateTime.now().month),
-        _selectedDate = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
+    : _repo = repository ?? ScheduleRepository(),
+      _viewMonth = DateTime(DateTime.now().year, DateTime.now().month),
+      _selectedDate = DateTime(
+        DateTime.now().year,
+        DateTime.now().month,
+        DateTime.now().day,
+      );
 
   final ScheduleRepository _repo;
 
   List<Map<String, dynamic>> _items = [];
   List<Map<String, dynamic>> _personalEvents = [];
+  List<Map<String, dynamic>> _classEvents = [];
   List<Map<String, dynamic>> _neisItems = [];
   bool _loading = false;
   String? _error;
@@ -24,6 +29,7 @@ class ScheduleViewModel extends ChangeNotifier {
 
   List<Map<String, dynamic>> get items => _items;
   List<Map<String, dynamic>> get personalEvents => _personalEvents;
+  List<Map<String, dynamic>> get classEvents => _classEvents;
   List<Map<String, dynamic>> get neisItems => _neisItems;
   bool get loading => _loading;
   String? get error => _error;
@@ -54,10 +60,20 @@ class ScheduleViewModel extends ChangeNotifier {
     try {
       _items = await _repo.fetchScheduleItems();
       final uid = _profile?.userId;
+      final grade = _profile?.gradeOrFromStudentId;
+      final classNum = _profile?.classNumOrFromStudentId;
       if (uid != null) {
         _personalEvents = await _repo.fetchPersonalEvents(uid);
       } else {
         _personalEvents = [];
+      }
+      if (grade != null && classNum != null) {
+        _classEvents = await _repo.fetchClassEvents(
+          grade: grade,
+          classNumber: classNum,
+        );
+      } else {
+        _classEvents = [];
       }
       _neisItems = await _repo.fetchAcademicCalendar(_viewMonth);
       _error = null;
@@ -111,6 +127,36 @@ class ScheduleViewModel extends ChangeNotifier {
 
   Future<void> deletePersonalEvent(String id) async {
     await _repo.deletePersonalEvent(id);
+    await fetch();
+  }
+
+  Future<void> addClassEvent({
+    required int grade,
+    required int classNumber,
+    required String title,
+    String? description,
+    required String startAt,
+    String? endAt,
+    required bool allDay,
+    required String createdByUserId,
+    required String createdByProfileId,
+  }) async {
+    await _repo.addClassEvent(
+      grade: grade,
+      classNumber: classNumber,
+      title: title,
+      description: description,
+      startAt: startAt,
+      endAt: endAt,
+      allDay: allDay,
+      createdByUserId: createdByUserId,
+      createdByProfileId: createdByProfileId,
+    );
+    await fetch();
+  }
+
+  Future<void> deleteClassEvent(String id) async {
+    await _repo.deleteClassEvent(id);
     await fetch();
   }
 }

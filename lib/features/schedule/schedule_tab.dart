@@ -30,7 +30,7 @@ DateTime? _parseUtc(String? s) {
 ///
 /// 상단에 Flutter 기본 위젯으로 만든 캘린더를 두고,
 /// 선택한 날짜의 일정만 목록으로 표시한다. 시간표(데이터/기능)는 기존과 동일하게 유지.
-/// council / admin 역할에게 추가/삭제 기능을 제공한다.
+  /// council / admin은 학교 일정 수정, 정반장/부반장은 학급 공유 일정을 관리한다.
 class ScheduleTab extends StatefulWidget {
   const ScheduleTab({super.key});
 
@@ -43,9 +43,11 @@ class _ScheduleTabState extends State<ScheduleTab> {
   String? _error;
   List<Map<String, dynamic>> _items = [];
   List<Map<String, dynamic>> _personalEvents = [];
+  List<Map<String, dynamic>> _classEvents = [];
   /// NEIS 학사일정 (시도교육청·학교 코드는 급식과 동일한 env 사용)
   List<Map<String, dynamic>> _neisItems = [];
   AppProfile? _profile;
+  String? _currentUserId;
 
   /// 캘린더에 표시할 월 (이동용)
   DateTime _viewMonth;
@@ -65,7 +67,13 @@ class _ScheduleTabState extends State<ScheduleTab> {
 
   Future<void> _loadProfile() async {
     final p = await getCurrentProfile();
-    if (mounted) setState(() => _profile = p);
+    final uid = await AuthRepository.instance.getUserId();
+    if (mounted) {
+      setState(() {
+        _profile = p;
+        _currentUserId = uid;
+      });
+    }
   }
 
   Future<void> _fetch() async {
@@ -81,11 +89,11 @@ class _ScheduleTabState extends State<ScheduleTab> {
           .select()
           .order('start_at', ascending: true);
 
-      // 개인 일정 (세션 또는 session_token 기반으로 조회)
+      // 개인 일정 (Supabase Auth 세션 기반 조회)
       final uid = await AuthRepository.instance.getUserId();
       final session = supabase.auth.currentSession;
-      final sessionToken = await AuthRepository.instance.getSessionToken();
       List<Map<String, dynamic>> personalRes = [];
+      List<Map<String, dynamic>> classRes = [];
 
       if (session != null && uid != null && uid.isNotEmpty) {
         // Supabase Auth 세션이 있는 경우: RLS(auth.uid() = user_id) 기준으로 직접 조회.
@@ -94,19 +102,24 @@ class _ScheduleTabState extends State<ScheduleTab> {
             .select()
             .eq('user_id', uid)
             .order('start_at', ascending: true);
-        personalRes = List<Map<String, dynamic>>.from(personalResRaw as List);
-      } else if (session == null &&
-          sessionToken != null &&
-          sessionToken.isNotEmpty) {
-        // 세션은 없지만 session_token이 있는 경우: 전용 RPC로 조회.
-        final rpcRes = await supabase.rpc(
-          'get_personal_events_by_token',
-          params: {'p_session_token': sessionToken},
-        );
-        if (rpcRes is List) {
-          personalRes =
-              List<Map<String, dynamic>>.from(rpcRes.cast<Map<String, dynamic>>());
-        }
+        personalRes = List<Map<String, dynamic>>.from(personalResRaw as List)
+            .map((item) => {...item, 'event_scope': 'personal'})
+            .toList();
+      }
+
+      final profile = _profile;
+      final grade = profile?.gradeOrFromStudentId;
+      final classNum = profile?.classNumOrFromStudentId;
+      if (session != null && grade != null && classNum != null) {
+        final classResRaw = await supabase
+            .from('class_events')
+            .select()
+            .eq('grade', grade)
+            .eq('class_number', classNum)
+            .order('start_at', ascending: true);
+        classRes = List<Map<String, dynamic>>.from(classResRaw as List)
+            .map((item) => {...item, 'event_scope': 'class'})
+            .toList();
       }
 
       // NEIS 학사일정 (시도교육청·학교 코드는 Edge Function env, 급식과 동일)
@@ -154,7 +167,9 @@ class _ScheduleTabState extends State<ScheduleTab> {
       setState(() {
         _items = List<Map<String, dynamic>>.from(scheduleRes as List);
         _personalEvents = personalRes;
+        _classEvents = classRes;
         _neisItems = neisList;
+        _currentUserId = uid;
         _loading = false;
       });
     } catch (e) {
@@ -167,16 +182,17 @@ class _ScheduleTabState extends State<ScheduleTab> {
   }
 
   bool get _canEdit => _profile?.isPrivileged ?? false;
+  bool get _canManageClassSharedEvents => _profile?.canManageClassResources ?? false;
 
   /// 선택한 날짜에 해당하는 일정만 반환 (학교 일정 + 개인 일정 + 학사일정).
   List<Map<String, dynamic>> get _itemsForSelectedDay {
-    final allItems = [..._items, ..._neisItems, ..._personalEvents];
+    final allItems = [..._items, ..._neisItems, ..._classEvents, ..._personalEvents];
     return allItems.where((item) => _eventOverlapsDay(item, _selectedDate)).toList();
   }
 
   /// 해당 날짜에 일정이 있으면 true (시작일·종료일 기준).
   bool _hasEventOnDate(DateTime day) {
-    final allItems = [..._items, ..._neisItems, ..._personalEvents];
+    final allItems = [..._items, ..._neisItems, ..._classEvents, ..._personalEvents];
     return allItems.any((item) => _eventOverlapsDay(item, day));
   }
 
@@ -551,15 +567,22 @@ class _ScheduleTabState extends State<ScheduleTab> {
     final title = item['title'] as String? ?? '';
     final desc = item['description'] as String? ?? '';
     final timeStr = _scheduleTimeStr(item);
-    final isPersonal = _personalEvents.any((e) => e['id'] == item['id']);
-    final isNeis = item['is_neis'] == true;
+    final scope = item['event_scope'] as String?;
+    final isPersonal = scope == 'personal';
+    final isClass = scope == 'class';
+    final isNeis = item['is_neis'] == true || scope == 'neis';
 
-    final subtitle = [if (timeStr.isNotEmpty) timeStr, if (desc.isNotEmpty) desc]
+    final subtitle = [
+      if (isClass) '${item['grade']}학년 ${item['class_number']}반 공유',
+      if (timeStr.isNotEmpty) timeStr,
+      if (desc.isNotEmpty) desc,
+    ]
         .join(' · ');
     final subtitleTrim = subtitle.isEmpty ? null : subtitle;
 
     Color leadingColor = Theme.of(context).colorScheme.primary;
     if (isPersonal) leadingColor = AppColors.primaryBlue500;
+    if (isClass) leadingColor = AppColors.primaryBlue;
     if (isNeis) leadingColor = AppColors.timetableHighlight;
 
     return M3ListTileInbox(
@@ -574,27 +597,46 @@ class _ScheduleTabState extends State<ScheduleTab> {
         ),
       ),
       trailing: Icon(Icons.chevron_right, size: context.rs(20), color: AppColors.hint),
-      onTap: () => _showScheduleDetail(context, item, isPersonal: isPersonal, isNeis: isNeis),
+      onTap: () => _showScheduleDetail(
+        context,
+        item,
+        isPersonal: isPersonal,
+        isClass: isClass,
+        isNeis: isNeis,
+      ),
     );
   }
 
-  void _showScheduleDetail(BuildContext context, Map<String, dynamic> item, {bool isPersonal = false, bool isNeis = false}) {
+  void _showScheduleDetail(
+    BuildContext context,
+    Map<String, dynamic> item, {
+    bool isPersonal = false,
+    bool isClass = false,
+    bool isNeis = false,
+  }) {
     final title = item['title'] as String? ?? '';
     final desc = item['description'] as String? ?? '';
     final timeStr = _scheduleTimeStr(item);
     final body = desc.isEmpty ? (timeStr.isEmpty ? '내용 없음' : '시간: $timeStr') : desc;
-    final secondary = timeStr.isNotEmpty ? '시간: $timeStr' : null;
+    final secondaryParts = <String>[
+      if (isClass) '${item['grade']}학년 ${item['class_number']}반 공유 일정',
+      if (timeStr.isNotEmpty) '시간: $timeStr',
+    ];
+    final secondary = secondaryParts.isEmpty ? null : secondaryParts.join(' · ');
 
     final actions = <Widget>[];
     final id = item['id'] as String?;
+    final isClassOwner = isClass && item['created_by_user_id'] == _currentUserId;
 
     // 학사일정(NEIS)은 삭제 불가. 개인 일정/학교 일정만 삭제 버튼 표시.
-    if (!isNeis && id != null && (isPersonal || _canEdit)) {
+    if (!isNeis && id != null && (isPersonal || isClassOwner || _canEdit || _canManageClassSharedEvents)) {
       actions.add(
         TextButton(
           onPressed: () async {
             if (isPersonal) {
               await _deletePersonalEvent(id);
+            } else if (isClass) {
+              await _deleteClassEvent(id);
             } else {
               await _delete(id);
             }
@@ -799,6 +841,7 @@ class _ScheduleTabState extends State<ScheduleTab> {
     );
     var end = start.add(const Duration(hours: 1));
     var allDay = false;
+    var shareWithClass = false;
 
     if (!mounted) return;
     try {
@@ -808,8 +851,8 @@ class _ScheduleTabState extends State<ScheduleTab> {
         isScrollControlled: true,
         useSafeArea: true,
         backgroundColor: Colors.transparent,
-        isDismissible: true,
-        enableDrag: true,
+        isDismissible: false,
+        enableDrag: false,
         builder: (sheetContext) {
           return DraggableScrollableSheet(
             expand: false,
@@ -819,14 +862,17 @@ class _ScheduleTabState extends State<ScheduleTab> {
             builder: (ctx, scrollController) {
               return StatefulBuilder(
                 builder: (innerContext, setSheetState) {
-                  return Container(
-                    decoration: BoxDecoration(
-                      color: Theme.of(innerContext).colorScheme.surface,
-                      borderRadius: BorderRadius.vertical(
-                        top: Radius.circular(AppShapes.radiusLarge),
+                  return GestureDetector(
+                    onTap: () => FocusScope.of(innerContext).unfocus(),
+                    behavior: HitTestBehavior.opaque,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Theme.of(innerContext).colorScheme.surface,
+                        borderRadius: BorderRadius.vertical(
+                          top: Radius.circular(AppShapes.radiusLarge),
+                        ),
                       ),
-                    ),
-                    child: SafeArea(
+                      child: SafeArea(
                       top: false,
                       child: Column(
                         children: [
@@ -850,7 +896,7 @@ class _ScheduleTabState extends State<ScheduleTab> {
                             child: Row(
                               children: [
                                 Text(
-                                  '개인 일정 추가',
+                                  '개인/학급 일정 추가',
                                   style: AppFonts.scaled(innerContext, AppFonts.titleBold),
                                 ),
                                 const Spacer(),
@@ -909,6 +955,21 @@ class _ScheduleTabState extends State<ScheduleTab> {
                                     title: const Text('하루 종일'),
                                     value: allDay,
                                     onChanged: (value) => setSheetState(() => allDay = value ?? false),
+                                    contentPadding: EdgeInsets.zero,
+                                  ),
+                                  CheckboxListTile(
+                                    title: const Text('반 전체에 공유하기'),
+                                    subtitle: Text(
+                                      _profile?.hasGradeClass != true
+                                          ? '프로필에 학년/반 정보가 없어 학급 공유를 사용할 수 없습니다.'
+                                          : !_canManageClassSharedEvents
+                                              ? '정반장/부반장(또는 관리자/교사) 권한이 필요합니다.'
+                                              : '${_profile!.gradeOrFromStudentId}학년 ${_profile!.classNumOrFromStudentId}반 전체에 보입니다.',
+                                    ),
+                                    value: shareWithClass,
+                                    onChanged: _profile?.hasGradeClass == true && _canManageClassSharedEvents
+                                        ? (value) => setSheetState(() => shareWithClass = value ?? false)
+                                        : null,
                                     contentPadding: EdgeInsets.zero,
                                   ),
                                   _buildDateTimeTile(
@@ -976,35 +1037,59 @@ class _ScheduleTabState extends State<ScheduleTab> {
 
                                       try {
                                         final session = supabase.auth.currentSession;
-                                        final sessionToken = await AuthRepository.instance.getSessionToken();
-
                                         if (session != null) {
-                                          // Supabase Auth 세션이 있는 경우: RLS(auth.uid() = user_id) 기준으로 직접 insert.
-                                          await supabase.from('personal_events').insert({
-                                            'user_id': uid,
-                                            'title': title,
-                                            'description': descController.text.trim().isEmpty
-                                                ? null
-                                                : descController.text.trim(),
-                                            'start_at': start.toIso8601String(),
-                                            'end_at': allDay ? null : end.toIso8601String(),
-                                            'all_day': allDay,
-                                          });
-                                        } else if (sessionToken != null && sessionToken.isNotEmpty) {
-                                          // 세션이 없지만 session_token이 있는 경우: 전용 RPC로 삽입 (profile_session_tokens 기반).
-                                          await supabase.rpc(
-                                            'insert_personal_event_by_token',
-                                            params: {
-                                              'p_session_token': sessionToken,
-                                              'p_title': title,
-                                              'p_description': descController.text.trim().isEmpty
-                                                  ? null
-                                                  : descController.text.trim(),
-                                              'p_start_at': start.toIso8601String(),
-                                              'p_end_at': allDay ? null : end.toIso8601String(),
-                                              'p_all_day': allDay,
-                                            },
-                                          );
+                                          final description = descController.text.trim().isEmpty
+                                              ? null
+                                              : descController.text.trim();
+                                          if (shareWithClass) {
+                                            if (!_canManageClassSharedEvents) {
+                                              if (innerContext.mounted) {
+                                                ScaffoldMessenger.of(innerContext).showSnackBar(
+                                                  const SnackBar(
+                                                    content: Text('학급 공유 일정은 정반장/부반장(또는 관리자/교사)만 추가할 수 있습니다.'),
+                                                    behavior: SnackBarBehavior.floating,
+                                                  ),
+                                                );
+                                              }
+                                              return;
+                                            }
+                                            final profile = _profile;
+                                            final grade = profile?.gradeOrFromStudentId;
+                                            final classNum = profile?.classNumOrFromStudentId;
+                                            if (profile == null || grade == null || classNum == null) {
+                                              if (innerContext.mounted) {
+                                                ScaffoldMessenger.of(innerContext).showSnackBar(
+                                                  const SnackBar(
+                                                    content: Text('학급 공유를 하려면 프로필에 학년/반 정보가 필요합니다.'),
+                                                    behavior: SnackBarBehavior.floating,
+                                                  ),
+                                                );
+                                              }
+                                              return;
+                                            }
+
+                                            await supabase.from('class_events').insert({
+                                              'grade': grade,
+                                              'class_number': classNum,
+                                              'title': title,
+                                              'description': description,
+                                              'start_at': start.toIso8601String(),
+                                              'end_at': allDay ? null : end.toIso8601String(),
+                                              'all_day': allDay,
+                                              'created_by_user_id': uid,
+                                              'created_by_profile_id': profile.id,
+                                            });
+                                          } else {
+                                            // Supabase Auth 세션이 있는 경우: RLS(auth.uid() = user_id) 기준으로 직접 insert.
+                                            await supabase.from('personal_events').insert({
+                                              'user_id': uid,
+                                              'title': title,
+                                              'description': description,
+                                              'start_at': start.toIso8601String(),
+                                              'end_at': allDay ? null : end.toIso8601String(),
+                                              'all_day': allDay,
+                                            });
+                                          }
                                         } else {
                                           if (innerContext.mounted) {
                                             ScaffoldMessenger.of(innerContext).showSnackBar(
@@ -1060,6 +1145,7 @@ class _ScheduleTabState extends State<ScheduleTab> {
                           ),
                         ],
                       ),
+                      ),
                     ),
                   );
                 },
@@ -1075,7 +1161,9 @@ class _ScheduleTabState extends State<ScheduleTab> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: const Text('개인 일정이 추가되었습니다.'),
+              content: Text(
+                shareWithClass ? '학급 공유 일정이 추가되었습니다.' : '개인 일정이 추가되었습니다.',
+              ),
               behavior: SnackBarBehavior.floating,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
@@ -1136,6 +1224,49 @@ class _ScheduleTabState extends State<ScheduleTab> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text('개인 일정이 삭제되었습니다.'),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            margin: const EdgeInsets.only(
+              bottom: 80,
+              left: 16,
+              right: 16,
+            ),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _deleteClassEvent(String id) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('삭제하시겠습니까?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('취소'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.error,
+            ),
+            child: const Text('삭제'),
+          ),
+        ],
+      ),
+    );
+
+    if (ok == true) {
+      await supabase.from('class_events').delete().eq('id', id);
+      _fetch();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('학급 공유 일정이 삭제되었습니다.'),
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(8),

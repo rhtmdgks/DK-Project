@@ -12,6 +12,7 @@ import 'package:myapp/core/widgets/dismiss_keyboard.dart';
 import 'package:myapp/core/widgets/tab_page_header.dart';
 import 'package:myapp/core/widgets/m3_list.dart';
 import 'package:myapp/repositories/content_report_repository.dart';
+import 'package:myapp/repositories/suggestions_repository.dart';
 import 'package:myapp/repositories/user_block_repository.dart';
 import 'package:myapp/services/content_moderation_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -41,8 +42,18 @@ String _formatDate(String? createdAt) {
   try {
     final dt = DateTime.parse(createdAt);
     const months = [
-      '1월', '2월', '3월', '4월', '5월', '6월',
-      '7월', '8월', '9월', '10월', '11월', '12월',
+      '1월',
+      '2월',
+      '3월',
+      '4월',
+      '5월',
+      '6월',
+      '7월',
+      '8월',
+      '9월',
+      '10월',
+      '11월',
+      '12월',
     ];
     return '${months[dt.month - 1]} ${dt.day}일';
   } catch (_) {
@@ -71,6 +82,7 @@ class _SuggestionsTabState extends State<SuggestionsTab>
   AppProfile? _profile;
   final _contentReportRepo = ContentReportRepository();
   final _blockRepo = UserBlockRepository();
+  final _suggestionsRepo = SuggestionsRepository();
 
   @override
   void initState() {
@@ -96,45 +108,36 @@ class _SuggestionsTabState extends State<SuggestionsTab>
 
   Future<void> _startDirectChat() async {
     try {
-      final adminProfiles = await supabase
-          .from('profiles')
-          .select('user_id, full_name')
-          .eq('role', 'admin')
-          .limit(1);
+      final staff = await _suggestionsRepo.fetchStaffChatContact();
+      final adminUserId = staff?['user_id'] as String?;
 
-      if ((adminProfiles as List).isEmpty) {
+      if (adminUserId == null || adminUserId.isEmpty) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('관리자를 찾을 수 없습니다')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('관리자를 찾을 수 없습니다')));
         return;
       }
-
-      final adminProfile = (adminProfiles as List).first as Map<String, dynamic>;
-      final adminUserId = adminProfile['user_id'] as String;
 
       final currentUserId = await AuthRepository.instance.getUserId();
       if (currentUserId == null) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('로그인이 필요합니다')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('로그인이 필요합니다')));
         return;
       }
 
       final result = await supabase.rpc(
         'create_or_get_direct_chat',
-        params: {
-          'p_other_user_id': adminUserId,
-          'p_user_id': currentUserId,
-        },
+        params: {'p_other_user_id': adminUserId, 'p_user_id': currentUserId},
       );
 
       if (result == null) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('채팅방을 생성할 수 없습니다')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('채팅방을 생성할 수 없습니다')));
         return;
       }
 
@@ -142,9 +145,9 @@ class _SuggestionsTabState extends State<SuggestionsTab>
       final roomId = resultMap['room_id'] as String?;
       if (roomId == null) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('채팅방 ID를 가져올 수 없습니다')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('채팅방 ID를 가져올 수 없습니다')));
         return;
       }
 
@@ -152,8 +155,7 @@ class _SuggestionsTabState extends State<SuggestionsTab>
       context.push('${AppRoute.chatList.path}/$roomId');
     } on PostgrestException catch (e) {
       if (!mounted) return;
-      if (e.code == 'P0001' &&
-          e.message.contains('cannot_chat_with_self')) {
+      if (e.code == 'P0001' && e.message.contains('cannot_chat_with_self')) {
         // 관리자 계정이 자기 자신에게 채팅을 시도하는 경우 – 친절한 안내로 대체
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -163,18 +165,14 @@ class _SuggestionsTabState extends State<SuggestionsTab>
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('채팅방을 여는 중 오류가 발생했습니다: ${e.message}'),
-          ),
+          SnackBar(content: Text('채팅방을 여는 중 오류가 발생했습니다: ${e.message}')),
         );
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('채팅방을 여는 중 오류가 발생했습니다: $e'),
-        ),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('채팅방을 여는 중 오류가 발생했습니다: $e')));
     }
   }
 
@@ -198,13 +196,11 @@ class _SuggestionsTabState extends State<SuggestionsTab>
         if (blockedProfileIds.isEmpty) {
           _list = rawList;
         } else {
-          _list = rawList
-              .where((item) {
-                final authorId = item['author_id']?.toString();
-                if (authorId == null) return true;
-                return !blockedProfileIds.contains(authorId);
-              })
-              .toList();
+          _list = rawList.where((item) {
+            final authorId = item['author_id']?.toString();
+            if (authorId == null) return true;
+            return !blockedProfileIds.contains(authorId);
+          }).toList();
         }
         _loading = false;
       });
@@ -256,10 +252,7 @@ class _SuggestionsTabState extends State<SuggestionsTab>
                     Expanded(
                       child: TabBarView(
                         controller: _tabController,
-                        children: [
-                          _buildListBody(),
-                          _buildChatSection(),
-                        ],
+                        children: [_buildListBody(), _buildChatSection()],
                       ),
                     ),
                   ],
@@ -272,7 +265,9 @@ class _SuggestionsTabState extends State<SuggestionsTab>
             ? FloatingActionButton(
                 onPressed: _showAddSuggestionBottomSheet,
                 backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-                foregroundColor: Theme.of(context).colorScheme.onPrimaryContainer,
+                foregroundColor: Theme.of(
+                  context,
+                ).colorScheme.onPrimaryContainer,
                 child: const Icon(Icons.add),
               )
             : null,
@@ -350,8 +345,10 @@ class _SuggestionsTabState extends State<SuggestionsTab>
               ),
               child: Text(
                 '답변 있음',
-                style: AppFonts.scaled(context, AppFonts.captionMedium)
-                    .copyWith(color: AppColors.primaryBlue),
+                style: AppFonts.scaled(
+                  context,
+                  AppFonts.captionMedium,
+                ).copyWith(color: AppColors.primaryBlue),
               ),
             ),
             SizedBox(width: context.rs(6)),
@@ -367,12 +364,18 @@ class _SuggestionsTabState extends State<SuggestionsTab>
             ),
             child: Text(
               statusLabel,
-              style: AppFonts.scaled(context, AppFonts.captionMedium)
-                  .copyWith(color: statusColor),
+              style: AppFonts.scaled(
+                context,
+                AppFonts.captionMedium,
+              ).copyWith(color: statusColor),
             ),
           ),
           SizedBox(width: context.rs(4)),
-          Icon(Icons.chevron_right, size: context.rs(20), color: AppColors.hint),
+          Icon(
+            Icons.chevron_right,
+            size: context.rs(20),
+            color: AppColors.hint,
+          ),
         ],
       ),
       onTap: () async {
@@ -390,8 +393,9 @@ class _SuggestionsTabState extends State<SuggestionsTab>
             ctx,
             title: title.isEmpty ? '(제목 없음)' : title,
             body: fullBody,
-            secondary:
-                dateStr.isNotEmpty ? '$dateStr · $statusLabel' : statusLabel,
+            secondary: dateStr.isNotEmpty
+                ? '$dateStr · $statusLabel'
+                : statusLabel,
           );
           return;
         }
@@ -400,8 +404,9 @@ class _SuggestionsTabState extends State<SuggestionsTab>
           ctx,
           title: title.isEmpty ? '(제목 없음)' : title,
           body: fullBody,
-          secondary:
-              dateStr.isNotEmpty ? '$dateStr · $statusLabel' : statusLabel,
+          secondary: dateStr.isNotEmpty
+              ? '$dateStr · $statusLabel'
+              : statusLabel,
           bodyWidget: _SuggestionDetailBodyWidget(
             suggestionId: suggestionId,
             baseBody: baseBody,
@@ -434,31 +439,14 @@ class _SuggestionsTabState extends State<SuggestionsTab>
             mainAxisSize: MainAxisSize.min,
             children: [
               DropdownButtonFormField<String>(
-                value: selectedReason,
-                decoration: const InputDecoration(
-                  labelText: '사유 선택',
-                ),
+                initialValue: selectedReason,
+                decoration: const InputDecoration(labelText: '사유 선택'),
                 items: const [
-                  DropdownMenuItem(
-                    value: '욕설/비하',
-                    child: Text('욕설/비하'),
-                  ),
-                  DropdownMenuItem(
-                    value: '괴롭힘/따돌림',
-                    child: Text('괴롭힘/따돌림'),
-                  ),
-                  DropdownMenuItem(
-                    value: '스팸',
-                    child: Text('스팸'),
-                  ),
-                  DropdownMenuItem(
-                    value: '불법/위험 행위',
-                    child: Text('불법/위험 행위'),
-                  ),
-                  DropdownMenuItem(
-                    value: '기타',
-                    child: Text('기타 (직접 입력)'),
-                  ),
+                  DropdownMenuItem(value: '욕설/비하', child: Text('욕설/비하')),
+                  DropdownMenuItem(value: '괴롭힘/따돌림', child: Text('괴롭힘/따돌림')),
+                  DropdownMenuItem(value: '스팸', child: Text('스팸')),
+                  DropdownMenuItem(value: '불법/위험 행위', child: Text('불법/위험 행위')),
+                  DropdownMenuItem(value: '기타', child: Text('기타 (직접 입력)')),
                 ],
                 onChanged: (v) {
                   selectedReason = v;
@@ -493,8 +481,7 @@ class _SuggestionsTabState extends State<SuggestionsTab>
 
     final baseReason = selectedReason ?? '기타';
     final extra = controller.text.trim();
-    final reason =
-        extra.isEmpty ? baseReason : '$baseReason - $extra';
+    final reason = extra.isEmpty ? baseReason : '$baseReason - $extra';
 
     try {
       await _contentReportRepo.reportContent(
@@ -502,7 +489,7 @@ class _SuggestionsTabState extends State<SuggestionsTab>
         contentId: contentId,
         reason: reason,
       );
-      if (!mounted) return;
+      if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('신고가 접수되었습니다.'),
@@ -510,7 +497,7 @@ class _SuggestionsTabState extends State<SuggestionsTab>
         ),
       );
     } catch (e) {
-      if (!mounted) return;
+      if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('신고 중 오류가 발생했습니다: $e'),
@@ -555,10 +542,7 @@ class _SuggestionsTabState extends State<SuggestionsTab>
               color: AppColors.primaryBlue,
             ),
             SizedBox(height: context.rh(24)),
-            Text(
-              '채팅하기',
-              style: AppFonts.scaled(context, AppFonts.titleBold),
-            ),
+            Text('채팅하기', style: AppFonts.scaled(context, AppFonts.titleBold)),
             SizedBox(height: context.rh(12)),
             Text(
               '대덕고등학교 학생회와 직접 소통하여 궁금한 것을 물어보세요!',
@@ -635,11 +619,15 @@ class _SuggestionsTabState extends State<SuggestionsTab>
                             children: [
                               Text(
                                 '건의하기',
-                                style: AppFonts.scaled(innerContext, AppFonts.titleBold),
+                                style: AppFonts.scaled(
+                                  innerContext,
+                                  AppFonts.titleBold,
+                                ),
                               ),
                               const Spacer(),
                               IconButton(
-                                onPressed: () => Navigator.of(sheetContext).pop(false),
+                                onPressed: () =>
+                                    Navigator.of(sheetContext).pop(false),
                                 icon: const Icon(Icons.close),
                                 style: IconButton.styleFrom(
                                   foregroundColor: AppColors.textSecondary,
@@ -671,17 +659,29 @@ class _SuggestionsTabState extends State<SuggestionsTab>
                                         .surfaceContainerHighest
                                         .withValues(alpha: 0.5),
                                     border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(AppShapes.radiusSmall),
-                                      borderSide: BorderSide(color: AppColors.border),
+                                      borderRadius: BorderRadius.circular(
+                                        AppShapes.radiusSmall,
+                                      ),
+                                      borderSide: BorderSide(
+                                        color: AppColors.border,
+                                      ),
                                     ),
                                     enabledBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(AppShapes.radiusSmall),
-                                      borderSide: BorderSide(color: AppColors.border),
+                                      borderRadius: BorderRadius.circular(
+                                        AppShapes.radiusSmall,
+                                      ),
+                                      borderSide: BorderSide(
+                                        color: AppColors.border,
+                                      ),
                                     ),
                                     focusedBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(AppShapes.radiusSmall),
+                                      borderRadius: BorderRadius.circular(
+                                        AppShapes.radiusSmall,
+                                      ),
                                       borderSide: BorderSide(
-                                        color: Theme.of(innerContext).colorScheme.primary,
+                                        color: Theme.of(
+                                          innerContext,
+                                        ).colorScheme.primary,
                                         width: 2,
                                       ),
                                     ),
@@ -698,17 +698,29 @@ class _SuggestionsTabState extends State<SuggestionsTab>
                                         .surfaceContainerHighest
                                         .withValues(alpha: 0.5),
                                     border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(AppShapes.radiusSmall),
-                                      borderSide: BorderSide(color: AppColors.border),
+                                      borderRadius: BorderRadius.circular(
+                                        AppShapes.radiusSmall,
+                                      ),
+                                      borderSide: BorderSide(
+                                        color: AppColors.border,
+                                      ),
                                     ),
                                     enabledBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(AppShapes.radiusSmall),
-                                      borderSide: BorderSide(color: AppColors.border),
+                                      borderRadius: BorderRadius.circular(
+                                        AppShapes.radiusSmall,
+                                      ),
+                                      borderSide: BorderSide(
+                                        color: AppColors.border,
+                                      ),
                                     ),
                                     focusedBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(AppShapes.radiusSmall),
+                                      borderRadius: BorderRadius.circular(
+                                        AppShapes.radiusSmall,
+                                      ),
                                       borderSide: BorderSide(
-                                        color: Theme.of(innerContext).colorScheme.primary,
+                                        color: Theme.of(
+                                          innerContext,
+                                        ).colorScheme.primary,
                                         width: 2,
                                       ),
                                     ),
@@ -722,7 +734,9 @@ class _SuggestionsTabState extends State<SuggestionsTab>
                                       child: OutlinedButton(
                                         onPressed: submitting
                                             ? null
-                                            : () => Navigator.of(sheetContext).pop(false),
+                                            : () => Navigator.of(
+                                                sheetContext,
+                                              ).pop(false),
                                         child: const Text('취소'),
                                       ),
                                     ),
@@ -734,20 +748,32 @@ class _SuggestionsTabState extends State<SuggestionsTab>
                                             : () async {
                                                 // 프로필이 아직 없다면 한 번 더 시도
                                                 AppProfile? profile = _profile;
-                                                profile ??=
-                                                    await AuthRepository.instance.getCurrentProfile();
+                                                profile ??= await AuthRepository
+                                                    .instance
+                                                    .getCurrentProfile();
                                                 if (mounted) {
-                                                  setState(() => _profile = profile);
+                                                  setState(
+                                                    () => _profile = profile,
+                                                  );
                                                 }
 
                                                 if (profile == null) {
                                                   if (sheetContext.mounted) {
-                                                    ScaffoldMessenger.of(innerContext).showSnackBar(
+                                                    ScaffoldMessenger.of(
+                                                      innerContext,
+                                                    ).showSnackBar(
                                                       SnackBar(
-                                                        content: const Text('로그인 후 건의를 등록할 수 있습니다.'),
-                                                        behavior: SnackBarBehavior.floating,
+                                                        content: const Text(
+                                                          '로그인 후 건의를 등록할 수 있습니다.',
+                                                        ),
+                                                        behavior:
+                                                            SnackBarBehavior
+                                                                .floating,
                                                         shape: RoundedRectangleBorder(
-                                                          borderRadius: BorderRadius.circular(8),
+                                                          borderRadius:
+                                                              BorderRadius.circular(
+                                                                8,
+                                                              ),
                                                         ),
                                                       ),
                                                     );
@@ -755,16 +781,29 @@ class _SuggestionsTabState extends State<SuggestionsTab>
                                                   return;
                                                 }
 
-                                                final title = titleController.text.trim();
-                                                final bodyText = bodyController.text.trim();
+                                                final title = titleController
+                                                    .text
+                                                    .trim();
+                                                final bodyText = bodyController
+                                                    .text
+                                                    .trim();
                                                 if (title.isEmpty) {
                                                   if (innerContext.mounted) {
-                                                    ScaffoldMessenger.of(innerContext).showSnackBar(
+                                                    ScaffoldMessenger.of(
+                                                      innerContext,
+                                                    ).showSnackBar(
                                                       SnackBar(
-                                                        content: const Text('제목을 입력해 주세요.'),
-                                                        behavior: SnackBarBehavior.floating,
+                                                        content: const Text(
+                                                          '제목을 입력해 주세요.',
+                                                        ),
+                                                        behavior:
+                                                            SnackBarBehavior
+                                                                .floating,
                                                         shape: RoundedRectangleBorder(
-                                                          borderRadius: BorderRadius.circular(8),
+                                                          borderRadius:
+                                                              BorderRadius.circular(
+                                                                8,
+                                                              ),
                                                         ),
                                                       ),
                                                     );
@@ -773,25 +812,33 @@ class _SuggestionsTabState extends State<SuggestionsTab>
                                                 }
 
                                                 // 욕설/불건전 표현 필터
-                                                final moderation = ContentModerationService.checkText(
-                                                  '$title\n$bodyText',
-                                                );
+                                                final moderation =
+                                                    ContentModerationService.checkText(
+                                                      '$title\n$bodyText',
+                                                    );
                                                 if (moderation.hasAbuse) {
                                                   if (innerContext.mounted) {
-                                                    ScaffoldMessenger.of(innerContext).showSnackBar(
+                                                    ScaffoldMessenger.of(
+                                                      innerContext,
+                                                    ).showSnackBar(
                                                       const SnackBar(
                                                         content: Text(
                                                           '부적절한 표현이 포함되어 있어 건의를 등록할 수 없습니다. 표현을 수정해 주세요.',
                                                         ),
-                                                        behavior: SnackBarBehavior.floating,
-                                                        backgroundColor: AppColors.error,
+                                                        behavior:
+                                                            SnackBarBehavior
+                                                                .floating,
+                                                        backgroundColor:
+                                                            AppColors.error,
                                                       ),
                                                     );
                                                   }
                                                   return;
                                                 }
 
-                                                setSheetState(() => submitting = true);
+                                                setSheetState(
+                                                  () => submitting = true,
+                                                );
 
                                                 try {
                                                   try {
@@ -799,146 +846,102 @@ class _SuggestionsTabState extends State<SuggestionsTab>
                                                       'insert_suggestion',
                                                       params: {
                                                         'p_title': title,
-                                                        'p_body': bodyText.isEmpty ? null : bodyText,
+                                                        'p_body':
+                                                            bodyText.isEmpty
+                                                            ? null
+                                                            : bodyText,
                                                       },
                                                     );
                                                   } catch (rpcError) {
-                                                    final msg = rpcError.toString();
-                                                    final isFunctionMissing = msg.contains('insert_suggestion') ||
-                                                        msg.contains('PGRST202') ||
-                                                        msg.contains('Could not find the function');
+                                                    final msg = rpcError
+                                                        .toString();
+                                                    final isFunctionMissing =
+                                                        msg.contains(
+                                                          'insert_suggestion',
+                                                        ) ||
+                                                        msg.contains(
+                                                          'PGRST202',
+                                                        ) ||
+                                                        msg.contains(
+                                                          'Could not find the function',
+                                                        );
                                                     if (isFunctionMissing) {
-                                                      await supabase.from('suggestions').insert({
-                                                        'author_id': profile.id,
-                                                        'title': title,
-                                                        'body': bodyText.isEmpty ? null : bodyText,
-                                                      });
+                                                      await supabase
+                                                          .from('suggestions')
+                                                          .insert({
+                                                            'author_id':
+                                                                profile.id,
+                                                            'title': title,
+                                                            'body':
+                                                                bodyText.isEmpty
+                                                                ? null
+                                                                : bodyText,
+                                                          });
                                                     } else {
                                                       rethrow;
                                                     }
                                                   }
                                                   if (sheetContext.mounted) {
-                                                    Navigator.of(sheetContext).pop(true);
+                                                    Navigator.of(
+                                                      sheetContext,
+                                                    ).pop(true);
                                                   }
                                                 } catch (e) {
-                                                  if (!sheetContext.mounted) return;
-                                                  setSheetState(() => submitting = false);
+                                                  if (!sheetContext.mounted) {
+                                                    return;
+                                                  }
+                                                  setSheetState(
+                                                    () => submitting = false,
+                                                  );
                                                   final msg = e.toString();
-                                                  final isSessionError = msg.contains('P0001') ||
-                                                      msg.contains('로그인 세션이 없습니다') ||
-                                                      msg.contains('row-level security') ||
+                                                  final isSessionError =
+                                                      msg.contains('P0001') ||
+                                                      msg.contains(
+                                                        '로그인 세션이 없습니다',
+                                                      ) ||
+                                                      msg.contains(
+                                                        'row-level security',
+                                                      ) ||
                                                       msg.contains('42501');
                                                   if (isSessionError) {
-                                                    final bodyForRpc = bodyController.text.trim();
-                                                    // 재인증 없이: 저장된 세션 토큰으로 먼저 시도
-                                                    final sessionToken = await AuthRepository.instance.getSessionToken();
-                                                    if (sessionToken != null && sessionToken.isNotEmpty) {
-                                                      try {
-                                                        await supabase.rpc(
-                                                          'insert_suggestion_by_token',
-                                                          params: {
-                                                            'p_token': sessionToken,
-                                                            'p_title': title,
-                                                            'p_body': bodyForRpc.isEmpty ? null : bodyForRpc,
-                                                          },
-                                                        );
-                                                        if (sheetContext.mounted) {
-                                                          Navigator.of(sheetContext).pop(true);
-                                                        }
-                                                        return;
-                                                      } catch (_) {
-                                                        // 토큰 만료/미적용 등 → 비밀번호 다이얼로그로 폴백
-                                                      }
-                                                    }
-                                                    if (!sheetContext.mounted) return;
-                                                    final password = await showDialog<String>(
-                                                      context: innerContext,
-                                                      barrierDismissible: false,
-                                                      builder: (dialogContext) {
-                                                        final controller = TextEditingController();
-                                                        return AlertDialog(
-                                                          title: const Text('인증 필요'),
-                                                          content: Column(
-                                                            mainAxisSize: MainAxisSize.min,
-                                                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                                                            children: [
-                                                              const Text(
-                                                                '건의를 등록하려면 비밀번호를 입력해 주세요.',
-                                                                style: TextStyle(fontSize: 14),
-                                                              ),
-                                                              const SizedBox(height: 16),
-                                                              TextField(
-                                                                controller: controller,
-                                                                obscureText: true,
-                                                                decoration: const InputDecoration(
-                                                                  labelText: '비밀번호',
-                                                                  border: OutlineInputBorder(),
-                                                                ),
-                                                              ),
-                                                            ],
-                                                          ),
-                                                          actions: [
-                                                            TextButton(
-                                                              onPressed: () => Navigator.of(dialogContext).pop(),
-                                                              child: const Text('취소'),
-                                                            ),
-                                                            FilledButton(
-                                                              onPressed: () {
-                                                                final pwd = controller.text;
-                                                                Navigator.of(dialogContext).pop(pwd.isEmpty ? null : pwd);
-                                                              },
-                                                              child: const Text('확인'),
-                                                            ),
-                                                          ],
-                                                        );
-                                                      },
-                                                    );
-                                                    if (password == null || !sheetContext.mounted) return;
-                                                    final pwd = password;
-                                                    final studentId = profile.studentId;
-                                                    WidgetsBinding.instance.addPostFrameCallback((_) async {
-                                                      if (!sheetContext.mounted) return;
-                                                      try {
-                                                        await supabase.rpc(
-                                                          'insert_suggestion_by_credentials',
-                                                          params: {
-                                                            'p_student_id': studentId,
-                                                            'p_password': pwd,
-                                                            'p_title': title,
-                                                            'p_body': bodyForRpc.isEmpty ? null : bodyForRpc,
-                                                          },
-                                                        );
-                                                        if (!sheetContext.mounted) return;
-                                                        Navigator.of(sheetContext).pop(true);
-                                                      } catch (credError) {
-                                                        if (!sheetContext.mounted) return;
-                                                        final ctx = innerContext;
-                                                        if (ctx.mounted) {
-                                                          ScaffoldMessenger.of(ctx).showSnackBar(
-                                                            SnackBar(
-                                                              content: Text(
-                                                                credError.toString().contains('맞지 않습니다')
-                                                                    ? '비밀번호가 맞지 않습니다.'
-                                                                    : '등록 실패: $credError',
-                                                              ),
-                                                              behavior: SnackBarBehavior.floating,
-                                                              backgroundColor: AppColors.error,
-                                                              shape: RoundedRectangleBorder(
-                                                                borderRadius: BorderRadius.circular(8),
-                                                              ),
-                                                            ),
-                                                          );
-                                                        }
-                                                      }
-                                                    });
-                                                  } else {
-                                                    ScaffoldMessenger.of(innerContext).showSnackBar(
+                                                    ScaffoldMessenger.of(
+                                                      innerContext,
+                                                    ).showSnackBar(
                                                       SnackBar(
-                                                        content: Text('등록 중 오류가 발생했습니다: $e'),
-                                                        behavior: SnackBarBehavior.floating,
-                                                        backgroundColor: AppColors.error,
+                                                        content: const Text(
+                                                          '세션이 만료되었습니다. 다시 로그인해 주세요.',
+                                                        ),
+                                                        behavior:
+                                                            SnackBarBehavior
+                                                                .floating,
+                                                        backgroundColor:
+                                                            AppColors.error,
                                                         shape: RoundedRectangleBorder(
-                                                          borderRadius: BorderRadius.circular(8),
+                                                          borderRadius:
+                                                              BorderRadius.circular(
+                                                                8,
+                                                              ),
+                                                        ),
+                                                      ),
+                                                    );
+                                                  } else {
+                                                    ScaffoldMessenger.of(
+                                                      innerContext,
+                                                    ).showSnackBar(
+                                                      SnackBar(
+                                                        content: Text(
+                                                          '등록 중 오류가 발생했습니다: $e',
+                                                        ),
+                                                        behavior:
+                                                            SnackBarBehavior
+                                                                .floating,
+                                                        backgroundColor:
+                                                            AppColors.error,
+                                                        shape: RoundedRectangleBorder(
+                                                          borderRadius:
+                                                              BorderRadius.circular(
+                                                                8,
+                                                              ),
                                                         ),
                                                       ),
                                                     );
@@ -949,7 +952,10 @@ class _SuggestionsTabState extends State<SuggestionsTab>
                                             ? const SizedBox(
                                                 height: 20,
                                                 width: 20,
-                                                child: CircularProgressIndicator(strokeWidth: 2),
+                                                child:
+                                                    CircularProgressIndicator(
+                                                      strokeWidth: 2,
+                                                    ),
                                               )
                                             : const Text('등록하기'),
                                       ),
@@ -994,10 +1000,7 @@ class _SuggestionsTabState extends State<SuggestionsTab>
 
 /// 질문하기(건의 등록) 폼. 카드 스타일, Supabase 연동.
 class _AddSuggestionForm extends StatefulWidget {
-  const _AddSuggestionForm({
-    required this.profile,
-    required this.onSubmitted,
-  });
+  const _AddSuggestionForm({required this.profile, required this.onSubmitted});
 
   final AppProfile? profile;
   final VoidCallback onSubmitted;
@@ -1040,23 +1043,15 @@ class _AddSuggestionFormState extends State<_AddSuggestionForm> {
           ),
           behavior: SnackBarBehavior.floating,
           backgroundColor: AppColors.error,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-          ),
-          margin: const EdgeInsets.only(
-            bottom: 80,
-            left: 16,
-            right: 16,
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          margin: const EdgeInsets.only(bottom: 80, left: 16, right: 16),
         ),
       );
       return;
     }
 
     final bodyText = _bodyController.text.trim();
-    final moderation = ContentModerationService.checkText(
-      '$title\n$bodyText',
-    );
+    final moderation = ContentModerationService.checkText('$title\n$bodyText');
     if (moderation.hasAbuse) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1067,14 +1062,8 @@ class _AddSuggestionFormState extends State<_AddSuggestionForm> {
           ),
           behavior: SnackBarBehavior.floating,
           backgroundColor: AppColors.error,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-          ),
-          margin: const EdgeInsets.only(
-            bottom: 80,
-            left: 16,
-            right: 16,
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          margin: const EdgeInsets.only(bottom: 80, left: 16, right: 16),
         ),
       );
       return;
@@ -1097,7 +1086,8 @@ class _AddSuggestionFormState extends State<_AddSuggestionForm> {
         );
       } catch (rpcError) {
         final msg = rpcError.toString();
-        final isFunctionMissing = msg.contains('insert_suggestion') ||
+        final isFunctionMissing =
+            msg.contains('insert_suggestion') ||
             msg.contains('PGRST202') ||
             msg.contains('Could not find the function');
         if (isFunctionMissing) {
@@ -1123,14 +1113,8 @@ class _AddSuggestionFormState extends State<_AddSuggestionForm> {
           ),
           behavior: SnackBarBehavior.floating,
           backgroundColor: AppColors.success,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-          ),
-          margin: const EdgeInsets.only(
-            bottom: 80,
-            left: 16,
-            right: 16,
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          margin: const EdgeInsets.only(bottom: 80, left: 16, right: 16),
         ),
       );
     } catch (e) {
@@ -1140,7 +1124,8 @@ class _AddSuggestionFormState extends State<_AddSuggestionForm> {
         _submitting = false;
       });
       final msg = e.toString();
-      final isSessionError = msg.contains('P0001') ||
+      final isSessionError =
+          msg.contains('P0001') ||
           msg.contains('로그인 세션이 없습니다') ||
           msg.contains('row-level security') ||
           msg.contains('42501');
@@ -1153,15 +1138,9 @@ class _AddSuggestionFormState extends State<_AddSuggestionForm> {
             style: const TextStyle(color: AppColors.white),
           ),
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           backgroundColor: AppColors.error,
-          margin: const EdgeInsets.only(
-            bottom: 80,
-            left: 16,
-            right: 16,
-          ),
+          margin: const EdgeInsets.only(bottom: 80, left: 16, right: 16),
         ),
       );
     }
@@ -1243,8 +1222,10 @@ class _AddSuggestionFormState extends State<_AddSuggestionForm> {
             SizedBox(height: context.rh(8)),
             Text(
               _error!,
-              style: AppFonts.scaled(context, AppFonts.smallRegular)
-                  .copyWith(color: AppColors.error),
+              style: AppFonts.scaled(
+                context,
+                AppFonts.smallRegular,
+              ).copyWith(color: AppColors.error),
             ),
           ],
           SizedBox(height: context.rh(20)),
@@ -1258,8 +1239,10 @@ class _AddSuggestionFormState extends State<_AddSuggestionForm> {
                   ? const CupertinoActivityIndicator(color: AppColors.white)
                   : Text(
                       '등록하기',
-                      style: AppFonts.scaled(context, AppFonts.bodyMedium)
-                          .copyWith(color: AppColors.white),
+                      style: AppFonts.scaled(
+                        context,
+                        AppFonts.bodyMedium,
+                      ).copyWith(color: AppColors.white),
                     ),
             ),
           ),
@@ -1290,7 +1273,8 @@ class _SuggestionDetailBodyWidget extends StatefulWidget {
       _SuggestionDetailBodyWidgetState();
 }
 
-class _SuggestionDetailBodyWidgetState extends State<_SuggestionDetailBodyWidget> {
+class _SuggestionDetailBodyWidgetState
+    extends State<_SuggestionDetailBodyWidget> {
   List<Map<String, dynamic>> _comments = [];
   final Set<String> _unlockedIds = {};
   bool _loading = true;
@@ -1320,13 +1304,11 @@ class _SuggestionDetailBodyWidgetState extends State<_SuggestionDetailBodyWidget
         if (blockedProfileIds.isEmpty) {
           _comments = raw;
         } else {
-          _comments = raw
-              .where((c) {
-                final authorId = c['author_id']?.toString();
-                if (authorId == null) return true;
-                return !blockedProfileIds.contains(authorId);
-              })
-              .toList();
+          _comments = raw.where((c) {
+            final authorId = c['author_id']?.toString();
+            if (authorId == null) return true;
+            return !blockedProfileIds.contains(authorId);
+          }).toList();
         }
         _loading = false;
       });
@@ -1373,9 +1355,9 @@ class _SuggestionDetailBodyWidgetState extends State<_SuggestionDetailBodyWidget
     if (ok == true && mounted && enteredPassword == storedPassword) {
       setState(() => _unlockedIds.add(id));
     } else if (ok == true && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('비밀번호가 맞지 않습니다.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('비밀번호가 맞지 않습니다.')));
     }
   }
 
@@ -1465,25 +1447,25 @@ class _SuggestionDetailBodyWidgetState extends State<_SuggestionDetailBodyWidget
                             onPressed: submitting
                                 ? null
                                 : () async {
-                                    final text =
-                                        contentController.text.trim();
+                                    final text = contentController.text.trim();
                                     if (text.isEmpty) {
                                       ScaffoldMessenger.of(
                                         innerContext,
                                       ).showSnackBar(
                                         const SnackBar(
-                                          content: Text(
-                                            '댓글 내용을 입력하세요.',
-                                          ),
+                                          content: Text('댓글 내용을 입력하세요.'),
                                         ),
                                       );
                                       return;
                                     }
                                     final moderation =
-                                        ContentModerationService.checkText(text);
+                                        ContentModerationService.checkText(
+                                          text,
+                                        );
                                     if (moderation.hasAbuse) {
-                                      ScaffoldMessenger.of(innerContext)
-                                          .showSnackBar(
+                                      ScaffoldMessenger.of(
+                                        innerContext,
+                                      ).showSnackBar(
                                         const SnackBar(
                                           content: Text(
                                             '부적절한 표현이 포함되어 있어 댓글을 등록할 수 없습니다. 표현을 수정해 주세요.',
@@ -1492,17 +1474,14 @@ class _SuggestionDetailBodyWidgetState extends State<_SuggestionDetailBodyWidget
                                       );
                                       return;
                                     }
-                                    final profile =
-                                        await getCurrentProfile();
+                                    final profile = await getCurrentProfile();
                                     if (profile == null) {
                                       if (innerContext.mounted) {
                                         ScaffoldMessenger.of(
                                           innerContext,
                                         ).showSnackBar(
                                           const SnackBar(
-                                            content: Text(
-                                              '로그인이 필요합니다.',
-                                            ),
+                                            content: Text('로그인이 필요합니다.'),
                                           ),
                                         );
                                       }
@@ -1513,31 +1492,29 @@ class _SuggestionDetailBodyWidgetState extends State<_SuggestionDetailBodyWidget
                                       await supabase
                                           .from('suggestion_comments')
                                           .insert({
-                                        'suggestion_id': widget.suggestionId,
-                                        'author_id': profile.id,
-                                        'content': text,
-                                        'is_private': isPrivate,
-                                        if (isPrivate &&
-                                            passwordController
-                                                .text
-                                                .trim()
-                                                .isNotEmpty)
-                                          'password': passwordController.text
-                                              .trim(),
-                                      });
+                                            'suggestion_id':
+                                                widget.suggestionId,
+                                            'author_id': profile.id,
+                                            'content': text,
+                                            'is_private': isPrivate,
+                                            if (isPrivate &&
+                                                passwordController.text
+                                                    .trim()
+                                                    .isNotEmpty)
+                                              'password': passwordController
+                                                  .text
+                                                  .trim(),
+                                          });
                                       if (sheetContext.mounted) {
                                         Navigator.of(sheetContext).pop(true);
                                       }
                                     } catch (e) {
                                       if (innerContext.mounted) {
-                                        setSheetState(
-                                            () => submitting = false);
+                                        setSheetState(() => submitting = false);
                                         ScaffoldMessenger.of(
                                           innerContext,
                                         ).showSnackBar(
-                                          SnackBar(
-                                            content: Text('등록 실패: $e'),
-                                          ),
+                                          SnackBar(content: Text('등록 실패: $e')),
                                         );
                                       }
                                     }
@@ -1546,8 +1523,7 @@ class _SuggestionDetailBodyWidgetState extends State<_SuggestionDetailBodyWidget
                                 ? const SizedBox(
                                     height: 20,
                                     width: 20,
-                                    child:
-                                        CircularProgressIndicator(
+                                    child: CircularProgressIndicator(
                                       strokeWidth: 2,
                                     ),
                                   )
@@ -1569,218 +1545,230 @@ class _SuggestionDetailBodyWidgetState extends State<_SuggestionDetailBodyWidget
   @override
   Widget build(BuildContext context) {
     final ctx = context;
-    return IntrinsicHeight(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '내용',
-                      style: AppFonts.scaled(ctx, AppFonts.captionMedium)
-                          .copyWith(color: AppColors.textSecondary),
-                    ),
-                    SizedBox(height: ctx.rh(4)),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        TextButton(
-                          onPressed: widget.onReportSuggestion,
-                          child: const Text('신고'),
-                        ),
-                        if (widget.onBlockAuthor != null)
-                          TextButton(
-                            onPressed: widget.onBlockAuthor,
-                            child: const Text('작성자 차단'),
-                          ),
-                      ],
-                    ),
-                  ],
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _buildSectionHeader(
+          ctx,
+          title: '내용',
+          trailing: PopupMenuButton<String>(
+            icon: const Icon(Icons.more_horiz),
+            onSelected: (value) {
+              if (value == 'report') {
+                widget.onReportSuggestion();
+                return;
+              }
+              if (value == 'block') {
+                widget.onBlockAuthor?.call();
+              }
+            },
+            itemBuilder: (menuContext) => [
+              const PopupMenuItem<String>(value: 'report', child: Text('신고')),
+              if (widget.onBlockAuthor != null)
+                const PopupMenuItem<String>(
+                  value: 'block',
+                  child: Text('작성자 차단'),
                 ),
-                SizedBox(height: ctx.rh(8)),
-                Container(
-                  padding: EdgeInsets.all(ctx.rs(12)),
-                  decoration: BoxDecoration(
-                    color: AppColors.background,
-                    borderRadius:
-                        BorderRadius.circular(AppShapes.radiusSmall),
-                    border: Border.all(color: AppColors.borderLight),
-                  ),
-                  child: Text(
-                    widget.baseBody,
-                    style: AppFonts.scaled(ctx, AppFonts.bodyRegular)
-                        .copyWith(color: AppColors.textPrimary),
-                  ),
-                ),
-                if (widget.adminComment.isNotEmpty) ...[
-                  SizedBox(height: ctx.rh(16)),
-                  Text(
-                    '관리자 댓글',
-                    style: AppFonts.scaled(ctx, AppFonts.captionMedium)
-                        .copyWith(color: AppColors.textSecondary),
-                  ),
-                  SizedBox(height: ctx.rh(8)),
-                  Container(
-                    padding: EdgeInsets.all(ctx.rs(12)),
-                    decoration: BoxDecoration(
-                      color: AppColors.primaryBlue.withValues(alpha: 0.06),
-                      borderRadius: BorderRadius.circular(
-                          AppShapes.radiusSmall),
-                      border: Border.all(
-                          color: AppColors.primaryBlueLight),
-                    ),
-                    child: Text(
-                      widget.adminComment,
-                      style: AppFonts.scaled(ctx, AppFonts.bodyRegular)
-                          .copyWith(color: AppColors.primaryBlue),
-                    ),
-                  ),
-                ],
-              ],
+            ],
+          ),
+        ),
+        SizedBox(height: ctx.rh(8)),
+        Container(
+          width: double.infinity,
+          padding: EdgeInsets.all(ctx.rs(12)),
+          decoration: BoxDecoration(
+            color: AppColors.background,
+            borderRadius: BorderRadius.circular(AppShapes.radiusSmall),
+            border: Border.all(color: AppColors.borderLight),
+          ),
+          child: Text(
+            widget.baseBody,
+            style: AppFonts.scaled(
+              ctx,
+              AppFonts.bodyRegular,
+            ).copyWith(color: AppColors.textPrimary),
+          ),
+        ),
+        if (widget.adminComment.isNotEmpty) ...[
+          SizedBox(height: ctx.rh(16)),
+          _buildSectionHeader(ctx, title: '관리자 댓글'),
+          SizedBox(height: ctx.rh(8)),
+          Container(
+            width: double.infinity,
+            padding: EdgeInsets.all(ctx.rs(12)),
+            decoration: BoxDecoration(
+              color: AppColors.primaryBlue.withValues(alpha: 0.06),
+              borderRadius: BorderRadius.circular(AppShapes.radiusSmall),
+              border: Border.all(color: AppColors.primaryBlueLight),
             ),
-          ),
-          SizedBox(width: ctx.rs(16)),
-          VerticalDivider(
-            width: 1,
-            thickness: 1,
-            color: AppColors.borderLight,
-          ),
-          SizedBox(width: ctx.rs(16)),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      '댓글',
-                      style: AppFonts.scaled(ctx, AppFonts.captionMedium)
-                          .copyWith(color: AppColors.textSecondary),
-                    ),
-                    TextButton.icon(
-                      onPressed: _loading
-                          ? null
-                          : () async {
-                              final added =
-                                  await _showAddCommentSheet();
-                              if (added == true && mounted) {
-                                _loadComments();
-                              }
-                            },
-                      icon: const Icon(Icons.add, size: 18),
-                      label: const Text('댓글 작성'),
-                    ),
-                  ],
-                ),
-                SizedBox(height: ctx.rh(8)),
-                if (_loading)
-                  const Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(16),
-                      child: CircularProgressIndicator(),
-                    ),
-                  )
-                else if (_comments.isEmpty)
-                  Text(
-                    '등록된 댓글이 없습니다.',
-                    style: AppFonts.scaled(ctx, AppFonts.smallRegular)
-                        .copyWith(color: AppColors.hint),
-                  )
-                else
-                  ..._comments.map((c) {
-                    final id = c['id'] as String?;
-                    final content = (c['content'] ??
-                            c['body'] ??
-                            c['comment'] ??
-                            '')
-                        .toString();
-                    final isPrivate =
-                        c['is_private'] == true || c['is_private'] == 'true';
-                    final unlocked =
-                        id != null && _unlockedIds.contains(id);
-                    final authorId = c['author_id']?.toString();
-
-                    return Padding(
-                      padding: EdgeInsets.only(bottom: ctx.rh(10)),
-                      child: Container(
-                        padding: EdgeInsets.all(ctx.rs(10)),
-                        decoration: BoxDecoration(
-                          color: AppColors.surfaceContainerLowest,
-                          borderRadius: BorderRadius.circular(
-                              AppShapes.radiusSmall),
-                          border: Border.all(
-                              color: AppColors.borderLight),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            if (isPrivate && !unlocked)
-                              InkWell(
-                                onTap: () => _showUnlockDialog(c),
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      Icons.lock_outline,
-                                      size: ctx.rs(16),
-                                      color: AppColors.textSecondary,
-                                    ),
-                                    SizedBox(width: ctx.rs(6)),
-                                    Expanded(
-                                      child: Text(
-                                        '비공개 댓글입니다. 탭하여 비밀번호 입력',
-                                        style: AppFonts.scaled(
-                                          ctx,
-                                          AppFonts.smallRegular,
-                                        ).copyWith(
-                                          color: AppColors.textSecondary,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              )
-                            else
-                              Text(
-                                content.isEmpty ? '(내용 없음)' : content,
-                                style: AppFonts.scaled(
-                                  ctx,
-                                  AppFonts.smallRegular,
-                                ).copyWith(color: AppColors.textPrimary),
-                              ),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.end,
-                              children: [
-                                TextButton(
-                                  onPressed: id == null
-                                      ? null
-                                      : () => _reportComment(id),
-                                  child: const Text('신고'),
-                                ),
-                                if (authorId != null)
-                                  TextButton(
-                                    onPressed: () =>
-                                        _blockAuthor(authorId),
-                                    child: const Text('작성자 차단'),
-                                  ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  }),
-              ],
+            child: Text(
+              widget.adminComment,
+              style: AppFonts.scaled(
+                ctx,
+                AppFonts.bodyRegular,
+              ).copyWith(color: AppColors.primaryBlue),
             ),
           ),
         ],
+        SizedBox(height: ctx.rh(20)),
+        Divider(height: 1, color: AppColors.borderLight),
+        SizedBox(height: ctx.rh(12)),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                '댓글',
+                style: AppFonts.scaled(
+                  ctx,
+                  AppFonts.captionMedium,
+                ).copyWith(color: AppColors.textSecondary),
+              ),
+            ),
+            TextButton.icon(
+              onPressed: _loading
+                  ? null
+                  : () async {
+                      final added = await _showAddCommentSheet();
+                      if (added == true && mounted) {
+                        _loadComments();
+                      }
+                    },
+              icon: const Icon(Icons.add, size: 18),
+              label: const Text('댓글 작성'),
+            ),
+          ],
+        ),
+        SizedBox(height: ctx.rh(8)),
+        if (_loading)
+          const Center(
+            child: Padding(
+              padding: EdgeInsets.all(16),
+              child: CircularProgressIndicator(),
+            ),
+          )
+        else if (_comments.isEmpty)
+          Padding(
+            padding: EdgeInsets.symmetric(vertical: ctx.rh(8)),
+            child: Text(
+              '등록된 댓글이 없습니다.',
+              style: AppFonts.scaled(
+                ctx,
+                AppFonts.smallRegular,
+              ).copyWith(color: AppColors.hint),
+            ),
+          )
+        else
+          ..._comments.map((c) => _buildCommentCard(ctx, c)),
+      ],
+    );
+  }
+
+  Widget _buildSectionHeader(
+    BuildContext context, {
+    required String title,
+    Widget? trailing,
+  }) {
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            title,
+            style: AppFonts.scaled(
+              context,
+              AppFonts.captionMedium,
+            ).copyWith(color: AppColors.textSecondary),
+          ),
+        ),
+        if (trailing != null) trailing,
+      ],
+    );
+  }
+
+  Widget _buildCommentCard(BuildContext context, Map<String, dynamic> comment) {
+    final id = comment['id'] as String?;
+    final content =
+        (comment['content'] ?? comment['body'] ?? comment['comment'] ?? '')
+            .toString();
+    final isPrivate =
+        comment['is_private'] == true || comment['is_private'] == 'true';
+    final unlocked = id != null && _unlockedIds.contains(id);
+    final authorId = comment['author_id']?.toString();
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: context.rh(10)),
+      child: Container(
+        width: double.infinity,
+        padding: EdgeInsets.all(context.rs(10)),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceContainerLowest,
+          borderRadius: BorderRadius.circular(AppShapes.radiusSmall),
+          border: Border.all(color: AppColors.borderLight),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: isPrivate && !unlocked
+                  ? InkWell(
+                      onTap: () => _showUnlockDialog(comment),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(
+                            Icons.lock_outline,
+                            size: context.rs(16),
+                            color: AppColors.textSecondary,
+                          ),
+                          SizedBox(width: context.rs(6)),
+                          Expanded(
+                            child: Text(
+                              '비공개 댓글입니다. 탭하여 비밀번호 입력',
+                              style: AppFonts.scaled(
+                                context,
+                                AppFonts.smallRegular,
+                              ).copyWith(color: AppColors.textSecondary),
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  : Text(
+                      content.isEmpty ? '(내용 없음)' : content,
+                      style: AppFonts.scaled(
+                        context,
+                        AppFonts.smallRegular,
+                      ).copyWith(color: AppColors.textPrimary),
+                    ),
+            ),
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.more_horiz),
+              onSelected: (value) {
+                if (value == 'report') {
+                  if (id != null) {
+                    _reportComment(id);
+                  }
+                  return;
+                }
+                if (value == 'block' && authorId != null) {
+                  _blockAuthor(authorId);
+                }
+              },
+              itemBuilder: (menuContext) => [
+                if (id != null)
+                  const PopupMenuItem<String>(
+                    value: 'report',
+                    child: Text('신고'),
+                  ),
+                if (authorId != null)
+                  const PopupMenuItem<String>(
+                    value: 'block',
+                    child: Text('작성자 차단'),
+                  ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1847,31 +1835,14 @@ class _SuggestionDetailBodyWidgetState extends State<_SuggestionDetailBodyWidget
             mainAxisSize: MainAxisSize.min,
             children: [
               DropdownButtonFormField<String>(
-                value: selectedReason,
-                decoration: const InputDecoration(
-                  labelText: '사유 선택',
-                ),
+                initialValue: selectedReason,
+                decoration: const InputDecoration(labelText: '사유 선택'),
                 items: const [
-                  DropdownMenuItem(
-                    value: '욕설/비하',
-                    child: Text('욕설/비하'),
-                  ),
-                  DropdownMenuItem(
-                    value: '괴롭힘/따돌림',
-                    child: Text('괴롭힘/따돌림'),
-                  ),
-                  DropdownMenuItem(
-                    value: '스팸',
-                    child: Text('스팸'),
-                  ),
-                  DropdownMenuItem(
-                    value: '불법/위험 행위',
-                    child: Text('불법/위험 행위'),
-                  ),
-                  DropdownMenuItem(
-                    value: '기타',
-                    child: Text('기타 (직접 입력)'),
-                  ),
+                  DropdownMenuItem(value: '욕설/비하', child: Text('욕설/비하')),
+                  DropdownMenuItem(value: '괴롭힘/따돌림', child: Text('괴롭힘/따돌림')),
+                  DropdownMenuItem(value: '스팸', child: Text('스팸')),
+                  DropdownMenuItem(value: '불법/위험 행위', child: Text('불법/위험 행위')),
+                  DropdownMenuItem(value: '기타', child: Text('기타 (직접 입력)')),
                 ],
                 onChanged: (v) {
                   selectedReason = v;

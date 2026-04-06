@@ -23,7 +23,25 @@ class ScheduleRepository {
         .select()
         .eq('user_id', userId)
         .order('start_at', ascending: true);
-    return List<Map<String, dynamic>>.from(res as List);
+    return List<Map<String, dynamic>>.from(
+      res as List,
+    ).map((item) => {...item, 'event_scope': 'personal'}).toList();
+  }
+
+  /// 특정 학년/반의 학급 공유 일정 목록.
+  Future<List<Map<String, dynamic>>> fetchClassEvents({
+    required int grade,
+    required int classNumber,
+  }) async {
+    final res = await _client
+        .from('class_events')
+        .select()
+        .eq('grade', grade)
+        .eq('class_number', classNumber)
+        .order('start_at', ascending: true);
+    return List<Map<String, dynamic>>.from(
+      res as List,
+    ).map((item) => {...item, 'event_scope': 'class'}).toList();
   }
 
   /// NEIS 학사일정 Edge Function 호출.
@@ -39,13 +57,15 @@ class ScheduleRepository {
     final toYmd =
         '${lastDay.year}${lastDay.month.toString().padLeft(2, '0')}${lastDay.day.toString().padLeft(2, '0')}';
 
-    final neisRes = await _client.functions.invoke(
-      'neis_academic_calendar',
-      queryParameters: {'from': fromYmd, 'to': toYmd},
-    ).timeout(
-      const Duration(seconds: 15),
-      onTimeout: () => throw Exception('학사일정 요청 시간 초과'),
-    );
+    final neisRes = await _client.functions
+        .invoke(
+          'neis_academic_calendar',
+          queryParameters: {'from': fromYmd, 'to': toYmd},
+        )
+        .timeout(
+          const Duration(seconds: 15),
+          onTimeout: () => throw Exception('학사일정 요청 시간 초과'),
+        );
 
     if (neisRes.status != 200 || neisRes.data is! Map<String, dynamic>) {
       return [];
@@ -119,8 +139,38 @@ class ScheduleRepository {
     });
   }
 
+  /// 학급 공유 일정 추가.
+  Future<void> addClassEvent({
+    required int grade,
+    required int classNumber,
+    required String title,
+    String? description,
+    required String startAt,
+    String? endAt,
+    required bool allDay,
+    required String createdByUserId,
+    required String createdByProfileId,
+  }) async {
+    await _client.from('class_events').insert({
+      'grade': grade,
+      'class_number': classNumber,
+      'title': title,
+      'description': description,
+      'start_at': startAt,
+      'end_at': endAt,
+      'all_day': allDay,
+      'created_by_user_id': createdByUserId,
+      'created_by_profile_id': createdByProfileId,
+    });
+  }
+
   /// 개인 일정 삭제.
   Future<void> deletePersonalEvent(String id) async {
     await _client.from('personal_events').delete().eq('id', id);
+  }
+
+  /// 학급 공유 일정 삭제.
+  Future<void> deleteClassEvent(String id) async {
+    await _client.from('class_events').delete().eq('id', id);
   }
 }

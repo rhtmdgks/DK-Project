@@ -60,6 +60,6 @@ class SuggestionsViewModel extends ChangeNotifier {
   }
 
   Future<Map<String, dynamic>?> fetchAdminProfile() async {
-    return _repo.fetchProfileByRole('admin');
+    return _repo.fetchStaffChatContact();
   }
 }

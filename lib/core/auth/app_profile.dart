@@ -14,6 +14,7 @@ class AppProfile {
     this.numberInClass,
     this.teacherSubjects,
     this.teacherRoles,
+    this.classLeaderRole,
   });
 
   final String id;
@@ -33,6 +34,8 @@ class AppProfile {
   final List<String>? teacherSubjects;
   /// 교사 담당 역할 리스트 (소속 반, 교무부장 등).
   final List<String>? teacherRoles;
+  /// 학급 리더 역할 (정반장/부반장).
+  final String? classLeaderRole;
 
   factory AppProfile.fromJson(Map<String, dynamic> json) {
     return AppProfile(
@@ -49,6 +52,9 @@ class AppProfile {
           _intOrNull(json['student_number']),
       teacherSubjects: _stringListFromJson(json['teacher_subjects']),
       teacherRoles: _stringListFromJson(json['teacher_roles']),
+      classLeaderRole: (json['class_leader_role'] as String?)?.trim().isEmpty == true
+          ? null
+          : (json['class_leader_role'] as String?),
     );
   }
 
@@ -74,6 +80,8 @@ class AppProfile {
       classNum ?? _parseGradeClassNumber(studentId).$2;
   int? get numberInClassOrFromStudentId =>
       numberInClass ?? _parseGradeClassNumber(studentId).$3;
+  bool get hasGradeClass =>
+      gradeOrFromStudentId != null && classNumOrFromStudentId != null;
 
   /// 학번 5자리 규칙: G(1) + 반(2) + 번(2) → 10201 = 1학년 2반 1번, 11002 = 1학년 10반 2번.
   static (int?, int?, int?) _parseGradeClassNumber(String s) {
@@ -88,4 +96,7 @@ class AppProfile {
   bool get isPrivileged => role == 'council' || role == 'admin';
 
   bool get isTeacher => role == 'teacher';
+  bool get isClassPresident => classLeaderRole == 'president';
+  bool get isClassVicePresident => classLeaderRole == 'vice_president';
+  bool get canManageClassResources => isClassPresident || isClassVicePresident || role == 'admin' || role == 'teacher';
 }

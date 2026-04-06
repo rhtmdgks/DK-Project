@@ -6,8 +6,9 @@
 - **토큰 발급**: `FirebaseMessaging.instance.getToken()` (iOS는 그 전에 `requestPermission()` 호출)
 - **저장 경로**: Supabase 직접 저장이 아니라 **Edge Function `register-fcm-token`** 호출
   - URL: `{SUPABASE_URL}/functions/v1/register-fcm-token`
-  - 헤더: `X-FCM-Register-Secret` (env와 일치해야 함)
-  - Body: `action`, `user_id`, `token`, `grade`, `class_number`, `platform`(ios|android)
+  - 헤더: `Authorization: Bearer <Supabase access token>` (로그인 세션 기반)
+  - Body: `action`, `token`, `platform`(ios|android)
+  - `user_id`, `grade`, `class_number`는 서버가 JWT 사용자 기준으로 계산/검증
 - **호출 시점**: `MealDepartureRealtimeService.startListening()` → 급식 출발 알림 ON + 로그인 + 학년·반 있을 때 `FcmTokenService.registerIfNeeded()` 호출
 
 ## 2. Android에서 실행 여부 로그로 확인
@@ -21,7 +22,7 @@ Android 빌드 후 앱에서 **급식 출발 알림을 ON** 하고, 해당 학�
 실패 시 예:
 
 - `FcmTokenService: getToken failed ...`
-- `FcmTokenService: register failed 401` (시크릿 불일치)
+- `FcmTokenService: register failed 401` (세션 만료/토큰 검증 실패)
 - `FcmTokenService: register failed 4xx/5xx`
 
 **확인 방법**: Android Studio / `adb logcat` 에서 `FcmTokenService` 또는 `flutter` 태그로 필터.

@@ -44,6 +44,9 @@ class SuggestionsRepository {
   }
 
   /// role이 [role]인 프로필 한 건 조회 (예: admin).
+  ///
+  /// 참고: RLS로 타인 프로필이 보이지 않으므로 [role]이 admin/council일 때는
+  /// [fetchStaffChatContact]를 사용하는 것이 맞다.
   Future<Map<String, dynamic>?> fetchProfileByRole(String role) async {
     final res = await _client
         .from('profiles')
@@ -53,5 +56,12 @@ class SuggestionsRepository {
     final list = res as List;
     if (list.isEmpty) return null;
     return list.first as Map<String, dynamic>;
+  }
+
+  /// 관리자 우선, 없으면 학생회(council) 1명 — 1:1 채팅 상대 (RPC, RLS와 무관).
+  Future<Map<String, dynamic>?> fetchStaffChatContact() async {
+    final result = await _client.rpc('get_staff_chat_contact');
+    if (result == null) return null;
+    return Map<String, dynamic>.from(result as Map);
   }
 }

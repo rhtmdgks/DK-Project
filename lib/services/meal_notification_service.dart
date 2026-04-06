@@ -17,6 +17,13 @@ class MealNotificationService {
   static const _channelName = '급식 출발 알림';
   static const _notificationIdLunch = 3;
   static const _notificationIdDinner = 4;
+  static const _weekdays = <int>[
+    DateTime.monday,
+    DateTime.tuesday,
+    DateTime.wednesday,
+    DateTime.thursday,
+    DateTime.friday,
+  ];
 
   static bool _initialized = false;
 
@@ -52,122 +59,103 @@ class MealNotificationService {
     if (enabled) {
       await scheduleMealNotifications();
     } else {
-      await _plugin.cancel(_notificationIdLunch);
-      await _plugin.cancel(_notificationIdDinner);
+      await _cancelScheduledMealNotifications();
     }
   }
 
   /// 급식 알림 스케줄링
   static Future<void> scheduleMealNotifications() async {
-    final now = tz.TZDateTime.now(tz.local);
-    
-    // 점심 알림: 매일 11시 50분
-    var lunchTime = tz.TZDateTime(
-      tz.local,
-      now.year,
-      now.month,
-      now.day,
-      11,
-      50,
-    );
-    if (lunchTime.isBefore(now)) {
-      lunchTime = lunchTime.add(const Duration(days: 1));
-    }
-
-    // 석식 알림: 매일 17시 50분
-    var dinnerTime = tz.TZDateTime(
-      tz.local,
-      now.year,
-      now.month,
-      now.day,
-      17,
-      50,
-    );
-    if (dinnerTime.isBefore(now)) {
-      dinnerTime = dinnerTime.add(const Duration(days: 1));
-    }
+    await _cancelScheduledMealNotifications();
 
     try {
-      // 점심 알림 예약
-      await _plugin.zonedSchedule(
-        _notificationIdLunch,
-        '급식 출발 알림',
-        '점심 급식 시간이 곧 시작됩니다!',
-        lunchTime,
-        NotificationDetails(
-          android: AndroidNotificationDetails(
-            _channelId,
-            _channelName,
-            channelDescription: '급식 출발 알림',
-          ),
-          iOS: const DarwinNotificationDetails(),
-        ),
+      await _scheduleWeekdayMealNotifications(
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation:
-            UILocalNotificationDateInterpretation.absoluteTime,
-        matchDateTimeComponents: DateTimeComponents.time,
-      );
-
-      // 석식 알림 예약
-      await _plugin.zonedSchedule(
-        _notificationIdDinner,
-        '급식 출발 알림',
-        '석식 급식 시간이 곧 시작됩니다!',
-        dinnerTime,
-        NotificationDetails(
-          android: AndroidNotificationDetails(
-            _channelId,
-            _channelName,
-            channelDescription: '급식 출발 알림',
-          ),
-          iOS: const DarwinNotificationDetails(),
-        ),
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation:
-            UILocalNotificationDateInterpretation.absoluteTime,
-        matchDateTimeComponents: DateTimeComponents.time,
       );
     } catch (e) {
       // 정확한 알람 권한이 없으면 부정확한 알람 모드로 폴백
       if (e.toString().contains('exact_alarms_not_permitted')) {
-        await _plugin.zonedSchedule(
-          _notificationIdLunch,
-          '급식 출발 알림',
-          '점심 급식 시간이 곧 시작됩니다!',
-          lunchTime,
-          NotificationDetails(
-            android: AndroidNotificationDetails(
-              _channelId,
-              _channelName,
-              channelDescription: '급식 출발 알림',
-            ),
-            iOS: const DarwinNotificationDetails(),
-          ),
+        await _scheduleWeekdayMealNotifications(
           androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-          uiLocalNotificationDateInterpretation:
-              UILocalNotificationDateInterpretation.absoluteTime,
-          matchDateTimeComponents: DateTimeComponents.time,
-        );
-
-        await _plugin.zonedSchedule(
-          _notificationIdDinner,
-          '급식 출발 알림',
-          '석식 급식 시간이 곧 시작됩니다!',
-          dinnerTime,
-          NotificationDetails(
-            android: AndroidNotificationDetails(
-              _channelId,
-              _channelName,
-              channelDescription: '급식 출발 알림',
-            ),
-            iOS: const DarwinNotificationDetails(),
-          ),
-          androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-          uiLocalNotificationDateInterpretation:
-              UILocalNotificationDateInterpretation.absoluteTime,
-          matchDateTimeComponents: DateTimeComponents.time,
         );
       }
     }
+  }
+
+  static Future<void> _scheduleWeekdayMealNotifications({
+    required AndroidScheduleMode androidScheduleMode,
+  }) async {
+    for (final weekday in _weekdays) {
+      await _plugin.zonedSchedule(
+        _weekdayNotificationId(true, weekday),
+        '급식 출발 알림',
+        '오늘 점심 급식이 곧 시작돼요!',
+        _nextWeekdayOccurrence(weekday, 11, 50),
+        _notificationDetails(),
+        androidScheduleMode: androidScheduleMode,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
+      );
+
+      await _plugin.zonedSchedule(
+        _weekdayNotificationId(false, weekday),
+        '급식 출발 알림',
+        '오늘 석식 급식이 곧 시작돼요!',
+        _nextWeekdayOccurrence(weekday, 17, 50),
+        _notificationDetails(),
+        androidScheduleMode: androidScheduleMode,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
+      );
+    }
+  }
+
+  static Future<void> _cancelScheduledMealNotifications() async {
+    await _plugin.cancel(_notificationIdLunch);
+    await _plugin.cancel(_notificationIdDinner);
+
+    for (final weekday in _weekdays) {
+      await _plugin.cancel(_weekdayNotificationId(true, weekday));
+      await _plugin.cancel(_weekdayNotificationId(false, weekday));
+    }
+  }
+
+  static NotificationDetails _notificationDetails() {
+    return NotificationDetails(
+      android: AndroidNotificationDetails(
+        _channelId,
+        _channelName,
+        channelDescription: '급식 출발 알림',
+      ),
+      iOS: const DarwinNotificationDetails(),
+    );
+  }
+
+  static int _weekdayNotificationId(bool isLunch, int weekday) {
+    final baseId = isLunch ? 300 : 400;
+    return baseId + weekday;
+  }
+
+  static tz.TZDateTime _nextWeekdayOccurrence(
+    int weekday,
+    int hour,
+    int minute,
+  ) {
+    final now = tz.TZDateTime.now(tz.local);
+    var scheduled = tz.TZDateTime(
+      tz.local,
+      now.year,
+      now.month,
+      now.day,
+      hour,
+      minute,
+    );
+
+    while (scheduled.weekday != weekday || !scheduled.isAfter(now)) {
+      scheduled = scheduled.add(const Duration(days: 1));
+    }
+
+    return scheduled;
   }
 }

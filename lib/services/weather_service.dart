@@ -2,6 +2,17 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+/// 아침 날씨 알림용 제목·본문.
+class MorningWeatherNotificationCopy {
+  const MorningWeatherNotificationCopy({
+    required this.title,
+    required this.body,
+  });
+
+  final String title;
+  final String body;
+}
+
 /// Open-Meteo 기반 현지 날씨 조회. 비/눈/구름/맑음 메시지 생성.
 ///
 /// WMO weather code: 0=맑음, 1-3=대체로 맑음/흐림/구름많음, 45,48=안개,
@@ -16,13 +27,33 @@ class WeatherService {
   static const defaultLon = 126.98;
   static const defaultTimezone = 'Asia/Seoul';
 
-  /// [latitude], [longitude]로 해당 지역 오늘 00:00~18:00 날씨를 조회해
-  /// 한 줄 요약 메시지를 반환한다.
-  /// - 18시 전 비(또는 강수) 예보/현재 → "비가 올 예정이에요" / "비가 오고 있어요"
-  /// - 눈 → "눈이 올 예정이에요" / "눈이 와요"
-  /// - 구름 → "구름이 낀다"
-  /// - 맑음 → "화창해요"
-  static Future<String> getMorningSummary({
+  static bool _isRainCode(int c) =>
+      c >= 51 && c <= 67 || c >= 80 && c <= 82 || c == 95;
+
+  static bool _isSnowCode(int c) =>
+      c >= 71 && c <= 77 || c >= 85 && c <= 86;
+
+  static int? _hourFromTime(String t) {
+    if (t.length >= 13) return int.tryParse(t.substring(11, 13));
+    return null;
+  }
+
+  static String _formatTemp(double? v) {
+    if (v == null || v.isNaN) return '—';
+    return v.round().toString();
+  }
+
+  /// 하루 중 시간대 힌트 (첫 강수 시각 등).
+  static String _dayPartFromHour(int hour) {
+    if (hour >= 6 && hour < 12) return '오전';
+    if (hour < 18) return '오후';
+    if (hour < 22) return '저녁';
+    return '밤';
+  }
+
+  /// [latitude], [longitude]로 해당 지역 오늘 00:00~18:00 예보를 조회해
+  /// 알림 제목·본문을 반환한다.
+  static Future<MorningWeatherNotificationCopy> getMorningNotificationCopy({
     double? latitude,
     double? longitude,
     String timezone = defaultTimezone,
@@ -33,7 +64,8 @@ class WeatherService {
     final uri = Uri.parse(_baseUrl).replace(queryParameters: {
       'latitude': '$lat',
       'longitude': '$lon',
-      'hourly': 'weathercode,precipitation',
+      'hourly': 'weathercode,precipitation,temperature_2m',
+      'daily': 'temperature_2m_max,temperature_2m_min',
       'timezone': timezone,
       'forecast_days': '1',
     });
@@ -51,44 +83,191 @@ class WeatherService {
     final hourly = data['hourly'] as Map<String, dynamic>?;
     if (hourly == null) throw Exception('날씨 데이터 없음');
 
-    final codes = (hourly['weathercode'] as List<dynamic>?)?.cast<int>() ?? [];
+    final codes =
+        (hourly['weathercode'] as List<dynamic>?)?.map((e) => (e as num).toInt()).toList() ??
+            [];
     final precip =
-        (hourly['precipitation'] as List<dynamic>?)?.cast<num>() ?? [];
+        (hourly['precipitation'] as List<dynamic>?)?.map((e) => e.toDouble()).toList() ??
+            [];
+    final temps =
+        (hourly['temperature_2m'] as List<dynamic>?)?.map((e) => e.toDouble()).toList() ??
+            [];
     final times = (hourly['time'] as List<dynamic>?)?.cast<String>() ?? [];
 
-    // 오늘 00:00 ~ 18:00 (18시 이전 시간만). time 형식: "2026-02-18T00:00" 등
     final now = DateTime.now();
-    final today = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    final today =
+        '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+
     int endIndex = 0;
     for (int i = 0; i < times.length; i++) {
       final t = times[i];
       if (t.startsWith(today)) {
-        final hour = t.length >= 13 ? int.tryParse(t.substring(11, 13)) ?? 0 : 0;
+        final hour = _hourFromTime(t) ?? 0;
         if (hour < 18) endIndex = i + 1;
       }
     }
     if (endIndex == 0) endIndex = 1;
+    if (endIndex > times.length) endIndex = times.length;
+
     final codeSlice = codes.take(endIndex).toList();
     final precipSlice = precip.take(endIndex).toList();
+    final tempSlice = temps.take(endIndex).toList();
 
-    // 1) 18시 전 비(또는 강수) 있음
+    double? tMax;
+    double? tMin;
+    final daily = data['daily'] as Map<String, dynamic>?;
+    if (daily != null) {
+      final dTimes = (daily['time'] as List<dynamic>?)?.cast<String>() ?? [];
+      final maxList =
+          (daily['temperature_2m_max'] as List<dynamic>?)?.map((e) => e.toDouble()).toList();
+      final minList =
+          (daily['temperature_2m_min'] as List<dynamic>?)?.map((e) => e.toDouble()).toList();
+      for (int i = 0; i < dTimes.length; i++) {
+        if (dTimes[i] == today) {
+          if (maxList != null && i < maxList.length) tMax = maxList[i];
+          if (minList != null && i < minList.length) tMin = minList[i];
+          break;
+        }
+      }
+    }
+    if (tMax == null || tMin == null) {
+      final inSlice = tempSlice.where((e) => !e.isNaN).toList();
+      if (inSlice.isNotEmpty) {
+        tMax ??= inSlice.reduce((a, b) => a > b ? a : b);
+        tMin ??= inSlice.reduce((a, b) => a < b ? a : b);
+      }
+    }
+
+    double? morningTemp;
+    final morningVals = <double>[];
+    for (int i = 0; i < endIndex && i < times.length; i++) {
+      if (!times[i].startsWith(today)) continue;
+      final h = _hourFromTime(times[i]) ?? 0;
+      if (h >= 6 && h <= 9 && i < tempSlice.length) {
+        morningVals.add(tempSlice[i]);
+      }
+    }
+    if (morningVals.isNotEmpty) {
+      morningTemp =
+          morningVals.reduce((a, b) => a + b) / morningVals.length;
+    } else {
+      for (int i = 0; i < endIndex && i < times.length; i++) {
+        if (!times[i].startsWith(today)) continue;
+        final h = _hourFromTime(times[i]) ?? 0;
+        if (h >= 6 && i < tempSlice.length) {
+          morningTemp = tempSlice[i];
+          break;
+        }
+      }
+      morningTemp ??= tempSlice.isNotEmpty ? tempSlice.first : null;
+    }
+
+    final maxStr = _formatTemp(tMax);
+    final minStr = _formatTemp(tMin);
+    final mStr = _formatTemp(morningTemp);
+    final spread = (tMax != null && tMin != null) ? (tMax - tMin) : null;
+
     bool hasRain = false;
     bool hasSnow = false;
     for (int i = 0; i < codeSlice.length; i++) {
       final c = codeSlice[i];
-      final p = i < precipSlice.length ? precipSlice[i].toDouble() : 0.0;
-      if (c >= 51 && c <= 67 || c >= 80 && c <= 82 || c == 95) hasRain = true;
-      if (c >= 71 && c <= 77 || c >= 85 && c <= 86) hasSnow = true;
-      if (p > 0 && (c >= 51 && c <= 67 || c >= 80 && c <= 82 || c == 95)) hasRain = true;
+      final p = i < precipSlice.length ? precipSlice[i] : 0.0;
+      if (_isRainCode(c)) hasRain = true;
+      if (_isSnowCode(c)) hasSnow = true;
+      if (p > 0 && _isRainCode(c)) hasRain = true;
     }
-    if (hasRain) return '비가 올 예정이에요. 우산을 챙기세요.';
-    if (hasSnow) return '눈이 올 예정이에요.';
 
-    // 2) 구름
-    final cloudy = codeSlice.any((c) => c >= 1 && c <= 3 || c == 45 || c == 48);
-    if (cloudy) return '구름이 낀다.';
+    int? firstRainIndex;
+    if (hasRain) {
+      for (int i = 0; i < codeSlice.length; i++) {
+        final c = codeSlice[i];
+        final p = i < precipSlice.length ? precipSlice[i] : 0.0;
+        if (_isRainCode(c) || (p > 0 && _isRainCode(c))) {
+          firstRainIndex = i;
+          break;
+        }
+      }
+    }
 
-    // 3) 맑음
-    return '화창해요.';
+    int? firstSnowIndex;
+    if (hasSnow) {
+      for (int i = 0; i < codeSlice.length; i++) {
+        if (_isSnowCode(codeSlice[i])) {
+          firstSnowIndex = i;
+          break;
+        }
+      }
+    }
+
+    String? rainTimeHint;
+    if (firstRainIndex != null && firstRainIndex < times.length) {
+      final h = _hourFromTime(times[firstRainIndex]);
+      if (h != null) {
+        rainTimeHint = '${_dayPartFromHour(h)}에 비가 올 수 있어요';
+      }
+    }
+
+    String? snowTimeHint;
+    if (firstSnowIndex != null && firstSnowIndex < times.length) {
+      final h = _hourFromTime(times[firstSnowIndex]);
+      if (h != null) {
+        snowTimeHint = '${_dayPartFromHour(h)}에 눈이 올 수 있어요';
+      }
+    }
+
+    if (hasRain) {
+      final buf = StringBuffer()
+        ..write('비가 올 수 있어요. 오전 기준 약 $mStr°, 오늘 최고 $maxStr° · 최저 $minStr°예요.');
+      if (rainTimeHint != null) {
+        buf.write(' $rainTimeHint.');
+      }
+      buf.write(' 우산과 얇은 겉옷을 챙기면 좋아요.');
+      return MorningWeatherNotificationCopy(
+        title: '우산이 있으면 든든해요',
+        body: buf.toString(),
+      );
+    }
+
+    if (hasSnow) {
+      final buf = StringBuffer()
+        ..write('눈이 올 수 있어요. 오전 기준 약 $mStr°, 오늘 최고 $maxStr° · 최저 $minStr°예요.');
+      if (snowTimeHint != null) {
+        buf.write(' $snowTimeHint.');
+      }
+      buf.write(' 길이 미끄러울 수 있으니 천천히 이동해 주세요.');
+      return MorningWeatherNotificationCopy(
+        title: '눈길·미끄러움에 주의해요',
+        body: buf.toString(),
+      );
+    }
+
+    final cloudy = codeSlice.any(
+      (c) => c >= 1 && c <= 3 || c == 45 || c == 48,
+    );
+    if (cloudy) {
+      final buf = StringBuffer()
+        ..write('구름이 많은 날씨예요. 오전 기준 약 $mStr°, 최고 $maxStr° · 최저 $minStr°예요.');
+      if (spread != null && spread >= 8) {
+        buf.write(' 일교차가 커서 겉옷을 준비해 보세요.');
+      } else {
+        buf.write(' 바깥 활동하기 무난해요.');
+      }
+      return MorningWeatherNotificationCopy(
+        title: '흐리지만 괜찮은 하루예요',
+        body: buf.toString(),
+      );
+    }
+
+    final clearBuf = StringBuffer()
+      ..write('대체로 맑은 날씨예요. 오전 기준 약 $mStr°, 최고 $maxStr° · 최저 $minStr°예요.');
+    if (spread != null && spread >= 10) {
+      clearBuf.write(' 낮과 밤 기온 차가 커서 얇은 겉옷 하나가 도움이 돼요.');
+    } else {
+      clearBuf.write(' 가볍게 입고 나가기 좋아요.');
+    }
+    return MorningWeatherNotificationCopy(
+      title: '맑고 기분 좋은 하루예요',
+      body: clearBuf.toString(),
+    );
   }
 }

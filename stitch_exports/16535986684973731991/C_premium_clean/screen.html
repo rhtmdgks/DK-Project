@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>LAON - Academic Sophistication</title>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "primary-container": "#2e5bff",
+                        "tertiary": "#993100",
+                        "secondary-container": "#9fafff",
+                        "surface-container-high": "#e7e8e9",
+                        "surface-container": "#edeeef",
+                        "on-tertiary-fixed-variant": "#812800",
+                        "on-secondary": "#ffffff",
+                        "surface-container-highest": "#e1e3e4",
+                        "on-tertiary-fixed": "#380d00",
+                        "outline": "#747688",
+                        "surface-bright": "#f8f9fa",
+                        "on-tertiary-container": "#ffece6",
+                        "surface-tint": "#124af0",
+                        "error": "#ba1a1a",
+                        "on-error-container": "#93000a",
+                        "error-container": "#ffdad6",
+                        "secondary-fixed-dim": "#b8c3ff",
+                        "on-tertiary": "#ffffff",
+                        "on-surface": "#191c1d",
+                        "secondary": "#4959a3",
+                        "surface-variant": "#e1e3e4",
+                        "on-secondary-fixed": "#001356",
+                        "on-primary-fixed": "#001356",
+                        "on-secondary-container": "#2f4088",
+                        "primary": "#0040e0",
+                        "outline-variant": "#c4c5d9",
+                        "inverse-on-surface": "#f0f1f2",
+                        "secondary-fixed": "#dde1ff",
+                        "inverse-surface": "#2e3132",
+                        "tertiary-container": "#c24100",
+                        "on-background": "#191c1d",
+                        "on-surface-variant": "#434656",
+                        "on-primary-container": "#efefff",
+                        "on-error": "#ffffff",
+                        "on-primary": "#ffffff",
+                        "tertiary-fixed-dim": "#ffb59b",
+                        "surface-container-lowest": "#ffffff",
+                        "background": "#f8f9fa",
+                        "on-primary-fixed-variant": "#0035be",
+                        "surface": "#f8f9fa",
+                        "tertiary-fixed": "#ffdbcf",
+                        "inverse-primary": "#b8c3ff",
+                        "surface-dim": "#d9dadb",
+                        "on-secondary-fixed-variant": "#304189",
+                        "primary-fixed-dim": "#b8c3ff",
+                        "primary-fixed": "#dde1ff",
+                        "surface-container-low": "#f3f4f5"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "2xl": "1.5rem",
+                        "full": "9999px"
+                    },
+                    "fontFamily": {
+                        "headline": ["Manrope"],
+                        "body": ["Manrope"],
+                        "label": ["Manrope"]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body { font-family: 'Manrope', sans-serif; }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-surface antialiased min-h-screen pb-32">
+<!-- TopAppBar -->
+<header class="bg-[#F8F9FA] dark:bg-slate-950/80 backdrop-blur-xl w-full sticky top-0 z-50 flex items-center justify-between px-6 py-4 w-full">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full overflow-hidden bg-surface-container">
+<img alt="Student Profile Photo" class="w-full h-full object-cover" data-alt="Close up portrait of a smiling student in a modern library with warm sunset lighting and soft depth of field" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCunj5sx_JjaBZCg3McHKMi0rfBJiV-Acpq5m1fWEyfqph6iMioydJ4FnDNBbyrrddr7-H0rIfpUrLPTuC2Z827j81A-3eYXvCiK1hz3-5le6l2n-RyDS4tWwUfH02SI8WV1U9HJ3zq8cTICtGUtKeEyMdwfgp9Iiny2w08bLthjFNZVbLDfNp3Wyx99acg7JCL6fcHmBzOTO0MZK9EemUcECM9PPQcdtEcypxcUZ_a8gED7rw4KW-iJCgdiQsqBOeF3VRHO0yVZx9n"/>
+</div>
+<span class="font-manrope font-bold text-[#0040E0] dark:text-blue-400 tracking-tight text-lg">LAON</span>
+</div>
+<button class="text-[#0040E0] dark:text-blue-400 hover:opacity-80 transition-opacity scale-95 active:duration-150">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+</header>
+<main class="px-6 space-y-8 mt-4 max-w-4xl mx-auto">
+<!-- Now Playing Hero Card -->
+<section class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#0040E0] to-[#2E5BFF] p-8 text-white shadow-[0_20px_50px_rgba(0,64,224,0.3)]">
+<div class="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+<div class="space-y-2">
+<span class="text-white/70 font-medium tracking-widest text-[10px] uppercase">Current Period • 04</span>
+<h1 class="text-4xl font-extrabold tracking-tight">Advanced Calculus</h1>
+<div class="inline-flex items-center gap-2 px-3 py-1 bg-white/10 backdrop-blur-md rounded-full border border-white/10 text-xs">
+<span class="material-symbols-outlined text-[14px]" data-icon="near_me">near_me</span>
+<span>Room 402 • Prof. Aris</span>
+</div>
+</div>
+<div class="flex items-center gap-6">
+<!-- Circular Timer -->
+<div class="relative w-24 h-24 flex items-center justify-center">
+<svg class="w-full h-full transform -rotate-90">
+<circle class="text-white/10" cx="48" cy="48" fill="transparent" r="42" stroke="currentColor" stroke-width="6"></circle>
+<circle class="text-white" cx="48" cy="48" fill="transparent" r="42" stroke="currentColor" stroke-dasharray="264" stroke-dashoffset="66" stroke-width="6"></circle>
+</svg>
+<div class="absolute inset-0 flex flex-col items-center justify-center">
+<span class="text-lg font-bold leading-none">24</span>
+<span class="text-[8px] opacity-70 uppercase tracking-tighter">min left</span>
+</div>
+</div>
+<div class="hidden sm:block h-12 w-[1px] bg-white/20"></div>
+<div class="flex flex-col gap-2">
+<span class="text-[10px] opacity-60 font-medium">NEXT UP</span>
+<div class="bg-white/10 backdrop-blur-md rounded-xl px-4 py-2 border border-white/5">
+<span class="block text-xs font-bold">World History</span>
+<span class="block text-[10px] opacity-70 italic">11:30 AM</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Decorative Elements -->
+<div class="absolute -right-8 -bottom-8 w-48 h-48 bg-white/10 rounded-full blur-3xl"></div>
+<div class="absolute -left-8 -top-8 w-32 h-32 bg-primary-container/20 rounded-full blur-2xl"></div>
+</section>
+<!-- Daily Roadmap -->
+<section>
+<div class="flex items-center justify-between mb-6">
+<h2 class="text-xl font-bold tracking-tight text-on-surface">Daily Roadmap</h2>
+<span class="text-xs font-semibold text-primary">Tuesday, Oct 24</span>
+</div>
+<div class="space-y-0 relative ml-4">
+<!-- Vertical Line -->
+<div class="absolute left-[7px] top-4 bottom-4 w-[2px] bg-surface-container-high"></div>
+<!-- Timeline Items -->
+<div class="space-y-4">
+<!-- Period 1: Completed -->
+<div class="flex gap-6 items-start group">
+<div class="relative z-10 w-4 h-4 rounded-full bg-surface-container-highest mt-1.5 flex items-center justify-center border-2 border-background">
+<span class="material-symbols-outlined text-[10px] text-outline" data-icon="check">check</span>
+</div>
+<div class="flex-1 pb-2 opacity-50">
+<div class="flex justify-between items-start">
+<div>
+<h4 class="font-bold text-sm">01 Physics 101</h4>
+<p class="text-xs text-on-surface-variant">08:00 - 09:15</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Period 2: Completed -->
+<div class="flex gap-6 items-start group">
+<div class="relative z-10 w-4 h-4 rounded-full bg-surface-container-highest mt-1.5 flex items-center justify-center border-2 border-background">
+<span class="material-symbols-outlined text-[10px] text-outline" data-icon="check">check</span>
+</div>
+<div class="flex-1 pb-2 opacity-50">
+<div class="flex justify-between items-start">
+<div>
+<h4 class="font-bold text-sm">02 Digital Media Arts</h4>
+<p class="text-xs text-on-surface-variant">09:30 - 10:45</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Period 3: Current / Focused -->
+<div class="flex gap-6 items-start group">
+<div class="relative z-10 w-4 h-4 rounded-full bg-primary mt-1.5 flex items-center justify-center border-2 border-background shadow-[0_0_12px_rgba(0,64,224,0.4)]">
+<div class="w-1.5 h-1.5 rounded-full bg-white"></div>
+</div>
+<div class="flex-1 bg-secondary-fixed rounded-2xl p-5 border-l-4 border-primary relative overflow-hidden shadow-[0_8px_24px_rgba(0,64,224,0.08)]">
+<div class="absolute top-0 right-0 p-4 opacity-10">
+<span class="material-symbols-outlined text-4xl" data-icon="auto_awesome">auto_awesome</span>
+</div>
+<div class="flex justify-between items-center relative z-10">
+<div>
+<span class="text-[10px] font-bold text-primary tracking-widest uppercase mb-1 block">Live Now</span>
+<h4 class="font-bold text-base text-on-primary-fixed">04 Advanced Calculus</h4>
+<p class="text-xs text-on-primary-fixed-variant">Lecture Room 4B • Finish in 24m</p>
+</div>
+<span class="material-symbols-outlined text-primary" data-icon="arrow_forward_ios">arrow_forward_ios</span>
+</div>
+</div>
+</div>
+<!-- Period 4: Upcoming -->
+<div class="flex gap-6 items-start group">
+<div class="relative z-10 w-4 h-4 rounded-full bg-surface-container-high mt-1.5 border-2 border-background"></div>
+<div class="flex-1 p-4 bg-surface-container-lowest rounded-2xl hover:bg-surface-container-low transition-colors duration-300">
+<div class="flex justify-between items-center">
+<div>
+<h4 class="font-bold text-sm">05 World History</h4>
+<p class="text-xs text-on-surface-variant">11:30 - 12:45</p>
+</div>
+<span class="text-[10px] px-2 py-1 bg-surface-container rounded-lg font-medium text-outline">Upcoming</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Bottom Sections Grid -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+<!-- Notices -->
+<section class="space-y-4">
+<div class="flex items-center justify-between">
+<h3 class="font-bold text-lg">Notices</h3>
+<button class="text-primary text-xs font-semibold">View All</button>
+</div>
+<div class="space-y-3">
+<div class="p-4 bg-white/40 backdrop-blur-md rounded-2xl border border-white/60 shadow-xl shadow-black/[0.02]">
+<div class="flex gap-3">
+<div class="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center text-primary shrink-0">
+<span class="material-symbols-outlined" data-icon="campaign">campaign</span>
+</div>
+<div>
+<p class="text-sm font-bold leading-tight">Final Exam Schedule Published</p>
+<p class="text-[11px] text-on-surface-variant mt-1">Academics Office • 2h ago</p>
+</div>
+</div>
+</div>
+<div class="p-4 bg-white/40 backdrop-blur-md rounded-2xl border border-white/60 shadow-xl shadow-black/[0.02]">
+<div class="flex gap-3">
+<div class="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center text-orange-600 shrink-0">
+<span class="material-symbols-outlined" data-icon="warning">warning</span>
+</div>
+<div>
+<p class="text-sm font-bold leading-tight">Library Maintenance Alert</p>
+<p class="text-[11px] text-on-surface-variant mt-1">Facility Management • 5h ago</p>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Upcoming Events -->
+<section class="space-y-4">
+<div class="flex items-center justify-between">
+<h3 class="font-bold text-lg">Campus Events</h3>
+<button class="text-primary text-xs font-semibold">Calendar</button>
+</div>
+<div class="relative overflow-hidden rounded-2xl h-[160px] group shadow-xl">
+<img alt="Campus Event" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" data-alt="Wide shot of a modern college campus event with students gathering on a green lawn at sunset near glass buildings" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCk1OrydmBMb2Owajt46GVaUiyVduqymjiEu4VeH6q_mW09OjL1I3kdN6QbWmFrBrSN78b1598yfatMnOyNQWtCtsXjDkwc54JFahrcrsolGui5NoGJ7MDBtZOOLzpfuIGjOV6uzODh-9kFEF5VNQ4pBFof9ZXYlsM-_9xyVMa1osgeLUiLXHd35U_XkK2FDs1I1B0AB06VpG2hYv0qSiS0jXqM-5gyJ3xOyMhnBw9vR4q5qtijEqqB2_dRBJ8qv-uCPY93Jjt0WN3B"/>
+<div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent p-5 flex flex-col justify-end">
+<span class="text-[10px] font-bold text-white/80 uppercase tracking-widest mb-1">Coming Saturday</span>
+<h4 class="text-white font-bold text-lg leading-tight">Autumn Tech Symposium 2024</h4>
+<div class="flex items-center gap-2 mt-2">
+<span class="material-symbols-outlined text-white/70 text-xs" data-icon="location_on">location_on</span>
+<span class="text-[10px] text-white/70">Main Auditorium</span>
+</div>
+</div>
+</div>
+</section>
+</div>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pt-3 pb-8 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl rounded-t-[24px] shadow-[0_-8px_24px_rgba(0,64,224,0.08)]">
+<a class="flex flex-col items-center justify-center bg-[#DDE1FF] dark:bg-blue-900/40 text-[#0040E0] dark:text-blue-200 rounded-2xl px-5 py-2 transition-all duration-300 ease-out" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="calendar_today">calendar_today</span>
+<span class="font-manrope text-[10px] font-medium tracking-wide">Schedule</span>
+</a>
+<a class="flex flex-col items-center justify-center text-slate-400 dark:text-slate-500 px-5 py-2 hover:text-[#0040E0] dark:hover:text-blue-300 transition-all duration-300 ease-out" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="assignment">assignment</span>
+<span class="font-manrope text-[10px] font-medium tracking-wide">Assignments</span>
+</a>
+<a class="flex flex-col items-center justify-center text-slate-400 dark:text-slate-500 px-5 py-2 hover:text-[#0040E0] dark:hover:text-blue-300 transition-all duration-300 ease-out" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="library_books">library_books</span>
+<span class="font-manrope text-[10px] font-medium tracking-wide">Resources</span>
+</a>
+<a class="flex flex-col items-center justify-center text-slate-400 dark:text-slate-500 px-5 py-2 hover:text-[#0040E0] dark:hover:text-blue-300 transition-all duration-300 ease-out" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="person">person</span>
+<span class="font-manrope text-[10px] font-medium tracking-wide">Profile</span>
+</a>
+</nav>
+</body></html>

@@ -14,12 +14,15 @@ class TabPageHeader extends StatelessWidget {
     super.key,
     required this.title,
     required this.subtitle,
+    this.leading,
     this.trailing,
     this.contentPadding,
   });
 
   final String title;
   final String subtitle;
+  /// 탭 루트가 아닌 푸시된 화면 등에서 뒤로가기 버튼을 넣을 때 사용.
+  final Widget? leading;
   final Widget? trailing;
 
   /// null이면 기본 좌우 패딩(16), 지정 시 해당 값 사용(예: [EdgeInsets.zero]로 끝에 붙이기).
@@ -32,7 +35,7 @@ class TabPageHeader extends StatelessWidget {
     // Material 3 Small App Bar 높이: 64dp
     const double appBarHeight = 64.0;
     final resolvedPadding = contentPadding ?? EdgeInsets.only(
-      left: 16,
+      left: leading != null ? 4 : 16,
       right: trailing != null ? 8 : 16,
     );
 
@@ -42,6 +45,10 @@ class TabPageHeader extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
+          if (leading != null) ...[
+            leading!,
+            const SizedBox(width: 4),
+          ],
           Expanded(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,

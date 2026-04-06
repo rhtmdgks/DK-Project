@@ -44,7 +44,6 @@ dependencies:
   geolocator: ^13.0.1
   flutter_markdown: ^0.7.4+1
   url_launcher: ^6.2.5
-  dnslib: ^1.2.13
   provider: ^6.1.1
   intl: ^0.20.2
   home_widget: ^0.9.0

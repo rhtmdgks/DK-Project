@@ -17,6 +17,11 @@ class App extends StatefulWidget {
 }
 
 class _AppState extends State<App> with WidgetsBindingObserver {
+  static const String _homeWidgetAppGroupId = String.fromEnvironment(
+    'HOME_WIDGET_APP_GROUP_ID',
+    defaultValue: 'group.com.wearegoodwill.laon',
+  );
+
   late final NotificationProvider _notificationProvider;
   StreamSubscription<Uri?>? _widgetClickedSubscription;
 
@@ -36,18 +41,39 @@ class _AppState extends State<App> with WidgetsBindingObserver {
 
     // 홈 위젯에서 앱 실행 시 급식 출발 알림 화면으로 이동
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _handleWidgetLaunch();
+      _initializeHomeWidgetBridge().then((_) {
+        _handleWidgetLaunch().catchError((Object e, StackTrace _) {
+          debugPrint('홈 위젯 실행 라우팅 실패: $e');
+        });
+      });
     });
-    _widgetClickedSubscription = HomeWidget.widgetClicked.listen(_onWidgetClicked);
+    _widgetClickedSubscription = HomeWidget.widgetClicked.listen(
+      _onWidgetClicked,
+      onError: (Object e, StackTrace _) {
+        debugPrint('홈 위젯 클릭 스트림 오류: $e');
+      },
+    );
+  }
+
+  Future<void> _initializeHomeWidgetBridge() async {
+    try {
+      await HomeWidget.setAppGroupId(_homeWidgetAppGroupId);
+    } catch (e) {
+      debugPrint('HomeWidget AppGroupId 설정 실패: $e');
+    }
   }
 
   Future<void> _handleWidgetLaunch() async {
-    final uri = await HomeWidget.initiallyLaunchedFromHomeWidget();
-    if (uri != null && uri.toString().contains('meal-departure-alert')) {
-      final ctx = rootNavigatorKey.currentContext;
-      if (ctx != null && ctx.mounted) {
-        ctx.go(AppRoute.mealDepartureAlert.path);
+    try {
+      final uri = await HomeWidget.initiallyLaunchedFromHomeWidget();
+      if (uri != null && uri.toString().contains('meal-departure-alert')) {
+        final ctx = rootNavigatorKey.currentContext;
+        if (ctx != null && ctx.mounted) {
+          ctx.go(AppRoute.mealDepartureAlert.path);
+        }
       }
+    } catch (e) {
+      debugPrint('HomeWidget 초기 실행 URI 확인 실패: $e');
     }
   }
 
