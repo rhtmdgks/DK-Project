@@ -77,10 +77,11 @@ class _HomeTabState extends State<HomeTab> {
       }
     } else {
       final currentMinutes = now.hour * 60 + now.minute;
+      final todayPeriods = TimetableUtils.periodStartTimesForDate(now);
       for (final card in list) {
         final idx = card.period - 1;
-        if (idx < 0 || idx >= TimetableUtils.periodStartTimes.length) continue;
-        final start = TimetableUtils.periodStartTimes[idx];
+        if (idx < 0 || idx >= todayPeriods.length) continue;
+        final start = todayPeriods[idx];
         final startMinutes = start[0] * 60 + start[1];
         if (startMinutes > currentMinutes) {
           next = card;
@@ -94,7 +95,7 @@ class _HomeTabState extends State<HomeTab> {
       name: next.name,
       periodName: '${next.period}교시',
       location: (next.room == null || next.room!.trim().isEmpty) ? '장소 미정' : next.room!.trim(),
-      time: TimetableUtils.startTimeString(next.period),
+      time: TimetableUtils.startTimeString(next.period, date: now),
       notice: '다음 수업 준비물을 확인해 주세요.',
     );
   }
@@ -461,6 +462,8 @@ class _HomeTabState extends State<HomeTab> {
     final now = DateTime.now();
     final nowTotalMinutes = now.hour * 60 + now.minute;
     final currentPeriod = TimetableUtils.currentPeriodAndSecondsLeft(now).period;
+    final todayPeriods = TimetableUtils.periodStartTimesForDate(now);
+    final periodNumbers = TimetableUtils.periodNumbersForDate(now);
 
     return _buildGlassCard(
       child: Column(
@@ -481,7 +484,7 @@ class _HomeTabState extends State<HomeTab> {
           ),
           SizedBox(height: context.rh(6)),
           Text(
-            '1교시부터 7교시까지 한눈에 확인하세요.',
+            '오늘 교시를 한눈에 확인하세요.',
             style: AppFonts.scaled(context, AppFonts.captionRegular).copyWith(
               color: AppColors.textSecondary,
             ),
@@ -502,14 +505,17 @@ class _HomeTabState extends State<HomeTab> {
                 ),
               ),
               Column(
-                children: List.generate(7, (index) {
-                  final period = index + 1;
+                children: periodNumbers.map((period) {
+                  final index = period - 1;
                   final subject = byPeriod[period];
-                  final start = TimetableUtils.periodStartTimes[index];
+                  if (index < 0 || index >= todayPeriods.length) {
+                    return const SizedBox.shrink();
+                  }
+                  final start = todayPeriods[index];
                   final startMinutes = start[0] * 60 + start[1];
                   final endMinutes = startMinutes + TimetableUtils.durationMinutes;
                   final timeRange =
-                      '${TimetableUtils.startTimeString(period)} - ${TimetableUtils.endTimeString(period)}';
+                      '${TimetableUtils.startTimeString(period, date: now)} - ${TimetableUtils.endTimeString(period, date: now)}';
 
                   final isCurrent = currentPeriod == period;
                   final isCompleted =
@@ -518,7 +524,7 @@ class _HomeTabState extends State<HomeTab> {
 
                   return Padding(
                     padding: EdgeInsets.only(
-                      bottom: period == 7 ? 0 : context.rh(10),
+                      bottom: period == periodNumbers.last ? 0 : context.rh(10),
                     ),
                     child: _buildRoadmapItem(
                       period: period,
@@ -529,7 +535,7 @@ class _HomeTabState extends State<HomeTab> {
                       isUpcoming: isUpcoming,
                     ),
                   );
-                }),
+                }).toList(),
               ),
             ],
           ),

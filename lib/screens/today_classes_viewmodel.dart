@@ -235,8 +235,8 @@ class TodayClassesViewModel extends ChangeNotifier {
           name: subject,
           period: period,
           chapter: '$period교시${room.isNotEmpty ? ' - $room' : ''}',
-          startTime: TimetableUtils.startTimeString(period),
-          endTime: TimetableUtils.endTimeString(period),
+          startTime: TimetableUtils.startTimeString(period, date: date),
+          endTime: TimetableUtils.endTimeString(period, date: date),
           location: room,
         );
       }).toList();

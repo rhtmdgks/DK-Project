@@ -117,9 +117,10 @@ class ClassMoveNotificationService {
               prevRoom.trim().isNotEmpty &&
               currRoom.trim().isNotEmpty &&
               prevRoom != currRoom &&
-              currPeriod <= TimetableUtils.periodStartTimes.length) {
+              currPeriod <= TimetableUtils.periodStartTimesForDate(targetDate).length) {
             // 수업 시작 시간 5분 전에 알림
-            final periodTime = TimetableUtils.periodStartTimes[currPeriod - 1];
+            final periodTime =
+                TimetableUtils.periodStartTimesForDate(targetDate)[currPeriod - 1];
             final notificationTime = tz.TZDateTime(
               tz.local,
               targetDate.year,
@@ -186,6 +187,7 @@ class ClassMoveNotificationService {
 
   static Future<void> _cancelScheduledNotifications() async {
     for (int dayOffset = 0; dayOffset < 7; dayOffset++) {
+      // 최대 7교시까지 사용하므로 취소 범위는 고정 유지
       for (
         int period = 1;
         period <= TimetableUtils.periodStartTimes.length;

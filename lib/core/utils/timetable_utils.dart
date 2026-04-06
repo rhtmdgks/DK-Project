@@ -3,35 +3,63 @@
 class TimetableUtils {
   TimetableUtils._();
 
-  /// 교시별 시작 시간 [시, 분]. 인덱스 0 = 1교시.
-  /// 08:20 시작, 50분 수업, 10분 쉬는시간, 점심 12:20-13:40.
-  static const List<List<int>> periodStartTimes = [
-    [8, 20],  // 1교시: 08:20 ~ 09:10
-    [9, 20],  // 2교시: 09:20 ~ 10:10
-    [10, 20], // 3교시: 10:20 ~ 11:10
-    [11, 20], // 4교시: 11:20 ~ 12:10
-    [13, 40], // 5교시: 13:40 ~ 14:30 (점심 후)
-    [14, 40], // 6교시: 14:40 ~ 15:30
-    [15, 40], // 7교시: 15:40 ~ 16:30
+  /// 월~목 기본 시간표 시작 시간 [시, 분]. 인덱스 0 = 1교시.
+  static const List<List<int>> _regularPeriodStartTimes = [
+    [8, 10],  // 1교시: 08:10 ~ 09:00
+    [9, 10],  // 2교시: 09:10 ~ 10:00
+    [10, 10], // 3교시: 10:10 ~ 11:00
+    [11, 10], // 4교시: 11:10 ~ 12:00
+    [13, 0],  // 5교시: 13:00 ~ 13:50
+    [14, 0],  // 6교시: 14:00 ~ 14:50
+    [15, 10], // 7교시: 15:10 ~ 16:00
   ];
+
+  /// 금요일 시간표 시작 시간 [시, 분]. 인덱스 0 = 1교시.
+  /// 청소시간(13:00~13:20) 이후 5교시가 시작되며 6교시까지 운영.
+  static const List<List<int>> _fridayPeriodStartTimes = [
+    [8, 10],  // 1교시: 08:10 ~ 09:00
+    [9, 10],  // 2교시: 09:10 ~ 10:00
+    [10, 10], // 3교시: 10:10 ~ 11:00
+    [11, 10], // 4교시: 11:10 ~ 12:00
+    [13, 20], // 5교시: 13:20 ~ 14:10
+    [14, 20], // 6교시: 14:20 ~ 15:10
+  ];
+
+  /// 하위 호환용(기존 사용처 유지). 월~목 기본 시간표를 반환한다.
+  static const List<List<int>> periodStartTimes = _regularPeriodStartTimes;
 
   /// 수업 시간(분). 종료 = 시작 + [durationMinutes].
   static const int durationMinutes = 50;
 
+  /// 날짜별 적용되는 교시 시작 시간표.
+  static List<List<int>> periodStartTimesForDate(DateTime date) {
+    if (!isWeekday(date)) return const <List<int>>[];
+    if (date.weekday == DateTime.friday) return _fridayPeriodStartTimes;
+    return _regularPeriodStartTimes;
+  }
+
+  /// 날짜별 운영 교시 번호 목록(1-based).
+  static List<int> periodNumbersForDate(DateTime date) {
+    final length = periodStartTimesForDate(date).length;
+    return List<int>.generate(length, (i) => i + 1);
+  }
+
   /// 교시(1-based)에 대한 시작 시간 "HH:mm" 문자열.
-  static String startTimeString(int period) {
+  static String startTimeString(int period, {DateTime? date}) {
+    final table = periodStartTimesForDate(date ?? DateTime.now());
     final idx = period - 1;
-    if (idx < 0 || idx >= periodStartTimes.length) return '--:--';
-    final t = periodStartTimes[idx];
+    if (idx < 0 || idx >= table.length) return '--:--';
+    final t = table[idx];
     return '${t[0].toString().padLeft(2, '0')}:${t[1].toString().padLeft(2, '0')}';
   }
 
   /// 교시(1-based)에 대한 종료 시간 "HH:mm" 문자열.
-  static String endTimeString(int period) {
+  static String endTimeString(int period, {DateTime? date}) {
+    final table = periodStartTimesForDate(date ?? DateTime.now());
     final idx = period - 1;
-    if (idx < 0 || idx >= periodStartTimes.length) return '--:--';
-    var h = periodStartTimes[idx][0];
-    var m = periodStartTimes[idx][1] + durationMinutes;
+    if (idx < 0 || idx >= table.length) return '--:--';
+    var h = table[idx][0];
+    var m = table[idx][1] + durationMinutes;
     if (m >= 60) {
       h += m ~/ 60;
       m = m % 60;
@@ -54,9 +82,10 @@ class TimetableUtils {
   /// 현재 시각이 어떤 교시의 수업 시간대 안에 있으면 해당 교시 번호(1-based)와
   /// 종료까지 남은 분을 반환. 해당 없으면 period == null.
   static ({int? period, int? minutesLeft}) currentPeriodAndMinutesLeft(DateTime now) {
+    final table = periodStartTimesForDate(now);
     final nowMinutes = now.hour * 60 + now.minute;
-    for (var i = 0; i < periodStartTimes.length; i++) {
-      final t = periodStartTimes[i];
+    for (var i = 0; i < table.length; i++) {
+      final t = table[i];
       final startMinutes = t[0] * 60 + t[1];
       final endMinutes = startMinutes + durationMinutes;
       if (nowMinutes >= startMinutes && nowMinutes < endMinutes) {
@@ -70,9 +99,10 @@ class TimetableUtils {
   /// 현재 시각이 수업 시간대 안에 있으면 해당 교시(1-based)와 종료까지 남은 초를 반환.
   /// 1초 단위 갱신으로 원·숫자가 자연스럽게 줄어들게 할 때 사용.
   static ({int? period, int? secondsLeft}) currentPeriodAndSecondsLeft(DateTime now) {
+    final table = periodStartTimesForDate(now);
     final nowTotalSeconds = now.hour * 3600 + now.minute * 60 + now.second;
-    for (var i = 0; i < periodStartTimes.length; i++) {
-      final t = periodStartTimes[i];
+    for (var i = 0; i < table.length; i++) {
+      final t = table[i];
       final startMinutes = t[0] * 60 + t[1];
       final endTotalSeconds = (startMinutes + durationMinutes) * 60;
       if (nowTotalSeconds >= startMinutes * 60 && nowTotalSeconds < endTotalSeconds) {
