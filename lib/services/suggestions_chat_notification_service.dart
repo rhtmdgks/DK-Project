@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'package:myapp/core/realtime/realtime_observability.dart';
 import 'package:myapp/core/supabase_client.dart';
 import 'package:myapp/models/notification_item.dart';
 import 'package:myapp/screens/suggestions_chat_screen.dart';
@@ -21,14 +22,24 @@ class SuggestionsChatNotificationService {
   /// 앱이 켜져있는 동안(포그라운드/백그라운드) 새 메시지에 대해 알림을 띄웁니다.
   static Future<void> startListening() async {
     // 이미 구독 중이면 중복 구독 방지
-    if (_channel != null) return;
-
-    final currentUserId = supabase.auth.currentUser?.id;
-    if (currentUserId == null) {
-      // 로그인 정보가 없으면 구독하지 않음
+    if (_channel != null) {
+      RealtimeObservability.channel(
+        'suggestions-chat-noti',
+        'already-subscribed',
+      );
       return;
     }
 
+    if (supabase.auth.currentUser?.id == null) {
+      // 로그인 정보가 없으면 구독하지 않음
+      RealtimeObservability.channel('suggestions-chat-noti', 'skip-no-session');
+      return;
+    }
+
+    RealtimeObservability.channel(
+      'suggestions-chat-noti',
+      'subscribe channel=suggestions_chat_notifications',
+    );
     _channel = supabase
         .channel('suggestions_chat_notifications')
         .onPostgresChanges(
@@ -43,6 +54,14 @@ class SuggestionsChatNotificationService {
           callback: (payload) async {
             final newRow = payload.newRecord;
             if (newRow.isEmpty) return;
+            RealtimeObservability.event(
+              'suggestions-chat-noti',
+              'suggestions_chat_notifications',
+              'chat_messages.insert',
+            );
+
+            final currentUserId = supabase.auth.currentUser?.id;
+            if (currentUserId == null) return;
 
             final senderId = newRow['sender_id'] as String?;
             if (senderId == null || senderId == currentUserId) {
@@ -64,17 +83,31 @@ class SuggestionsChatNotificationService {
             );
           },
         )
-        .subscribe();
+        .subscribe((status, [error]) {
+          RealtimeObservability.channel(
+            'suggestions-chat-noti',
+            'status=$status error=${error ?? '-'}',
+          );
+        });
   }
 
   /// 건의함 채팅 알림 구독 중지.
   static Future<void> stopListening() async {
     if (_channel != null) {
       try {
+        RealtimeObservability.channel(
+          'suggestions-chat-noti',
+          'unsubscribe channel=suggestions_chat_notifications',
+        );
         await supabase.removeChannel(_channel!);
       } catch (_) {}
       _channel = null;
     }
   }
-}
 
+  /// 세션 전환 시 구독을 안전하게 재바인딩한다.
+  static Future<void> refreshSubscription() async {
+    await stopListening();
+    await startListening();
+  }
+}

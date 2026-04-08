@@ -15,7 +15,7 @@ import 'package:myapp/services/schedule_notification_service.dart';
 import 'package:myapp/services/weather_notification_service.dart';
 
 /// 통합 알림 서비스
-/// 
+///
 /// 모든 알림 타입을 관리하고 앱 내 알림 목록과 로컬 알림을 통합 처리합니다.
 class NotificationService {
   NotificationService._();
@@ -102,8 +102,12 @@ class NotificationService {
     try {
       await FcmTokenService.ensureFirebaseInitialized();
       FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-        final title = message.notification?.title ?? message.data['message'] ?? '급식 출발 알림';
-        final body = message.notification?.body ?? message.data['body'] ?? '급식이 출발했습니다.';
+        final title =
+            message.notification?.title ??
+            message.data['message'] ??
+            '급식 출발 알림';
+        final body =
+            message.notification?.body ?? message.data['body'] ?? '급식이 출발했습니다.';
         showNotification(
           id: 2000,
           title: title.toString(),
@@ -198,7 +202,9 @@ class NotificationService {
     if (_notificationProvider != null) {
       await _notificationProvider!.addNotification(notification);
     } else {
-      debugPrint('NotificationService.showNotification: _notificationProvider가 null이라 앱 내 목록에 추가하지 못함. initialize() 완료 여부 확인 필요.');
+      debugPrint(
+        'NotificationService.showNotification: _notificationProvider가 null이라 앱 내 목록에 추가하지 못함. initialize() 완료 여부 확인 필요.',
+      );
     }
 
     // 2) 로컬(시스템) 알림 표시
@@ -223,12 +229,24 @@ class NotificationService {
         payload: payload,
       );
     } catch (e) {
-      debugPrint('NotificationService.showNotification: 시스템 알림 표시 실패 ($type): $e');
+      debugPrint(
+        'NotificationService.showNotification: 시스템 알림 표시 실패 ($type): $e',
+      );
     }
   }
 
   /// 프로필 변경 시 프로필 의존 구독을 갱신합니다.
   static Future<void> onProfileChanged() async {
+    try {
+      await AnnouncementNotificationService.refreshSubscription();
+    } catch (e) {
+      debugPrint('공지사항 구독 갱신 실패: $e');
+    }
+    try {
+      await SuggestionsChatNotificationService.refreshSubscription();
+    } catch (e) {
+      debugPrint('건의함 채팅 구독 갱신 실패: $e');
+    }
     try {
       await MealDepartureRealtimeService.refreshSubscription();
     } catch (e) {
@@ -252,6 +270,11 @@ class NotificationService {
       await MealDepartureRealtimeService.stopListening();
     } catch (e) {
       debugPrint('급식 출발 알림 구독 중지 실패: $e');
+    }
+    try {
+      await SuggestionsChatNotificationService.stopListening();
+    } catch (e) {
+      debugPrint('건의함 채팅 구독 중지 실패: $e');
     }
     _initialized = false;
   }

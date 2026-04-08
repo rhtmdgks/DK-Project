@@ -3,6 +3,7 @@ import 'package:myapp/repositories/notification_settings_repository.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:myapp/core/auth/auth_state.dart';
+import 'package:myapp/core/realtime/realtime_observability.dart';
 import 'package:myapp/core/supabase_client.dart';
 import 'package:myapp/models/notification_item.dart';
 import 'package:myapp/services/notification_service.dart';
@@ -41,7 +42,8 @@ class AnnouncementNotificationService {
   static Future<void> _createNotificationChannel() async {
     await _plugin
         .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>()
+          AndroidFlutterLocalNotificationsPlugin
+        >()
         ?.createNotificationChannel(
           const AndroidNotificationChannel(
             _channelId,
@@ -55,7 +57,8 @@ class AnnouncementNotificationService {
   static Future<bool> _requestIOSPermission() async {
     final iosImplementation = _plugin
         .resolvePlatformSpecificImplementation<
-            IOSFlutterLocalNotificationsPlugin>();
+          IOSFlutterLocalNotificationsPlugin
+        >();
     if (iosImplementation != null) {
       final result = await iosImplementation.requestPermissions(
         alert: true,
@@ -72,7 +75,8 @@ class AnnouncementNotificationService {
     // Android 확인
     final androidImplementation = _plugin
         .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>();
+          AndroidFlutterLocalNotificationsPlugin
+        >();
     if (androidImplementation != null) {
       final granted = await androidImplementation.areNotificationsEnabled();
       return granted ?? false;
@@ -81,7 +85,8 @@ class AnnouncementNotificationService {
     // iOS 확인
     final iosImplementation = _plugin
         .resolvePlatformSpecificImplementation<
-            IOSFlutterLocalNotificationsPlugin>();
+          IOSFlutterLocalNotificationsPlugin
+        >();
     if (iosImplementation != null) {
       final result = await iosImplementation.checkPermissions();
       return result?.isEnabled ?? false;
@@ -95,9 +100,11 @@ class AnnouncementNotificationService {
     // Android 권한 요청
     final androidImplementation = _plugin
         .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>();
+          AndroidFlutterLocalNotificationsPlugin
+        >();
     if (androidImplementation != null) {
-      final granted = await androidImplementation.requestNotificationsPermission();
+      final granted = await androidImplementation
+          .requestNotificationsPermission();
       return granted ?? false;
     }
 
@@ -165,20 +172,30 @@ class AnnouncementNotificationService {
   /// 공지사항 알림 구독 시작
   static Future<void> startListening() async {
     // 이미 구독 중이면 중복 구독 방지
-    if (_channel != null) return;
+    if (_channel != null) {
+      RealtimeObservability.channel('announcement-noti', 'already-subscribed');
+      return;
+    }
 
     final enabled = await isNoticeEnabled();
-    if (!enabled) return;
+    if (!enabled) {
+      RealtimeObservability.channel('announcement-noti', 'skip-disabled');
+      return;
+    }
 
     // Android 채널 생성 및 iOS 권한 확인
     await _createNotificationChannel();
-    
+
     // 알림 권한 확인 및 요청 (필요한 경우)
     final hasPermission = await isNotificationPermissionGranted();
     if (!hasPermission) {
       await requestNotificationPermission();
     }
 
+    RealtimeObservability.channel(
+      'announcement-noti',
+      'subscribe channel=announcements',
+    );
     _channel = supabase
         .channel('announcements')
         .onPostgresChanges(
@@ -188,18 +205,27 @@ class AnnouncementNotificationService {
           callback: (payload) async {
             final newRow = payload.newRecord;
             if (newRow.isEmpty) return;
+            RealtimeObservability.event(
+              'announcement-noti',
+              'announcements',
+              'announcements.insert',
+            );
 
             // 설정에서 공지사항 알림이 켜져있는지 다시 확인
             final stillEnabled = await isNoticeEnabled();
             if (!stillEnabled) return;
 
             // 대상(학년·반) 필터 (백오피스는 target_class_number 사용)
-            final targetGrade = _stringArg(newRow, 'target_grade') ??
+            final targetGrade =
+                _stringArg(newRow, 'target_grade') ??
                 _stringArg(newRow, 'target_audience') ??
                 _stringArg(newRow, 'target');
-            final targetClass = _intOrNull(newRow['target_class_number']) ??
+            final targetClass =
+                _intOrNull(newRow['target_class_number']) ??
                 _intOrNull(newRow['target_class']);
-            if (!await _shouldNotifyCurrentUser(targetGrade, targetClass)) return;
+            if (!await _shouldNotifyCurrentUser(targetGrade, targetClass)) {
+              return;
+            }
 
             final title = newRow['title'] as String? ?? '새 공지사항';
             final body = newRow['body'] as String?;
@@ -214,11 +240,22 @@ class AnnouncementNotificationService {
             );
           },
         )
-        .subscribe();
+        .subscribe((status, [error]) {
+          RealtimeObservability.channel(
+            'announcement-noti',
+            'status=$status error=${error ?? '-'}',
+          );
+        });
   }
 
   /// 공지사항 알림 구독 중지
   static Future<void> stopListening() async {
+    if (_channel != null) {
+      RealtimeObservability.channel(
+        'announcement-noti',
+        'unsubscribe channel=announcements',
+      );
+    }
     await _channel?.unsubscribe();
     _channel = null;
   }

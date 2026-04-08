@@ -3,6 +3,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:myapp/core/auth/auth_state.dart';
+import 'package:myapp/core/realtime/realtime_observability.dart';
 import 'package:myapp/repositories/notification_settings_repository.dart';
 import 'package:myapp/core/supabase_client.dart';
 import 'package:myapp/models/notification_item.dart';
@@ -37,7 +38,8 @@ class MealDepartureRealtimeService {
 
     await _plugin
         .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>()
+          AndroidFlutterLocalNotificationsPlugin
+        >()
         ?.createNotificationChannel(
           const AndroidNotificationChannel(
             _androidChannelId,
@@ -75,12 +77,14 @@ class MealDepartureRealtimeService {
     final enabled = await isEnabled();
     if (!enabled) {
       debugPrint('급식 출발 알림: 설정이 꺼져 있어 구독하지 않습니다. 설정 → 급식 출발 알림을 켜주세요.');
+      RealtimeObservability.channel('meal-departure-noti', 'skip-disabled');
       return;
     }
 
     final profile = await getCurrentProfile();
     if (profile == null) {
       debugPrint('급식 출발 알림: 로그인된 프로필이 없어 구독하지 않습니다.');
+      RealtimeObservability.channel('meal-departure-noti', 'skip-no-profile');
       return;
     }
 
@@ -88,7 +92,13 @@ class MealDepartureRealtimeService {
     final classNum = profile.classNumOrFromStudentId;
 
     if (grade == null || classNum == null) {
-      debugPrint('급식 출발 알림: 학년·반을 알 수 없어 구독하지 않습니다. (studentId=${profile.studentId}, grade=$grade, classNum=$classNum)');
+      debugPrint(
+        '급식 출발 알림: 학년·반을 알 수 없어 구독하지 않습니다. (studentId=${profile.studentId}, grade=$grade, classNum=$classNum)',
+      );
+      RealtimeObservability.channel(
+        'meal-departure-noti',
+        'skip-no-grade-class',
+      );
       return;
     }
 
@@ -102,6 +112,10 @@ class MealDepartureRealtimeService {
 
     final channelName = 'meal-departure:$grade:$classNum';
     debugPrint('급식 출발 알림: $channelName 채널 구독 시작');
+    RealtimeObservability.channel(
+      'meal-departure-noti',
+      'subscribe channel=$channelName',
+    );
 
     _channel = supabase
         .channel(channelName)
@@ -110,6 +124,11 @@ class MealDepartureRealtimeService {
           callback: (payload) async {
             try {
               debugPrint('급식 출발 알림 수신: $payload');
+              RealtimeObservability.event(
+                'meal-departure-noti',
+                channelName,
+                'meal-departure',
+              );
 
               final stillEnabled = await isEnabled();
               if (!stillEnabled) return;
@@ -130,7 +149,12 @@ class MealDepartureRealtimeService {
             }
           },
         )
-        .subscribe();
+        .subscribe((status, [error]) {
+          RealtimeObservability.channel(
+            'meal-departure-noti',
+            'status=$status channel=$channelName error=${error ?? '-'}',
+          );
+        });
 
     _subscribedGrade = grade;
     _subscribedClassNum = classNum;
@@ -146,6 +170,10 @@ class MealDepartureRealtimeService {
   static Future<void> stopListening() async {
     if (_channel != null) {
       try {
+        RealtimeObservability.channel(
+          'meal-departure-noti',
+          'unsubscribe channel=meal-departure:${_subscribedGrade ?? '-'}:${_subscribedClassNum ?? '-'}',
+        );
         await supabase.removeChannel(_channel!);
       } catch (e) {
         debugPrint('급식 출발 알림 채널 해제 실패: $e');
