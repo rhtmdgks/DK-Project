@@ -64,6 +64,35 @@ class _LoginScreenState extends State<LoginScreen> {
     return '로그인에 실패했습니다: $message';
   }
 
+  bool _isTransientAuthError(Object e) {
+    final m = e.toString().toLowerCase();
+    return m.contains('502') ||
+        m.contains('500') ||
+        m.contains('bad gateway') ||
+        m.contains('database error querying schema') ||
+        m.contains('timeout') ||
+        m.contains('context canceled');
+  }
+
+  Future<String> _resolveLoginEmail({
+    required String studentId,
+    required String password,
+  }) async {
+    try {
+      final rpc = await supabase.rpc(
+        'login_from_profiles',
+        params: {'p_student_id': studentId, 'p_password': password},
+      );
+      if (rpc is Map<String, dynamic>) {
+        final email = rpc['email']?.toString().trim();
+        if (email != null && email.isNotEmpty) return email;
+      }
+    } catch (_) {
+      // RPC 실패 시 레거시 이메일 포맷으로 폴백
+    }
+    return '$studentId@school.local';
+  }
+
   Future<void> _submit() async {
     if (!_canSubmit || _loading) return;
 
@@ -75,14 +104,46 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       final studentId = _studentIdController.text.trim();
       final password = _passwordController.text;
-      final email = '$studentId@school.local';
-
-      final authResponse = await supabase.auth.signInWithPassword(
-        email: email,
+      final resolvedEmail = await _resolveLoginEmail(
+        studentId: studentId,
         password: password,
       );
 
-      if (authResponse.session == null || authResponse.user == null) {
+      final emailCandidates = <String>{
+        resolvedEmail,
+        '$studentId@school.local',
+        '$studentId@laon.local',
+      }.where((e) => e.trim().isNotEmpty).toList();
+
+      dynamic authResponse;
+      Object? lastError;
+      for (final email in emailCandidates) {
+        for (int attempt = 0; attempt < 2; attempt++) {
+          try {
+            authResponse = await supabase.auth.signInWithPassword(
+              email: email,
+              password: password,
+            );
+            if (authResponse.session != null && authResponse.user != null) {
+              break;
+            }
+          } catch (e) {
+            lastError = e;
+            if (!_isTransientAuthError(e) || attempt == 1) {
+              break;
+            }
+            await Future<void>.delayed(const Duration(milliseconds: 400));
+          }
+        }
+        if (authResponse?.session != null && authResponse?.user != null) {
+          break;
+        }
+      }
+
+      if (authResponse == null ||
+          authResponse.session == null ||
+          authResponse.user == null) {
+        if (lastError != null) throw lastError;
         throw Exception('세션을 생성하지 못했습니다.');
       }
 
