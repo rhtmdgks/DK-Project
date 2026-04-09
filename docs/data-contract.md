@@ -24,7 +24,7 @@ NEIS 학사일정: 백오피스 /api/neis-academic-sync 로 DB 동기화. 앱은
 ## 인증
 
 - **계정 생성**: 백오피스에서만 (profiles + auth.users). 이메일 형식: `학번@school.local` 또는 `학번-profileId@laon.local`.
-- **앱 로그인**: Supabase Auth (signInWithPassword). user_id = profiles.user_id. `login_from_profiles` RPC는 학번으로 `auth.users` 이메일을 알려 주며, `profiles.password`가 채워져 있을 때만 DB에서 비밀번호 문자열을 검증하고, 비어 있으면 이메일만 반환한 뒤 최종 검증은 Auth에 맡긴다(관리자 등 Auth만 맞춘 계정도 앱 로그인 가능).
+- **앱 로그인**: Supabase Auth (signInWithPassword). user_id = profiles.user_id. `login_from_profiles` RPC는 **학번으로만** 프로필·`auth.users` 이메일을 조회하고 비밀번호는 검사하지 않는다(일괄 리셋 후 `profiles.password` 불일치로 막히는 문제 방지). 실제 비밀번호 검증은 항상 `signInWithPassword` 한 번만.
 - **백오피스 로그인**: POST /api/auth (학번, 비밀번호) → 쿠키 세션. 다음 중 하나면 허용: `profiles.can_access_backoffice = true` **또는** `profiles.role` 이 `admin` / `council` / `teacher` (동일 기준으로 세션 검증). 세션에 노출하는 역할은 `backoffice_role` 우선, 없으면 위 app 역할. 학생 계정에만 백오피스를 열어야 할 때는 `can_access_backoffice`만 켜는 방식으로 구분.
 - **전체 비밀번호 리셋(백오피스)**: 설정 화면에서 관리자(admin)만 실행. 확인 대화상자 → 관리자 본인 비밀번호(step-up) → POST `/api/admin/bulk-reset-passwords`. **실행한 관리자 본인(`user_id`)은 리셋에서 제외**되고, 나머지 사용자는 임시 비밀번호 기본값 `12345678`(선택적으로 환경 변수 `BULK_RESET_DEFAULT_PASSWORD`로 덮어쓰기)로 Auth·`profiles`를 맞추며 `must_change_password = true`. 앱은 첫 로그인 시 비밀번호 변경 화면으로 유도.
 
