@@ -9,7 +9,7 @@ LAON 앱을 App Store에 올리기 위한 준비 사항과 절차입니다.
 | 앱 이름 (표시) | LAON |
 | Bundle ID | `com.wearegoodwill.laon` |
 | 위젯 Bundle ID | `com.wearegoodwill.laon.MealDepartureWidgetExtension` |
-| 버전 (pubspec.yaml) | `1.0.0+2` → 버전명 1.0.0, 빌드 번호 2 |
+| 버전 (pubspec.yaml) | 예: `1.0.2+5` → CFBundleShortVersionString **1.0.2**, CFBundleVersion **5** |
 | iOS 최소 버전 | 14.0 |
 | 개발팀 (Xcode) | G62875F3M4 |
 
@@ -50,6 +50,12 @@ LAON 앱을 App Store에 올리기 위한 준비 사항과 절차입니다.
   ```
 
 - **같은 버전(1.0.0)으로 재제출할 때는 빌드 번호만 반드시 이전보다 크게** 올려야 함 (예: 2 → 3).
+
+- **Xcode로만 아카이브할 때 필수:** `ios/Flutter/Generated.xcconfig` 는 `.gitignore` 로 저장소에 없고, **`pubspec.yaml` 의 버전은 `flutter build ios --config-only`**(또는 `flutter build ipa`) 실행 시에만 반영된다. 이걸 생략하면 **이전 버전(예: 1.0.1)으로 IPA가 만들어져** App Store Connect에서 `CFBundleShortVersionString` 오류(90062)·트레인 오류(90186)가 난다. **항상 프로젝트 루트에서 아래를 먼저 실행한 뒤** Xcode → Product → Archive 한다.
+
+  ```bash
+  cd /path/to/DK-Project && flutter pub get && flutter build ios --config-only
+  ```
 
 ### 2.2 아이콘·스플래시
 
