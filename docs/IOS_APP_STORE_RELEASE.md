@@ -9,7 +9,7 @@ LAON 앱을 App Store에 올리기 위한 준비 사항과 절차입니다.
 | 앱 이름 (표시) | LAON |
 | Bundle ID | `com.wearegoodwill.laon` |
 | 위젯 Bundle ID | `com.wearegoodwill.laon.MealDepartureWidgetExtension` |
-| 버전 (pubspec.yaml) | 예: `1.0.2+5` → CFBundleShortVersionString **1.0.2**, CFBundleVersion **5** |
+| 버전 (pubspec.yaml) | 예: `1.0.3+7` → CFBundleShortVersionString **1.0.3**, CFBundleVersion **7** |
 | iOS 최소 버전 | 14.0 |
 | 개발팀 (Xcode) | G62875F3M4 |
 
@@ -54,8 +54,21 @@ LAON 앱을 App Store에 올리기 위한 준비 사항과 절차입니다.
 - **Xcode로만 아카이브할 때 필수:** `ios/Flutter/Generated.xcconfig` 는 `.gitignore` 로 저장소에 없고, **`pubspec.yaml` 의 버전은 `flutter build ios --config-only`**(또는 `flutter build ipa`) 실행 시에만 반영된다. 이걸 생략하면 **이전 버전(예: 1.0.1)으로 IPA가 만들어져** App Store Connect에서 `CFBundleShortVersionString` 오류(90062)·트레인 오류(90186)가 난다. **항상 프로젝트 루트에서 아래를 먼저 실행한 뒤** Xcode → Product → Archive 한다.
 
   ```bash
+  ./scripts/ios_pre_archive.sh
+  ```
+
+  또는:
+
+  ```bash
   cd /path/to/DK-Project && flutter pub get && flutter build ios --config-only
   ```
+
+- **버전 번호:** 스토어에 **1.0.1이 이미 승인·종료**된 경우, 새 빌드는 **반드시 그보다 큰** `CFBundleShortVersionString`(예: **1.0.3**)이어야 한다. `pubspec`의 `+` 뒤 숫자는 **빌드 번호**(CFBundleVersion)로 매 제출마다 올리면 된다.
+
+### dSYM / Upload Symbols 경고
+
+- `objective_c.framework` 등에 대한 **Upload Symbols Failed** 는 Flutter/iOS 툴체인에서 가끔 나오는 **경고**인 경우가 많다. 위 **버전 오류(90186/90062)가 해결되면** 먼저 빌드가 수락되는지 확인한다.
+- 심볼을 **CLI 한 번에** 올리려면: `flutter build ipa` 로 아카이브·업로드까지 진행하는 방법도 있다(서명·프로비저닝 설정 필요).
 
 ### 2.2 아이콘·스플래시
 
