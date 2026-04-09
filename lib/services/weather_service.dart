@@ -1,5 +1,7 @@
 import 'dart:convert';
+import 'dart:io';
 
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 
 /// 아침 날씨 알림용 제목·본문.
@@ -21,6 +23,9 @@ class WeatherService {
   WeatherService._();
 
   static const _baseUrl = 'https://api.open-meteo.com/v1/forecast';
+  static const MethodChannel _weatherKitChannel = MethodChannel(
+    'weatherkit_channel',
+  );
 
   /// 기본 위치 (서울). 위치 권한 또는 설정에서 변경 가능.
   static const defaultLat = 37.57;
@@ -30,8 +35,7 @@ class WeatherService {
   static bool _isRainCode(int c) =>
       c >= 51 && c <= 67 || c >= 80 && c <= 82 || c == 95;
 
-  static bool _isSnowCode(int c) =>
-      c >= 71 && c <= 77 || c >= 85 && c <= 86;
+  static bool _isSnowCode(int c) => c >= 71 && c <= 77 || c >= 85 && c <= 86;
 
   static int? _hourFromTime(String t) {
     if (t.length >= 13) return int.tryParse(t.substring(11, 13));
@@ -41,6 +45,11 @@ class WeatherService {
   static String _formatTemp(double? v) {
     if (v == null || v.isNaN) return '—';
     return v.round().toString();
+  }
+
+  static String _limitText(String text, int maxLength) {
+    if (text.length <= maxLength) return text;
+    return '${text.substring(0, maxLength - 1)}…';
   }
 
   /// 하루 중 시간대 힌트 (첫 강수 시각 등).
@@ -61,19 +70,121 @@ class WeatherService {
     final lat = latitude ?? defaultLat;
     final lon = longitude ?? defaultLon;
 
-    final uri = Uri.parse(_baseUrl).replace(queryParameters: {
-      'latitude': '$lat',
-      'longitude': '$lon',
-      'hourly': 'weathercode,precipitation,temperature_2m',
-      'daily': 'temperature_2m_max,temperature_2m_min',
-      'timezone': timezone,
-      'forecast_days': '1',
-    });
+    // iOS 16+에서는 WeatherKit 우선 시도, 실패 시 Open-Meteo로 fallback.
+    if (Platform.isIOS) {
+      try {
+        final payload = await _weatherKitChannel
+            .invokeMethod<Map<dynamic, dynamic>>('getMorningForecast', {
+              'latitude': lat,
+              'longitude': lon,
+              'timezone': timezone,
+            });
+        if (payload != null) {
+          final copy = _buildCopyFromMappedWeather(
+            weatherType: (payload['weatherType'] as String? ?? 'clear')
+                .toLowerCase(),
+            morningTemp: (payload['morningTemp'] as num?)?.toDouble(),
+            maxTemp: (payload['maxTemp'] as num?)?.toDouble(),
+            minTemp: (payload['minTemp'] as num?)?.toDouble(),
+            timeHint: payload['timeHint'] as String?,
+          );
+          return copy;
+        }
+      } catch (_) {
+        // fallback
+      }
+    }
 
-    final response = await http.get(uri).timeout(
-      const Duration(seconds: 10),
-      onTimeout: () => throw Exception('날씨 요청 시간 초과'),
+    return _getMorningNotificationCopyFromOpenMeteo(
+      latitude: lat,
+      longitude: lon,
+      timezone: timezone,
     );
+  }
+
+  static MorningWeatherNotificationCopy _buildCopyFromMappedWeather({
+    required String weatherType,
+    required double? morningTemp,
+    required double? maxTemp,
+    required double? minTemp,
+    String? timeHint,
+  }) {
+    final mStr = _formatTemp(morningTemp);
+    final maxStr = _formatTemp(maxTemp);
+    final minStr = _formatTemp(minTemp);
+    final spread = (maxTemp != null && minTemp != null)
+        ? (maxTemp - minTemp)
+        : null;
+    final spreadLarge = spread != null && spread >= 10;
+    final hint = (timeHint ?? '').trim();
+
+    if (weatherType == 'rain') {
+      final title = _limitText('비 소식 있어요, 우산 챙겨요', 18);
+      final body = _limitText(
+        '${hint.isEmpty ? '출발 시간대에 비가 예상돼요.' : '$hint 비가 예상돼요.'} 오전 약 $mStr°, 최고 $maxStr°/최저 $minStr°예요. 접이식 우산을 챙겨주세요.',
+        90,
+      );
+      return MorningWeatherNotificationCopy(title: title, body: body);
+    }
+
+    if (weatherType == 'snow') {
+      final title = _limitText('눈길 주의, 따뜻하게 입어요', 18);
+      final body = _limitText(
+        '${hint.isEmpty ? '눈 또는 진눈깨비 가능성이 있어요.' : '$hint 눈 가능성이 있어요.'} 오전 약 $mStr°, 체감은 더 낮을 수 있어요. 미끄럼에 주의해 주세요.',
+        90,
+      );
+      return MorningWeatherNotificationCopy(title: title, body: body);
+    }
+
+    if (weatherType == 'cloudy') {
+      final title = _limitText('흐리지만 활동하기 괜찮아요', 18);
+      final body = _limitText(
+        '구름이 많은 날씨예요. 오전 약 $mStr°, 최고 $maxStr°/최저 $minStr°예요. ${spreadLarge ? '일교차가 커 얇은 겉옷을 추천해요.' : '가벼운 외투 정도면 충분해요.'}',
+        90,
+      );
+      return MorningWeatherNotificationCopy(title: title, body: body);
+    }
+
+    if (spreadLarge) {
+      final title = _limitText('일교차 커요, 겉옷 챙겨요', 18);
+      final body = _limitText(
+        '대체로 맑지만 기온 차가 커요. 오전 약 $mStr°, 최고 $maxStr°/최저 $minStr°예요. 얇은 겉옷을 챙기면 좋아요.',
+        90,
+      );
+      return MorningWeatherNotificationCopy(title: title, body: body);
+    }
+
+    final title = _limitText('맑은 아침이에요', 18);
+    final body = _limitText(
+      '대체로 맑은 날씨예요. 오전 약 $mStr°, 최고 $maxStr°/최저 $minStr°예요. 가볍게 준비해도 좋아요.',
+      90,
+    );
+    return MorningWeatherNotificationCopy(title: title, body: body);
+  }
+
+  static Future<MorningWeatherNotificationCopy>
+  _getMorningNotificationCopyFromOpenMeteo({
+    required double latitude,
+    required double longitude,
+    required String timezone,
+  }) async {
+    final uri = Uri.parse(_baseUrl).replace(
+      queryParameters: {
+        'latitude': '$latitude',
+        'longitude': '$longitude',
+        'hourly': 'weathercode,precipitation,temperature_2m',
+        'daily': 'temperature_2m_max,temperature_2m_min',
+        'timezone': timezone,
+        'forecast_days': '1',
+      },
+    );
+
+    final response = await http
+        .get(uri)
+        .timeout(
+          const Duration(seconds: 10),
+          onTimeout: () => throw Exception('날씨 요청 시간 초과'),
+        );
 
     if (response.statusCode != 200) {
       throw Exception('날씨 조회 실패: ${response.statusCode}');
@@ -84,14 +195,20 @@ class WeatherService {
     if (hourly == null) throw Exception('날씨 데이터 없음');
 
     final codes =
-        (hourly['weathercode'] as List<dynamic>?)?.map((e) => (e as num).toInt()).toList() ??
-            [];
+        (hourly['weathercode'] as List<dynamic>?)
+            ?.map((e) => (e as num).toInt())
+            .toList() ??
+        [];
     final precip =
-        (hourly['precipitation'] as List<dynamic>?)?.map((e) => e.toDouble()).toList() ??
-            [];
+        (hourly['precipitation'] as List<dynamic>?)
+            ?.map((e) => e.toDouble())
+            .toList() ??
+        [];
     final temps =
-        (hourly['temperature_2m'] as List<dynamic>?)?.map((e) => e.toDouble()).toList() ??
-            [];
+        (hourly['temperature_2m'] as List<dynamic>?)
+            ?.map((e) => e.toDouble())
+            .toList() ??
+        [];
     final times = (hourly['time'] as List<dynamic>?)?.cast<String>() ?? [];
 
     final now = DateTime.now();
@@ -118,10 +235,12 @@ class WeatherService {
     final daily = data['daily'] as Map<String, dynamic>?;
     if (daily != null) {
       final dTimes = (daily['time'] as List<dynamic>?)?.cast<String>() ?? [];
-      final maxList =
-          (daily['temperature_2m_max'] as List<dynamic>?)?.map((e) => e.toDouble()).toList();
-      final minList =
-          (daily['temperature_2m_min'] as List<dynamic>?)?.map((e) => e.toDouble()).toList();
+      final maxList = (daily['temperature_2m_max'] as List<dynamic>?)
+          ?.map((e) => e.toDouble())
+          .toList();
+      final minList = (daily['temperature_2m_min'] as List<dynamic>?)
+          ?.map((e) => e.toDouble())
+          .toList();
       for (int i = 0; i < dTimes.length; i++) {
         if (dTimes[i] == today) {
           if (maxList != null && i < maxList.length) tMax = maxList[i];
@@ -148,8 +267,7 @@ class WeatherService {
       }
     }
     if (morningVals.isNotEmpty) {
-      morningTemp =
-          morningVals.reduce((a, b) => a + b) / morningVals.length;
+      morningTemp = morningVals.reduce((a, b) => a + b) / morningVals.length;
     } else {
       for (int i = 0; i < endIndex && i < times.length; i++) {
         if (!times[i].startsWith(today)) continue;
@@ -221,10 +339,10 @@ class WeatherService {
       if (rainTimeHint != null) {
         buf.write(' $rainTimeHint.');
       }
-      buf.write(' 우산과 얇은 겉옷을 챙기면 좋아요.');
+      buf.write(' 접이식 우산을 챙겨주세요.');
       return MorningWeatherNotificationCopy(
-        title: '우산이 있으면 든든해요',
-        body: buf.toString(),
+        title: '비 소식 있어요, 우산 챙겨요',
+        body: _limitText(buf.toString(), 90),
       );
     }
 
@@ -234,16 +352,14 @@ class WeatherService {
       if (snowTimeHint != null) {
         buf.write(' $snowTimeHint.');
       }
-      buf.write(' 길이 미끄러울 수 있으니 천천히 이동해 주세요.');
+      buf.write(' 길이 미끄러울 수 있어 천천히 이동해 주세요.');
       return MorningWeatherNotificationCopy(
-        title: '눈길·미끄러움에 주의해요',
-        body: buf.toString(),
+        title: '눈길 주의, 따뜻하게 입어요',
+        body: _limitText(buf.toString(), 90),
       );
     }
 
-    final cloudy = codeSlice.any(
-      (c) => c >= 1 && c <= 3 || c == 45 || c == 48,
-    );
+    final cloudy = codeSlice.any((c) => c >= 1 && c <= 3 || c == 45 || c == 48);
     if (cloudy) {
       final buf = StringBuffer()
         ..write('구름이 많은 날씨예요. 오전 기준 약 $mStr°, 최고 $maxStr° · 최저 $minStr°예요.');
@@ -253,8 +369,8 @@ class WeatherService {
         buf.write(' 바깥 활동하기 무난해요.');
       }
       return MorningWeatherNotificationCopy(
-        title: '흐리지만 괜찮은 하루예요',
-        body: buf.toString(),
+        title: '흐리지만 활동하기 괜찮아요',
+        body: _limitText(buf.toString(), 90),
       );
     }
 
@@ -266,8 +382,8 @@ class WeatherService {
       clearBuf.write(' 가볍게 입고 나가기 좋아요.');
     }
     return MorningWeatherNotificationCopy(
-      title: '맑고 기분 좋은 하루예요',
-      body: clearBuf.toString(),
+      title: '맑은 아침이에요',
+      body: _limitText(clearBuf.toString(), 90),
     );
   }
 }
