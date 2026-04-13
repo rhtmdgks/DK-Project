@@ -93,10 +93,6 @@ class _ClassPhotoSharesScreenState extends State<ClassPhotoSharesScreen> {
     final grade = _grade;
     final classNumber = _classNumber;
     if (profileId == null || userId == null || grade == null || classNumber == null) return;
-    if (!_canManage) {
-      _showSnack('정반장/부반장(또는 관리자/교사) 권한이 필요합니다.');
-      return;
-    }
 
     final titleController = TextEditingController();
     final subjectController = TextEditingController();
@@ -268,12 +264,10 @@ class _ClassPhotoSharesScreenState extends State<ClassPhotoSharesScreen> {
           ],
         ),
       ),
-      floatingActionButton: _canManage
-          ? FloatingActionButton(
-              onPressed: _uploadPhoto,
-              child: const Icon(Icons.add_a_photo_outlined),
-            )
-          : null,
+      floatingActionButton: FloatingActionButton(
+        onPressed: _uploadPhoto,
+        child: const Icon(Icons.add_a_photo_outlined),
+      ),
     );
   }
 }

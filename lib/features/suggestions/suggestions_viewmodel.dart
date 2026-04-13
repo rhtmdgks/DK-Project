@@ -51,11 +51,9 @@ class SuggestionsViewModel extends ChangeNotifier {
   /// 1:1 채팅방 생성 또는 조회. 반환: RPC 결과 맵 (room id 등).
   Future<Map<String, dynamic>> createOrGetDirectChat({
     required String otherUserId,
-    required String userId,
   }) async {
     return _repo.createOrGetDirectChat(
       otherUserId: otherUserId,
-      userId: userId,
     );
   }
 

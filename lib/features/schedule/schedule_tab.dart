@@ -122,46 +122,8 @@ class _ScheduleTabState extends State<ScheduleTab> {
             .toList();
       }
 
-      // NEIS 학사일정 (시도교육청·학교 코드는 Edge Function env, 급식과 동일)
-      List<Map<String, dynamic>> neisList = [];
-      final firstDay = DateTime(_viewMonth.year, _viewMonth.month, 1);
-      final lastDay = DateTime(_viewMonth.year, _viewMonth.month + 1, 0);
-      final fromYmd =
-          '${firstDay.year}${firstDay.month.toString().padLeft(2, '0')}${firstDay.day.toString().padLeft(2, '0')}';
-      final toYmd =
-          '${lastDay.year}${lastDay.month.toString().padLeft(2, '0')}${lastDay.day.toString().padLeft(2, '0')}';
-
-      try {
-        final neisRes = await supabase.functions.invoke(
-          'neis_academic_calendar',
-          queryParameters: {'from': fromYmd, 'to': toYmd},
-        ).timeout(
-          const Duration(seconds: 15),
-          onTimeout: () => throw Exception('학사일정 요청 시간 초과'),
-        );
-
-        if (neisRes.status == 200 && neisRes.data is Map<String, dynamic>) {
-          final data = neisRes.data as Map<String, dynamic>;
-          final schedule = data['schedule'] as List<dynamic>? ?? [];
-          for (final row in schedule) {
-            final m = row as Map<String, dynamic>;
-            final aaYmd = m['AA_YMD'] as String? ?? '';
-            if (aaYmd.length != 8) continue;
-            final eventNm = m['EVENT_NM'] as String? ?? '';
-            final eventCntnt = m['EVENT_CNTNT'] as String? ?? '';
-            neisList.add({
-              'start_at': '${aaYmd.substring(0, 4)}-${aaYmd.substring(4, 6)}-${aaYmd.substring(6, 8)}T00:00:00.000Z',
-              'end_at': null,
-              'title': eventNm.isEmpty ? '(학사일정)' : eventNm,
-              'description': eventCntnt.isEmpty ? null : eventCntnt,
-              'is_neis': true,
-            });
-          }
-        }
-        // 오류 시 자체 해결하지 않고 _neisItems만 비움 (나머지 일정은 표시)
-      } catch (_) {
-        neisList = [];
-      }
+      // 학사일정(NEIS)은 연동하지 않고, 앱/백오피스에서 등록한 일정만 표시한다.
+      final neisList = <Map<String, dynamic>>[];
 
       if (!mounted) return;
       setState(() {
@@ -182,7 +144,6 @@ class _ScheduleTabState extends State<ScheduleTab> {
   }
 
   bool get _canEdit => _profile?.isPrivileged ?? false;
-  bool get _canManageClassSharedEvents => _profile?.canManageClassResources ?? false;
 
   /// 선택한 날짜에 해당하는 일정만 반환 (학교 일정 + 개인 일정 + 학사일정).
   List<Map<String, dynamic>> get _itemsForSelectedDay {
@@ -573,7 +534,9 @@ class _ScheduleTabState extends State<ScheduleTab> {
     final isNeis = item['is_neis'] == true || scope == 'neis';
 
     final subtitle = [
+      if (isPersonal) '개인 일정',
       if (isClass) '${item['grade']}학년 ${item['class_number']}반 공유',
+      if (!isPersonal && !isClass && !isNeis) '학교 일정',
       if (timeStr.isNotEmpty) timeStr,
       if (desc.isNotEmpty) desc,
     ]
@@ -629,7 +592,7 @@ class _ScheduleTabState extends State<ScheduleTab> {
     final isClassOwner = isClass && item['created_by_user_id'] == _currentUserId;
 
     // 학사일정(NEIS)은 삭제 불가. 개인 일정/학교 일정만 삭제 버튼 표시.
-    if (!isNeis && id != null && (isPersonal || isClassOwner || _canEdit || _canManageClassSharedEvents)) {
+    if (!isNeis && id != null && (isPersonal || isClassOwner || _canEdit)) {
       actions.add(
         TextButton(
           onPressed: () async {
@@ -962,12 +925,10 @@ class _ScheduleTabState extends State<ScheduleTab> {
                                     subtitle: Text(
                                       _profile?.hasGradeClass != true
                                           ? '프로필에 학년/반 정보가 없어 학급 공유를 사용할 수 없습니다.'
-                                          : !_canManageClassSharedEvents
-                                              ? '정반장/부반장(또는 관리자/교사) 권한이 필요합니다.'
-                                              : '${_profile!.gradeOrFromStudentId}학년 ${_profile!.classNumOrFromStudentId}반 전체에 보입니다.',
+                                          : '${_profile!.gradeOrFromStudentId}학년 ${_profile!.classNumOrFromStudentId}반 전체에 보입니다.',
                                     ),
                                     value: shareWithClass,
-                                    onChanged: _profile?.hasGradeClass == true && _canManageClassSharedEvents
+                                    onChanged: _profile?.hasGradeClass == true
                                         ? (value) => setSheetState(() => shareWithClass = value ?? false)
                                         : null,
                                     contentPadding: EdgeInsets.zero,
@@ -1042,17 +1003,6 @@ class _ScheduleTabState extends State<ScheduleTab> {
                                               ? null
                                               : descController.text.trim();
                                           if (shareWithClass) {
-                                            if (!_canManageClassSharedEvents) {
-                                              if (innerContext.mounted) {
-                                                ScaffoldMessenger.of(innerContext).showSnackBar(
-                                                  const SnackBar(
-                                                    content: Text('학급 공유 일정은 정반장/부반장(또는 관리자/교사)만 추가할 수 있습니다.'),
-                                                    behavior: SnackBarBehavior.floating,
-                                                  ),
-                                                );
-                                              }
-                                              return;
-                                            }
                                             final profile = _profile;
                                             final grade = profile?.gradeOrFromStudentId;
                                             final classNum = profile?.classNumOrFromStudentId;

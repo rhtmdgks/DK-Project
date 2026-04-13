@@ -31,13 +31,11 @@ class SuggestionsRepository {
   /// 1:1 채팅방 생성 또는 조회. 반환값은 RPC 결과 (room id 등).
   Future<Map<String, dynamic>> createOrGetDirectChat({
     required String otherUserId,
-    required String userId,
   }) async {
     final result = await _client.rpc(
       'create_or_get_direct_chat',
       params: {
         'p_other_user_id': otherUserId,
-        'p_user_id': userId,
       },
     );
     return result as Map<String, dynamic>;

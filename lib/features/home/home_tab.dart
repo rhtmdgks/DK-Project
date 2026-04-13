@@ -78,17 +78,22 @@ class _HomeTabState extends State<HomeTab> {
     } else {
       final currentMinutes = now.hour * 60 + now.minute;
       final todayPeriods = TimetableUtils.periodStartTimesForDate(now);
+      int? firstStartMinutes;
       for (final card in list) {
         final idx = card.period - 1;
         if (idx < 0 || idx >= todayPeriods.length) continue;
         final start = todayPeriods[idx];
         final startMinutes = start[0] * 60 + start[1];
+        firstStartMinutes ??= startMinutes;
         if (startMinutes > currentMinutes) {
           next = card;
           break;
         }
       }
-      next ??= list.first;
+      // 수업 시작 전에는 1교시를, 수업 종료 후에는 다음 수업이 없는 것으로 처리.
+      if (next == null && firstStartMinutes != null && currentMinutes < firstStartMinutes) {
+        next = list.first;
+      }
     }
     if (next == null) return null;
     return _NextClassInfo(

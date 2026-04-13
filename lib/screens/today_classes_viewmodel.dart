@@ -151,6 +151,13 @@ class TodayClassesViewModel extends ChangeNotifier {
     _loadTimetableForDate(date);
   }
 
+  void selectWeekday(int weekday) {
+    final now = DateTime.now();
+    final monday = now.subtract(Duration(days: now.weekday - DateTime.monday));
+    final target = monday.add(Duration(days: weekday - DateTime.monday));
+    selectDate(DateTime(target.year, target.month, target.day));
+  }
+
   void navigateMonth(int delta) {
     _selectedDate = DateTime(
       _selectedDate.year,
@@ -177,6 +184,43 @@ class TodayClassesViewModel extends ChangeNotifier {
       _loadTimetableForDate(_selectedDate),
       _loadChangeLogs(),
     ]);
+  }
+
+  Future<void> upsertTimetableEntry({
+    required int period,
+    required String subject,
+    String? room,
+  }) async {
+    final uid = supabase.auth.currentUser?.id;
+    final dayOfWeek = TimetableUtils.dayOfWeekForDb(_selectedDate);
+    if (uid == null || dayOfWeek == null) return;
+
+    await supabase.from('timetable_entries').upsert({
+      'user_id': uid,
+      'day_of_week': dayOfWeek,
+      'period': period,
+      'subject': subject.trim(),
+      'room': room?.trim().isEmpty == true ? null : room?.trim(),
+    }, onConflict: 'user_id,day_of_week,period');
+
+    _timetableCache.remove(_cacheKey(_selectedDate));
+    await _loadTimetableForDate(_selectedDate);
+  }
+
+  Future<void> deleteTimetableEntry({required int period}) async {
+    final uid = supabase.auth.currentUser?.id;
+    final dayOfWeek = TimetableUtils.dayOfWeekForDb(_selectedDate);
+    if (uid == null || dayOfWeek == null) return;
+
+    await supabase
+        .from('timetable_entries')
+        .delete()
+        .eq('user_id', uid)
+        .eq('day_of_week', dayOfWeek)
+        .eq('period', period);
+
+    _timetableCache.remove(_cacheKey(_selectedDate));
+    await _loadTimetableForDate(_selectedDate);
   }
 
   Future<void> _loadProfile() async {
@@ -273,7 +317,7 @@ class TodayClassesViewModel extends ChangeNotifier {
 
   void _startProgressTimer() {
     _progressTimer = Timer.periodic(
-      const Duration(seconds: 60),
+      const Duration(seconds: 1),
       (_) => notifyListeners(),
     );
   }

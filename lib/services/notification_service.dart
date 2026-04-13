@@ -219,6 +219,7 @@ class NotificationService {
             _getChannelName(type),
             importance: Importance.defaultImportance,
             priority: Priority.defaultPriority,
+            styleInformation: BigTextStyleInformation(body),
           ),
           iOS: const DarwinNotificationDetails(
             presentAlert: true,

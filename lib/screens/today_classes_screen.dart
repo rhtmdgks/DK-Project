@@ -29,12 +29,12 @@ class _TodayClassesScreenState extends State<TodayClassesScreen> {
     super.dispose();
   }
 
-  static const _weekdayLabels = [
-    'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN',
-  ];
-  static const _monthLabels = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December',
+  static const _weekdayTabs = [
+    (weekday: DateTime.monday, label: '월'),
+    (weekday: DateTime.tuesday, label: '화'),
+    (weekday: DateTime.wednesday, label: '수'),
+    (weekday: DateTime.thursday, label: '목'),
+    (weekday: DateTime.friday, label: '금'),
   ];
 
   @override
@@ -54,7 +54,9 @@ class _TodayClassesScreenState extends State<TodayClassesScreen> {
                 vertical: context.rh(16),
               ),
               children: [
-                _buildMonthAndDateStrip(),
+                _buildWeekdayStrip(),
+                SizedBox(height: context.rh(12)),
+                _buildTimetableEditorButton(),
                 SizedBox(height: context.rh(24)),
                 _buildClassList(),
                 SizedBox(height: context.rh(32)),
@@ -127,164 +129,46 @@ class _TodayClassesScreenState extends State<TodayClassesScreen> {
     );
   }
 
-  // ─── Month Header + Date Strip ───
-
-  Widget _buildMonthAndDateStrip() {
-    final date = _vm.selectedDate;
-    final monthLabel = '${_monthLabels[date.month - 1]} ${date.year}';
-    final startOfMonth = DateTime(date.year, date.month, 1);
-    final endOfMonth = DateTime(date.year, date.month + 1, 0);
-    final daysInMonth = endOfMonth.day;
-    final dates = List.generate(
-      daysInMonth,
-      (i) => startOfMonth.add(Duration(days: i)),
-    );
-
+  // ─── Weekday Strip ───
+  Widget _buildWeekdayStrip() {
+    final selectedWeekday = _vm.selectedDate.weekday;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  monthLabel,
-                  style: AppFonts.scaled(context, AppFonts.smallMedium)
-                      .copyWith(
-                    color: AppColors.textSecondary,
-                    fontSize: context.rs(14),
-                  ),
-                ),
-                SizedBox(height: context.rh(2)),
-                Text(
-                  'Schedule',
-                  style: AppFonts.scaled(context, AppFonts.titleSemiBold)
-                      .copyWith(
-                    color: AppColors.textDark,
-                    fontSize: context.rs(30),
-                    fontWeight: FontWeight.w800,
-                    height: 1.1,
-                  ),
-                ),
-              ],
-            ),
-            const Spacer(),
-            Container(
-              decoration: BoxDecoration(
-                color: AppColors.surfaceContainerLow,
-                borderRadius: BorderRadius.circular(999),
-              ),
-              padding: EdgeInsets.all(context.rs(4)),
-              child: Row(
-                children: [
-                  _MonthNavButton(
-                    icon: CupertinoIcons.chevron_left,
-                    onTap: () => _vm.navigateMonth(-1),
-                  ),
-                  SizedBox(width: context.rs(4)),
-                  _MonthNavButton(
-                    icon: CupertinoIcons.chevron_right,
-                    onTap: () => _vm.navigateMonth(1),
-                  ),
-                ],
-              ),
-            ),
-          ],
+        Text(
+          '요일별 시간표',
+          style: AppFonts.scaled(context, AppFonts.titleSemiBold).copyWith(
+            color: AppColors.textDark,
+            fontWeight: FontWeight.w800,
+            fontSize: context.rs(24),
+          ),
         ),
-        SizedBox(height: context.rh(16)),
+        SizedBox(height: context.rh(10)),
         SizedBox(
-          height: context.rh(82),
-          child: ListView.builder(
+          height: context.rh(54),
+          child: ListView.separated(
             scrollDirection: Axis.horizontal,
-            itemCount: dates.length,
+            itemCount: _weekdayTabs.length,
+            separatorBuilder: (_, __) => SizedBox(width: context.rs(8)),
             itemBuilder: (context, index) {
-              final d = dates[index];
-              final isSelected = d.day == date.day &&
-                  d.month == date.month &&
-                  d.year == date.year;
-              final label = _weekdayLabels[d.weekday - 1];
-
-              return Padding(
-                padding: EdgeInsets.only(
-                  right: index < dates.length - 1 ? context.rs(8) : 0,
+              final tab = _weekdayTabs[index];
+              final isSelected = selectedWeekday == tab.weekday;
+              return ChoiceChip(
+                selected: isSelected,
+                label: Text('${tab.label}요일'),
+                onSelected: (_) => _vm.selectWeekday(tab.weekday),
+                selectedColor: AppColors.primaryBlue,
+                backgroundColor: AppColors.white,
+                labelStyle: AppFonts.scaled(context, AppFonts.bodyMedium).copyWith(
+                  color: isSelected ? AppColors.white : AppColors.textDark,
+                  fontWeight: FontWeight.w700,
                 ),
-                child: Material(
-                  color: Colors.transparent,
-                  borderRadius: BorderRadius.circular(24),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(24),
-                    onTap: () => _vm.selectDate(d),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 180),
-                      curve: Curves.easeOutCubic,
-                      width: context.rs(56),
-                      decoration: BoxDecoration(
-                        color: isSelected
-                            ? AppColors.primaryBlue
-                            : AppColors.white,
-                        borderRadius: BorderRadius.circular(24),
-                        boxShadow: isSelected
-                            ? [
-                                BoxShadow(
-                                  color: AppColors.primaryBlue
-                                      .withValues(alpha: 0.15),
-                                  offset: const Offset(0, 8),
-                                  blurRadius: 24,
-                                ),
-                              ]
-                            : null,
-                      ),
-                      padding: EdgeInsets.symmetric(
-                        vertical: context.rh(10),
-                      ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            label,
-                            style: AppFonts.scaled(
-                              context,
-                              AppFonts.captionMedium,
-                            ).copyWith(
-                              color: isSelected
-                                  ? AppColors.white.withValues(alpha: 0.8)
-                                  : AppColors.textSecondary,
-                              fontSize: context.rs(10),
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 0.7,
-                            ),
-                          ),
-                          SizedBox(height: context.rh(4)),
-                          Text(
-                            '${d.day}',
-                            style: AppFonts.scaled(
-                              context,
-                              AppFonts.display3SemiBold,
-                            ).copyWith(
-                              color: isSelected
-                                  ? AppColors.white
-                                  : AppColors.textDark,
-                              fontWeight: FontWeight.w800,
-                              fontSize: context.rs(18),
-                            ),
-                          ),
-                          if (isSelected) ...[
-                            SizedBox(height: context.rh(5)),
-                            Container(
-                              width: context.rs(4),
-                              height: context.rs(4),
-                              decoration: const BoxDecoration(
-                                color: AppColors.white,
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(999),
+                  side: BorderSide(
+                    color: isSelected
+                        ? AppColors.primaryBlue
+                        : AppColors.borderLight,
                   ),
                 ),
               );
@@ -292,6 +176,17 @@ class _TodayClassesScreenState extends State<TodayClassesScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildTimetableEditorButton() {
+    return Align(
+      alignment: Alignment.centerRight,
+      child: OutlinedButton.icon(
+        onPressed: _showTimetableEditDialog,
+        icon: const Icon(Icons.edit_calendar_outlined, size: 18),
+        label: const Text('개인 시간표 수정'),
+      ),
     );
   }
 
@@ -546,6 +441,13 @@ class _TodayClassesScreenState extends State<TodayClassesScreen> {
                             ),
                           ),
                           SizedBox(width: context.rs(8)),
+                          IconButton(
+                            onPressed: () => _showTimetableEditDialog(initial: item),
+                            icon: const Icon(Icons.edit_outlined),
+                            tooltip: '이 교시 수정',
+                            color: AppColors.textSecondary,
+                            visualDensity: VisualDensity.compact,
+                          ),
                           if (isCurrent)
                             _buildStateIcon(
                               icon: Icons.near_me_rounded,
@@ -1053,37 +955,157 @@ class _TodayClassesScreenState extends State<TodayClassesScreen> {
 
   // ─── Helpers ───
 
+  Future<void> _showTimetableEditDialog({ClassItem? initial}) async {
+    final periods = TimetableUtils.periodNumbersForDate(_vm.selectedDate);
+    if (periods.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('주말은 시간표를 수정할 수 없습니다.')),
+      );
+      return;
+    }
+
+    var selectedPeriod = initial?.period ?? periods.first;
+    if (!periods.contains(selectedPeriod)) {
+      selectedPeriod = periods.first;
+    }
+    final subjectController = TextEditingController(text: initial?.name ?? '');
+    final roomController = TextEditingController(text: initial?.location ?? '');
+
+    ClassItem? findEntry(int period) {
+      for (final c in _vm.classes) {
+        if (c.period == period) return c;
+      }
+      return null;
+    }
+
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        bool busy = false;
+        return StatefulBuilder(
+          builder: (dialogContext, setDialogState) {
+            final existing = findEntry(selectedPeriod);
+            return AlertDialog(
+              title: const Text('개인 시간표 수정'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  DropdownButtonFormField<int>(
+                    initialValue: selectedPeriod,
+                    items: periods
+                        .map((p) => DropdownMenuItem<int>(
+                              value: p,
+                              child: Text('$p교시'),
+                            ))
+                        .toList(),
+                    onChanged: busy
+                        ? null
+                        : (v) {
+                            if (v == null) return;
+                            setDialogState(() {
+                              selectedPeriod = v;
+                              final target = findEntry(v);
+                              subjectController.text = target?.name ?? '';
+                              roomController.text = target?.location ?? '';
+                            });
+                          },
+                    decoration: const InputDecoration(labelText: '교시'),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: subjectController,
+                    enabled: !busy,
+                    decoration: const InputDecoration(labelText: '과목'),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: roomController,
+                    enabled: !busy,
+                    decoration: const InputDecoration(labelText: '교실(선택)'),
+                  ),
+                  if (existing != null) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      '현재 등록: ${existing.name}${existing.location.isNotEmpty ? ' (${existing.location})' : ''}',
+                      style: AppFonts.scaled(context, AppFonts.captionMedium)
+                          .copyWith(color: AppColors.textSecondary),
+                    ),
+                  ],
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: busy
+                      ? null
+                      : () => Navigator.of(dialogContext).pop(false),
+                  child: const Text('취소'),
+                ),
+                if (existing != null)
+                  TextButton(
+                    onPressed: busy
+                        ? null
+                        : () async {
+                            setDialogState(() => busy = true);
+                            try {
+                              await _vm.deleteTimetableEntry(period: selectedPeriod);
+                              if (dialogContext.mounted) {
+                                Navigator.of(dialogContext).pop(true);
+                              }
+                            } finally {
+                              if (dialogContext.mounted) {
+                                setDialogState(() => busy = false);
+                              }
+                            }
+                          },
+                    child: const Text('삭제'),
+                  ),
+                FilledButton(
+                  onPressed: busy
+                      ? null
+                      : () async {
+                          final subject = subjectController.text.trim();
+                          if (subject.isEmpty) return;
+                          setDialogState(() => busy = true);
+                          try {
+                            await _vm.upsertTimetableEntry(
+                              period: selectedPeriod,
+                              subject: subject,
+                              room: roomController.text.trim(),
+                            );
+                            if (dialogContext.mounted) {
+                              Navigator.of(dialogContext).pop(true);
+                            }
+                          } finally {
+                            if (dialogContext.mounted) {
+                              setDialogState(() => busy = false);
+                            }
+                          }
+                        },
+                  child: const Text('저장'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    subjectController.dispose();
+    roomController.dispose();
+
+    if (saved == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('시간표가 저장되었습니다.')),
+      );
+    }
+  }
+
   String _formatTime24h(String time24) {
     final parts = time24.split(':');
     if (parts.length < 2) return time24;
     final h = int.tryParse(parts[0]) ?? 0;
     final m = parts[1];
     return '${h.toString().padLeft(2, '0')}:$m';
-  }
-}
-
-// ─── Month Navigation Button ───
-
-class _MonthNavButton extends StatelessWidget {
-  const _MonthNavButton({required this.icon, required this.onTap});
-
-  final IconData icon;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: AppColors.white,
-      borderRadius: BorderRadius.circular(999),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(999),
-        onTap: onTap,
-        child: SizedBox(
-          width: context.rs(40),
-          height: context.rs(40),
-          child: Icon(icon, size: context.rs(16), color: AppColors.textSecondary),
-        ),
-      ),
-    );
   }
 }
