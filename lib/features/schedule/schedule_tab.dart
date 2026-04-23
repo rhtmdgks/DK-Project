@@ -182,7 +182,7 @@ class _ScheduleTabState extends State<ScheduleTab> {
               padding: EdgeInsets.symmetric(horizontal: context.rs(22)),
               child: TabPageHeader(
                 title: '일정',
-                subtitle: '날짜를 선택해 일정을 확인하세요. 개인 일정은 본인만, 「학급에 공유」로 넣은 일정은 같은 반 학생 모두에게 보입니다.',
+                subtitle: '날짜를 선택해 일정을 확인하세요.',
                 trailing: _canEdit
                     ? CupertinoButton(
                         padding: EdgeInsets.zero,
