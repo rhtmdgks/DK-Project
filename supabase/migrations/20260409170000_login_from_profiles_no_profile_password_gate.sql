@@ -18,7 +18,7 @@ DECLARE
   v_profile_id uuid;
   v_user_id uuid;
   v_email text;
-  v_profile_data jsonb;
+  v_profile_data jsonb;₩
 BEGIN
   IF nullif(trim(p_student_id), '') IS NULL OR nullif(trim(p_password), '') IS NULL THEN
     RAISE EXCEPTION 'invalid_input';

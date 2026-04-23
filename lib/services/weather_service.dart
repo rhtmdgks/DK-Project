@@ -122,7 +122,7 @@ class WeatherService {
       final title = _limitText('비 소식 있어요, 우산 챙겨요', 18);
       final body = _limitText(
         '${hint.isEmpty ? '출발 시간대에 비가 예상돼요.' : '$hint 비가 예상돼요.'} 오전 약 $mStr°, 최고 $maxStr°/최저 $minStr°예요. 접이식 우산을 챙겨주세요.',
-        160,
+        520,
       );
       return MorningWeatherNotificationCopy(title: title, body: body);
     }
@@ -131,7 +131,7 @@ class WeatherService {
       final title = _limitText('눈길 주의, 따뜻하게 입어요', 18);
       final body = _limitText(
         '${hint.isEmpty ? '눈 또는 진눈깨비 가능성이 있어요.' : '$hint 눈 가능성이 있어요.'} 오전 약 $mStr°, 체감은 더 낮을 수 있어요. 미끄럼에 주의해 주세요.',
-        160,
+        520,
       );
       return MorningWeatherNotificationCopy(title: title, body: body);
     }
@@ -140,7 +140,7 @@ class WeatherService {
       final title = _limitText('흐리지만 활동하기 괜찮아요', 18);
       final body = _limitText(
         '구름이 많은 날씨예요. 오전 약 $mStr°, 최고 $maxStr°/최저 $minStr°예요. ${spreadLarge ? '일교차가 커 얇은 겉옷을 추천해요.' : '가벼운 외투 정도면 충분해요.'}',
-        160,
+        520,
       );
       return MorningWeatherNotificationCopy(title: title, body: body);
     }
@@ -149,7 +149,7 @@ class WeatherService {
       final title = _limitText('일교차 커요, 겉옷 챙겨요', 18);
       final body = _limitText(
         '대체로 맑지만 기온 차가 커요. 오전 약 $mStr°, 최고 $maxStr°/최저 $minStr°예요. 얇은 겉옷을 챙기면 좋아요.',
-        160,
+        520,
       );
       return MorningWeatherNotificationCopy(title: title, body: body);
     }
@@ -157,7 +157,7 @@ class WeatherService {
     final title = _limitText('맑은 아침이에요', 18);
     final body = _limitText(
       '대체로 맑은 날씨예요. 오전 약 $mStr°, 최고 $maxStr°/최저 $minStr°예요. 가볍게 준비해도 좋아요.',
-      160,
+      520,
     );
     return MorningWeatherNotificationCopy(title: title, body: body);
   }
@@ -342,7 +342,7 @@ class WeatherService {
       buf.write(' 접이식 우산을 챙겨주세요.');
       return MorningWeatherNotificationCopy(
         title: '비 소식 있어요, 우산 챙겨요',
-        body: _limitText(buf.toString(), 160),
+        body: _limitText(buf.toString(), 520),
       );
     }
 
@@ -355,7 +355,7 @@ class WeatherService {
       buf.write(' 길이 미끄러울 수 있어 천천히 이동해 주세요.');
       return MorningWeatherNotificationCopy(
         title: '눈길 주의, 따뜻하게 입어요',
-        body: _limitText(buf.toString(), 160),
+        body: _limitText(buf.toString(), 520),
       );
     }
 
@@ -370,7 +370,7 @@ class WeatherService {
       }
       return MorningWeatherNotificationCopy(
         title: '흐리지만 활동하기 괜찮아요',
-        body: _limitText(buf.toString(), 160),
+        body: _limitText(buf.toString(), 520),
       );
     }
 
@@ -383,7 +383,7 @@ class WeatherService {
     }
     return MorningWeatherNotificationCopy(
       title: '맑은 아침이에요',
-      body: _limitText(clearBuf.toString(), 160),
+      body: _limitText(clearBuf.toString(), 520),
     );
   }
 }

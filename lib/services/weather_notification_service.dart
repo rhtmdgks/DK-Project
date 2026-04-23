@@ -199,26 +199,27 @@ class WeatherNotificationService {
     await prefs.setString(_keyNextScheduledDate, scheduleKey);
     debugPrint('날씨 알림 예약: ${scheduled.toString()} / $scheduleKey');
 
+    final androidDetails = AndroidNotificationDetails(
+      _channelId,
+      _channelName,
+      channelDescription: '매일 오전 6시 30분 날씨 알림',
+      importance: Importance.high,
+      priority: Priority.high,
+      styleInformation: BigTextStyleInformation(body),
+    );
+    const iosDetails = DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: true,
+    );
+
     try {
       await _plugin.zonedSchedule(
         _notificationId,
         title,
         body,
         scheduled,
-        const NotificationDetails(
-          android: AndroidNotificationDetails(
-            _channelId,
-            _channelName,
-            channelDescription: '매일 오전 6시 30분 날씨 알림',
-            importance: Importance.high,
-            priority: Priority.high,
-          ),
-          iOS: DarwinNotificationDetails(
-            presentAlert: true,
-            presentBadge: true,
-            presentSound: true,
-          ),
-        ),
+        NotificationDetails(android: androidDetails, iOS: iosDetails),
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
         uiLocalNotificationDateInterpretation:
             UILocalNotificationDateInterpretation.absoluteTime,
@@ -232,20 +233,7 @@ class WeatherNotificationService {
           title,
           body,
           scheduled,
-          const NotificationDetails(
-            android: AndroidNotificationDetails(
-              _channelId,
-              _channelName,
-              channelDescription: '매일 오전 6시 30분 날씨 알림',
-              importance: Importance.high,
-              priority: Priority.high,
-            ),
-            iOS: DarwinNotificationDetails(
-              presentAlert: true,
-              presentBadge: true,
-              presentSound: true,
-            ),
-          ),
+          NotificationDetails(android: androidDetails, iOS: iosDetails),
           androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
           uiLocalNotificationDateInterpretation:
               UILocalNotificationDateInterpretation.absoluteTime,

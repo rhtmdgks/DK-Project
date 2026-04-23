@@ -6,12 +6,11 @@ import 'package:timezone/data/latest_all.dart' as tz_data;
 
 import 'package:myapp/core/supabase_client.dart';
 
-/// 이동 수업 알림: 시간표에 설정한 이동 수업 5분 전에 알림 표시.
+/// 이동 수업 알림: 시간표에 표시한 이동 수업(또는 교실 변경 추정) 5분 전 알림.
 ///
 /// - 설정에서 "이동 수업 알림" ON
-/// - timetable_entries 테이블에서 사용자의 시간표 조회
-/// - 이전 수업과 다음 수업의 room이 다르면 이동 수업으로 판단
-/// - 수업 시작 시간 5분 전에 알림
+/// - `is_moving_class`가 true인 교시는 항상 해당 교시 시작 5분 전 알림
+/// - 그 외에는 연속 교시 간 `room`이 모두 있고 서로 다르면 이동으로 추정(기존 동작)
 class ClassMoveNotificationService {
   ClassMoveNotificationService._();
 
@@ -72,14 +71,14 @@ class ClassMoveNotificationService {
   static Future<void> scheduleClassMoveNotifications() async {
     final uid = supabase.auth.currentUser?.id;
     if (uid == null) return;
+    if (!await isClassMoveEnabled()) return;
 
     try {
       await _cancelScheduledNotifications();
 
-      // 사용자의 시간표 조회
       final timetable = await supabase
           .from('timetable_entries')
-          .select('day_of_week, period, room, subject')
+          .select('day_of_week, period, room, subject, is_moving_class')
           .eq('user_id', uid)
           .order('day_of_week')
           .order('period');
@@ -88,60 +87,71 @@ class ClassMoveNotificationService {
 
       final now = tz.TZDateTime.now(tz.local);
 
-      // 오늘부터 일주일간의 이동 수업 알림 스케줄링
       for (int dayOffset = 0; dayOffset < 7; dayOffset++) {
         final targetDate = now.add(Duration(days: dayOffset));
         final targetDay = TimetableUtils.dayOfWeekForDb(targetDate);
 
         if (targetDay == null) continue;
 
-        // 해당 요일의 시간표 필터링
-        final dayTimetable = timetable.where((entry) {
-          return entry['day_of_week'] == targetDay;
-        }).toList();
+        final dayTimetable = timetable
+            .where((entry) => entry['day_of_week'] == targetDay)
+            .toList()
+          ..sort(
+            (a, b) => (a['period'] as int).compareTo(b['period'] as int),
+          );
 
-        if (dayTimetable.length < 2) continue;
+        if (dayTimetable.isEmpty) continue;
 
-        // 이동 수업 찾기: 이전 수업과 다음 수업의 room이 다르면 이동 수업
-        for (int i = 1; i < dayTimetable.length; i++) {
-          final prevEntry = dayTimetable[i - 1];
-          final currEntry = dayTimetable[i];
+        final scheduledPeriods = <int>{};
+        final periodStarts = TimetableUtils.periodStartTimesForDate(targetDate);
 
-          final prevRoom = prevEntry['room'] as String?;
-          final currRoom = currEntry['room'] as String?;
-          final currPeriod = currEntry['period'] as int;
+        Future<void> scheduleOne({
+          required int currPeriod,
+          required String body,
+        }) async {
+          if (currPeriod < 1 || currPeriod > periodStarts.length) return;
+          if (scheduledPeriods.contains(currPeriod)) return;
+          scheduledPeriods.add(currPeriod);
 
-          // room이 있고, 이전 수업과 다르면 이동 수업
-          if (prevRoom != null &&
-              currRoom != null &&
-              prevRoom.trim().isNotEmpty &&
-              currRoom.trim().isNotEmpty &&
-              prevRoom != currRoom &&
-              currPeriod <= TimetableUtils.periodStartTimesForDate(targetDate).length) {
-            // 수업 시작 시간 5분 전에 알림
-            final periodTime =
-                TimetableUtils.periodStartTimesForDate(targetDate)[currPeriod - 1];
-            final notificationTime = tz.TZDateTime(
-              tz.local,
-              targetDate.year,
-              targetDate.month,
-              targetDate.day,
-              periodTime[0],
-              periodTime[1] - 5, // 5분 전
+          final periodTime = periodStarts[currPeriod - 1];
+          final notificationTime = tz.TZDateTime(
+            tz.local,
+            targetDate.year,
+            targetDate.month,
+            targetDate.day,
+            periodTime[0],
+            periodTime[1] - 5,
+          );
+
+          if (notificationTime.isBefore(now)) return;
+
+          final notificationId =
+              _notificationIdBase + (dayOffset * 100) + currPeriod;
+
+          try {
+            await _plugin.zonedSchedule(
+              notificationId,
+              '이동 수업 알림',
+              body,
+              notificationTime,
+              NotificationDetails(
+                android: AndroidNotificationDetails(
+                  _channelId,
+                  _channelName,
+                  channelDescription: '이동 수업 알림',
+                ),
+                iOS: const DarwinNotificationDetails(),
+              ),
+              androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+              uiLocalNotificationDateInterpretation:
+                  UILocalNotificationDateInterpretation.absoluteTime,
             );
-
-            // 이미 지난 시간이면 스킵
-            if (notificationTime.isBefore(now)) continue;
-
-            final subject = currEntry['subject'] as String? ?? '수업';
-            final notificationId =
-                _notificationIdBase + (dayOffset * 100) + currPeriod;
-
-            try {
+          } catch (e) {
+            if (e.toString().contains('exact_alarms_not_permitted')) {
               await _plugin.zonedSchedule(
                 notificationId,
                 '이동 수업 알림',
-                '$subject 수업이 $currRoom에서 시작됩니다 (5분 전)',
+                body,
                 notificationTime,
                 NotificationDetails(
                   android: AndroidNotificationDetails(
@@ -151,38 +161,55 @@ class ClassMoveNotificationService {
                   ),
                   iOS: const DarwinNotificationDetails(),
                 ),
-                androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+                androidScheduleMode:
+                    AndroidScheduleMode.inexactAllowWhileIdle,
                 uiLocalNotificationDateInterpretation:
                     UILocalNotificationDateInterpretation.absoluteTime,
               );
-            } catch (e) {
-              if (e.toString().contains('exact_alarms_not_permitted')) {
-                await _plugin.zonedSchedule(
-                  notificationId,
-                  '이동 수업 알림',
-                  '$subject 수업이 $currRoom에서 시작됩니다 (5분 전)',
-                  notificationTime,
-                  NotificationDetails(
-                    android: AndroidNotificationDetails(
-                      _channelId,
-                      _channelName,
-                      channelDescription: '이동 수업 알림',
-                    ),
-                    iOS: const DarwinNotificationDetails(),
-                  ),
-                  androidScheduleMode:
-                      AndroidScheduleMode.inexactAllowWhileIdle,
-                  uiLocalNotificationDateInterpretation:
-                      UILocalNotificationDateInterpretation.absoluteTime,
-                );
-              }
+            }
+          }
+        }
+
+        for (final currEntry in dayTimetable) {
+          if (currEntry['is_moving_class'] != true) continue;
+          final currPeriod = currEntry['period'] as int;
+          final subject = currEntry['subject'] as String? ?? '수업';
+          final currRoom = (currEntry['room'] as String?)?.trim();
+          final body = currRoom != null && currRoom.isNotEmpty
+              ? '$subject 수업이 $currRoom에서 시작됩니다 (5분 전)'
+              : '$subject 수업이 곧 시작됩니다 (5분 전)';
+          await scheduleOne(
+            currPeriod: currPeriod,
+            body: body,
+          );
+        }
+
+        if (dayTimetable.length >= 2) {
+          for (int i = 1; i < dayTimetable.length; i++) {
+            final prevEntry = dayTimetable[i - 1];
+            final currEntry = dayTimetable[i];
+
+            final prevRoom = prevEntry['room'] as String?;
+            final currRoom = currEntry['room'] as String?;
+            final currPeriod = currEntry['period'] as int;
+
+            if (prevRoom != null &&
+                currRoom != null &&
+                prevRoom.trim().isNotEmpty &&
+                currRoom.trim().isNotEmpty &&
+                prevRoom != currRoom &&
+                currPeriod <= periodStarts.length) {
+              final subject = currEntry['subject'] as String? ?? '수업';
+              await scheduleOne(
+                currPeriod: currPeriod,
+                body:
+                    '$subject 수업이 $currRoom에서 시작됩니다 (5분 전)',
+              );
             }
           }
         }
       }
-    } catch (_) {
-      // 오류 발생 시 무시 (시간표가 없거나 권한 문제 등)
-    }
+    } catch (_) {}
   }
 
   static Future<void> _cancelScheduledNotifications() async {

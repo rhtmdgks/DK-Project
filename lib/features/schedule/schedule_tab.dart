@@ -182,7 +182,7 @@ class _ScheduleTabState extends State<ScheduleTab> {
               padding: EdgeInsets.symmetric(horizontal: context.rs(22)),
               child: TabPageHeader(
                 title: '일정',
-                subtitle: '날짜를 선택해 일정을 확인하세요.',
+                subtitle: '날짜를 선택해 일정을 확인하세요. 개인 일정은 본인만, 「학급에 공유」로 넣은 일정은 같은 반 학생 모두에게 보입니다.',
                 trailing: _canEdit
                     ? CupertinoButton(
                         padding: EdgeInsets.zero,
@@ -925,7 +925,7 @@ class _ScheduleTabState extends State<ScheduleTab> {
                                     subtitle: Text(
                                       _profile?.hasGradeClass != true
                                           ? '프로필에 학년/반 정보가 없어 학급 공유를 사용할 수 없습니다.'
-                                          : '${_profile!.gradeOrFromStudentId}학년 ${_profile!.classNumOrFromStudentId}반 전체에 보입니다.',
+                                          : '학생회 권한 없이 같은 반 학생 모두에게 표시됩니다.',
                                     ),
                                     value: shareWithClass,
                                     onChanged: _profile?.hasGradeClass == true

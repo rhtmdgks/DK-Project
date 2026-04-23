@@ -3,7 +3,9 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:myapp/core/auth/auth_state.dart';
 import 'package:myapp/core/supabase_client.dart';
+import 'package:myapp/core/utils/merged_school_timetable.dart';
 import 'package:myapp/core/utils/timetable_utils.dart';
+import 'package:myapp/services/class_move_notification_service.dart';
 
 class ClassItem {
   const ClassItem({
@@ -13,6 +15,7 @@ class ClassItem {
     required this.startTime,
     required this.endTime,
     required this.location,
+    this.isMovingClass = false,
   });
 
   final String name;
@@ -21,6 +24,8 @@ class ClassItem {
   final String startTime;
   final String endTime;
   final String location;
+  /// 개인 시간표에서 '이동 수업'으로 표시(알림 연동).
+  final bool isMovingClass;
 }
 
 class TimetableChangeLogItem {
@@ -71,15 +76,29 @@ enum TimetableViewState {
 }
 
 class TodayClassesViewModel extends ChangeNotifier {
+  late DateTime _selectedDate;
+
   TodayClassesViewModel() {
+    _selectedDate = _normalizeSelectedDate(DateTime.now());
     _startProgressTimer();
     loadAll();
   }
 
-  DateTime _selectedDate = DateTime.now();
+  /// 주말에는 금요일 기준으로 맞춤 — 화면은 평일(월~금)만 다룸.
+  static DateTime _normalizeSelectedDate(DateTime d) {
+    final day = DateTime(d.year, d.month, d.day);
+    if (day.weekday == DateTime.saturday) {
+      return day.subtract(const Duration(days: 1));
+    }
+    if (day.weekday == DateTime.sunday) {
+      return day.subtract(const Duration(days: 2));
+    }
+    return day;
+  }
   List<ClassItem> _classes = [];
   List<TimetableChangeLogItem> _changeLogs = [];
   String? _avatarUrl;
+  AppProfile? _profile;
   bool _timetableLoading = true;
   bool _changeLogsLoading = true;
   String? _error;
@@ -146,9 +165,9 @@ class TodayClassesViewModel extends ChangeNotifier {
   }
 
   void selectDate(DateTime date) {
-    _selectedDate = date;
+    _selectedDate = _normalizeSelectedDate(date);
     notifyListeners();
-    _loadTimetableForDate(date);
+    _loadTimetableForDate(_selectedDate);
   }
 
   void selectWeekday(int weekday) {
@@ -171,8 +190,8 @@ class TodayClassesViewModel extends ChangeNotifier {
   Future<void> loadAll() async {
     _error = null;
     notifyListeners();
+    await _loadProfile();
     await Future.wait([
-      _loadProfile(),
       _loadTimetableForDate(_selectedDate),
       _loadChangeLogs(),
     ]);
@@ -190,6 +209,7 @@ class TodayClassesViewModel extends ChangeNotifier {
     required int period,
     required String subject,
     String? room,
+    bool isMovingClass = false,
   }) async {
     final uid = supabase.auth.currentUser?.id;
     final dayOfWeek = TimetableUtils.dayOfWeekForDb(_selectedDate);
@@ -201,10 +221,14 @@ class TodayClassesViewModel extends ChangeNotifier {
       'period': period,
       'subject': subject.trim(),
       'room': room?.trim().isEmpty == true ? null : room?.trim(),
+      'is_moving_class': isMovingClass,
     }, onConflict: 'user_id,day_of_week,period');
 
     _timetableCache.remove(_cacheKey(_selectedDate));
     await _loadTimetableForDate(_selectedDate);
+    try {
+      await ClassMoveNotificationService.scheduleClassMoveNotifications();
+    } catch (_) {}
   }
 
   Future<void> deleteTimetableEntry({required int period}) async {
@@ -221,11 +245,15 @@ class TodayClassesViewModel extends ChangeNotifier {
 
     _timetableCache.remove(_cacheKey(_selectedDate));
     await _loadTimetableForDate(_selectedDate);
+    try {
+      await ClassMoveNotificationService.scheduleClassMoveNotifications();
+    } catch (_) {}
   }
 
   Future<void> _loadProfile() async {
     try {
       final profile = await getCurrentProfile();
+      _profile = profile;
       _avatarUrl = profile?.avatarUrl;
       notifyListeners();
     } catch (_) {}
@@ -255,6 +283,8 @@ class TodayClassesViewModel extends ChangeNotifier {
       return;
     }
 
+    _profile ??= await getCurrentProfile();
+
     final dayOfWeek = TimetableUtils.dayOfWeekForDb(date);
     if (dayOfWeek == null) {
       _classes = [];
@@ -264,17 +294,17 @@ class TodayClassesViewModel extends ChangeNotifier {
     }
 
     try {
-      final res = await supabase
-          .from('timetable_entries')
-          .select('subject, period, room')
-          .eq('user_id', uid)
-          .eq('day_of_week', dayOfWeek)
-          .order('period', ascending: true);
-      final list = List<Map<String, dynamic>>.from(res as List);
-      _classes = list.map((e) {
+      final rows = await MergedSchoolTimetable.fetchRowsForDate(
+        date: date,
+        userId: uid,
+        profile: _profile,
+      );
+      _classes = rows.map((e) {
         final period = (e['period'] as num?)?.toInt() ?? 0;
-        final subject = (e['subject'] as String?)?.trim() ?? '(없음)';
+        final rawSubject = (e['subject'] as String?)?.trim() ?? '';
+        final subject = rawSubject.isEmpty ? '(없음)' : rawSubject;
         final room = (e['room'] as String?)?.trim() ?? '';
+        final moving = e['is_moving_class'] == true;
         return ClassItem(
           name: subject,
           period: period,
@@ -282,6 +312,7 @@ class TodayClassesViewModel extends ChangeNotifier {
           startTime: TimetableUtils.startTimeString(period, date: date),
           endTime: TimetableUtils.endTimeString(period, date: date),
           location: room,
+          isMovingClass: moving,
         );
       }).toList();
       _timetableCache[key] = _classes;

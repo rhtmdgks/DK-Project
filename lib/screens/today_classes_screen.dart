@@ -17,6 +17,12 @@ class TodayClassesScreen extends StatefulWidget {
 class _TodayClassesScreenState extends State<TodayClassesScreen> {
   late final TodayClassesViewModel _vm;
 
+  /// 화면은 요일(월~금) 단위로만 다루므로 앱바도 요일 중심 문구를 쓴다.
+  static String _weekdayTimetableTitle(DateTime d) {
+    const labels = ['', '월', '화', '수', '목', '금', '토', '일'];
+    return '${labels[d.weekday]}요일 시간표';
+  }
+
   @override
   void initState() {
     super.initState();
@@ -82,7 +88,7 @@ class _TodayClassesScreenState extends State<TodayClassesScreen> {
         onPressed: () => context.pop(),
       ),
       title: Text(
-        "Today's Class",
+        _weekdayTimetableTitle(_vm.selectedDate),
         style: AppFonts.scaled(context, AppFonts.titleSemiBold).copyWith(
           color: AppColors.textDark,
           fontWeight: FontWeight.w800,
@@ -389,6 +395,32 @@ class _TodayClassesScreenState extends State<TodayClassesScreen> {
                                         ),
                                       ),
                                     ),
+                                    if (item.isMovingClass) ...[
+                                      SizedBox(width: context.rs(8)),
+                                      Container(
+                                        padding: EdgeInsets.symmetric(
+                                          horizontal: context.rs(6),
+                                          vertical: context.rh(2),
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.primaryBlue
+                                              .withValues(alpha: 0.12),
+                                          borderRadius:
+                                              BorderRadius.circular(6),
+                                        ),
+                                        child: Text(
+                                          '이동',
+                                          style: AppFonts.scaled(
+                                            context,
+                                            AppFonts.captionMedium,
+                                          ).copyWith(
+                                            color: AppColors.primaryBlue,
+                                            fontSize: context.rs(10),
+                                            fontWeight: FontWeight.w800,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                     if (isCurrent) ...[
                                       SizedBox(width: context.rs(8)),
                                       Container(
@@ -971,6 +1003,7 @@ class _TodayClassesScreenState extends State<TodayClassesScreen> {
     }
     final subjectController = TextEditingController(text: initial?.name ?? '');
     final roomController = TextEditingController(text: initial?.location ?? '');
+    var isMovingClass = initial?.isMovingClass ?? false;
 
     ClassItem? findEntry(int period) {
       for (final c in _vm.classes) {
@@ -992,6 +1025,7 @@ class _TodayClassesScreenState extends State<TodayClassesScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   DropdownButtonFormField<int>(
+                    key: ValueKey<int>(selectedPeriod),
                     initialValue: selectedPeriod,
                     items: periods
                         .map((p) => DropdownMenuItem<int>(
@@ -1008,6 +1042,7 @@ class _TodayClassesScreenState extends State<TodayClassesScreen> {
                               final target = findEntry(v);
                               subjectController.text = target?.name ?? '';
                               roomController.text = target?.location ?? '';
+                              isMovingClass = target?.isMovingClass ?? false;
                             });
                           },
                     decoration: const InputDecoration(labelText: '교시'),
@@ -1023,6 +1058,22 @@ class _TodayClassesScreenState extends State<TodayClassesScreen> {
                     controller: roomController,
                     enabled: !busy,
                     decoration: const InputDecoration(labelText: '교실(선택)'),
+                  ),
+                  CheckboxListTile(
+                    value: isMovingClass,
+                    onChanged: busy
+                        ? null
+                        : (v) => setDialogState(
+                              () => isMovingClass = v ?? false,
+                            ),
+                    title: const Text('이동 수업으로 표시'),
+                    subtitle: Text(
+                      '알림 설정에서 「이동 수업 알림」을 켠 경우 이 교시 시작 5분 전에 알림을 보냅니다.',
+                      style: AppFonts.scaled(context, AppFonts.captionMedium)
+                          .copyWith(color: AppColors.textSecondary),
+                    ),
+                    controlAffinity: ListTileControlAffinity.leading,
+                    contentPadding: EdgeInsets.zero,
                   ),
                   if (existing != null) ...[
                     const SizedBox(height: 8),
@@ -1072,6 +1123,7 @@ class _TodayClassesScreenState extends State<TodayClassesScreen> {
                               period: selectedPeriod,
                               subject: subject,
                               room: roomController.text.trim(),
+                              isMovingClass: isMovingClass,
                             );
                             if (dialogContext.mounted) {
                               Navigator.of(dialogContext).pop(true);

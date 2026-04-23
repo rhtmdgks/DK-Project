@@ -204,6 +204,11 @@ class _ClassPhotoSharesScreenState extends State<ClassPhotoSharesScreen> {
               ),
               title: '학급 사진 공유',
               subtitle: '학년·반별로 사진을 올려 공유할 수 있습니다.',
+              trailing: TextButton.icon(
+                onPressed: _loading ? null : _uploadPhoto,
+                icon: const Icon(Icons.add_photo_alternate_outlined, size: 20),
+                label: const Text('올리기'),
+              ),
             ),
             Expanded(
               child: AsyncBody(
@@ -263,10 +268,6 @@ class _ClassPhotoSharesScreenState extends State<ClassPhotoSharesScreen> {
             ),
           ],
         ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _uploadPhoto,
-        child: const Icon(Icons.add_a_photo_outlined),
       ),
     );
   }
