@@ -9,6 +9,7 @@ import 'package:myapp/core/auth/auth_state.dart';
 import 'package:myapp/core/routing/app_router.dart';
 import 'package:myapp/core/supabase_client.dart';
 import 'package:myapp/core/theme/app_theme.dart';
+import 'package:myapp/core/utils/merged_school_timetable.dart';
 import 'package:myapp/core/utils/timetable_utils.dart';
 import 'package:myapp/core/theme/responsive.dart';
 import 'package:myapp/core/utils/subject_theme_service.dart';
@@ -63,44 +64,52 @@ class _HomeTabState extends State<HomeTab> {
   Timer? _currentClassTimer;
 
   _NextClassInfo? get _nextClassInfo {
-    final list = _todayTimetableEntries ?? [];
-    if (list.isEmpty) return null;
     final now = DateTime.now();
-    final current = TimetableUtils.currentPeriodAndSecondsLeft(now).period;
-    _SubjectCard? next;
+    final todayPeriods = TimetableUtils.periodStartTimesForDate(now);
+    if (todayPeriods.isEmpty) return null;
+
+    final byPeriod = <int, _SubjectCard>{};
+    for (final card in _todayTimetableEntries ?? <_SubjectCard>[]) {
+      byPeriod[card.period] = card;
+    }
+
+    final currentInfo = TimetableUtils.currentPeriodAndSecondsLeft(now);
+    final current = currentInfo.period;
+    final nowMinutes = now.hour * 60 + now.minute;
+
+    int? nextPeriod;
+
     if (current != null) {
-      for (final card in list) {
-        if (card.period > current) {
-          next = card;
-          break;
-        }
+      // 수업 중: 바로 다음 교시(등록 여부 무관)
+      final candidate = current + 1;
+      if (candidate - 1 < todayPeriods.length) {
+        nextPeriod = candidate;
       }
     } else {
-      final currentMinutes = now.hour * 60 + now.minute;
-      final todayPeriods = TimetableUtils.periodStartTimesForDate(now);
-      int? firstStartMinutes;
-      for (final card in list) {
-        final idx = card.period - 1;
-        if (idx < 0 || idx >= todayPeriods.length) continue;
-        final start = todayPeriods[idx];
-        final startMinutes = start[0] * 60 + start[1];
-        firstStartMinutes ??= startMinutes;
-        if (startMinutes > currentMinutes) {
-          next = card;
+      // 쉬는 시간/수업 전/후: 아직 시작 안 한 첫 번째 교시
+      for (var i = 0; i < todayPeriods.length; i++) {
+        final startMinutes = todayPeriods[i][0] * 60 + todayPeriods[i][1];
+        if (startMinutes > nowMinutes) {
+          nextPeriod = i + 1;
           break;
         }
       }
-      // 수업 시작 전에는 1교시를, 수업 종료 후에는 다음 수업이 없는 것으로 처리.
-      if (next == null && firstStartMinutes != null && currentMinutes < firstStartMinutes) {
-        next = list.first;
-      }
     }
-    if (next == null) return null;
+
+    if (nextPeriod == null) return null;
+
+    final idx = nextPeriod - 1;
+    if (idx < 0 || idx >= todayPeriods.length) return null;
+    final endMinutes = todayPeriods[idx][0] * 60 + todayPeriods[idx][1] + TimetableUtils.durationMinutes;
+    if (nowMinutes >= endMinutes) return null;
+
+    final next = byPeriod[nextPeriod];
+
     return _NextClassInfo(
-      name: next.name,
-      periodName: '${next.period}교시',
-      location: (next.room == null || next.room!.trim().isEmpty) ? '장소 미정' : next.room!.trim(),
-      time: TimetableUtils.startTimeString(next.period, date: now),
+      name: next?.name ?? '수업 없음',
+      periodName: '${nextPeriod}교시',
+      location: (next?.room == null || next!.room!.trim().isEmpty) ? '장소 미정' : next.room!.trim(),
+      time: TimetableUtils.startTimeString(nextPeriod, date: now),
       notice: '다음 수업 준비물을 확인해 주세요.',
     );
   }
@@ -188,25 +197,25 @@ class _HomeTabState extends State<HomeTab> {
       return;
     }
     try {
-      final res = await supabase
-          .from('timetable_entries')
-          .select('subject, period, room')
-          .eq('user_id', uid)
-          .eq('day_of_week', weekday)
-          .order('period');
-      final list = List<Map<String, dynamic>>.from(res as List);
+      final profile = await getCurrentProfile();
+      final list = await MergedSchoolTimetable.fetchRowsForDate(
+        date: today,
+        userId: uid,
+        profile: profile,
+      );
       if (!mounted) return;
       setState(() {
         _todayTimetableEntries = list
-            .map((e) => _SubjectCard(
-                  name: (e['subject'] as String? ?? '').trim().isEmpty
-                      ? '(없음)'
-                      : (e['subject'] as String).trim(),
-                  period: (e['period'] as num?)?.toInt() ?? 0,
-                  room: (e['room'] as String?)?.trim().isEmpty == true
-                      ? null
-                      : (e['room'] as String?),
-                ))
+            .map((e) {
+              final raw = (e['subject'] as String? ?? '').trim();
+              return _SubjectCard(
+                name: raw.isEmpty ? '(없음)' : raw,
+                period: (e['period'] as num?)?.toInt() ?? 0,
+                room: (e['room'] as String?)?.trim().isEmpty == true
+                    ? null
+                    : (e['room'] as String?),
+              );
+            })
             .toList();
         _timetableLoading = false;
       });
