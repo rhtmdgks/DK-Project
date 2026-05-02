@@ -12,6 +12,10 @@
 # Play 업로드 없이 Release만 디버그 키로 빌드하려면 android/gradle.properties 에
 #   android.signReleaseWithDebug=true
 # 또는 환경 변수 ANDROID_SIGN_RELEASE_WITH_DEBUG=1 (Play 업로드 불가).
+#
+# 업로드 키가 Play와 같은지 확인 (출력 SHA1 이 아래와 같아야 함 — upload_cert.der 과 동일):
+#   keytool -list -v -keystore app/upload-keystore.jks -alias <별칭>
+#   SHA1: 2A:C4:EE:19:FD:D0:A6:FA:87:15:06:A0:26:14:50:A4:9B:FA:E0:F2
 
 storePassword=변경하세요
 keyPassword=변경하세요
