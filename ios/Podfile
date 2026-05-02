@@ -39,8 +39,42 @@ target 'Runner' do
   end
 end
 
+def patch_app_links_generated_plugin_registrant!
+  path = File.join(__dir__, 'Runner', 'GeneratedPluginRegistrant.m')
+  return unless File.file?(path)
+
+  contents = File.read(path)
+  return if contents.include?('app_links-Swift.h')
+
+  old_block = <<~'PATCH'
+#if __has_include(<app_links/AppLinksIosPlugin.h>)
+#import <app_links/AppLinksIosPlugin.h>
+#else
+@import app_links;
+#endif
+PATCH
+  new_block = <<~'PATCH'
+// Swift 전용 app_links: 생성 헤더 우선 (flutter pub get 이 덮어쓰므로 pod install 시 재적용)
+#if __has_include(<app_links/app_links-Swift.h>)
+#import <app_links/app_links-Swift.h>
+#elif __has_include(<app_links/AppLinksIosPlugin.h>)
+#import <app_links/AppLinksIosPlugin.h>
+#else
+@import app_links;
+#endif
+PATCH
+  unless contents.include?(old_block.strip)
+    STDERR.puts "[Podfile] GeneratedPluginRegistrant.m: app_links 블록이 예상과 다릅니다. 수동으로 Swift 헤더 분기를 확인하세요."
+    return
+  end
+
+  File.write(path, contents.sub(old_block.strip, new_block.strip))
+  STDERR.puts '[Podfile] GeneratedPluginRegistrant.m: app_links → app_links-Swift.h 분기 적용됨'
+end
+
 post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
   end
+  patch_app_links_generated_plugin_registrant!
 end
