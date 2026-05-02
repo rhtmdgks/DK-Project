@@ -107,7 +107,7 @@ class _HomeTabState extends State<HomeTab> {
 
     return _NextClassInfo(
       name: next?.name ?? '수업 없음',
-      periodName: '${nextPeriod}교시',
+      periodName: '$nextPeriod교시',
       location: (next?.room == null || next!.room!.trim().isEmpty) ? '장소 미정' : next.room!.trim(),
       time: TimetableUtils.startTimeString(nextPeriod, date: now),
       notice: '다음 수업 준비물을 확인해 주세요.',

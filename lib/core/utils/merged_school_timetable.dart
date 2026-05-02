@@ -7,18 +7,8 @@ import 'package:myapp/core/utils/timetable_utils.dart';
 class MergedSchoolTimetable {
   MergedSchoolTimetable._();
 
-  /// 백엔드 `class_timetable.week_offset` (0=이번 주, 1=다음 주)와 맞춘다.
-  static int weekOffsetForDate(DateTime date) {
-    final today = DateTime.now();
-    final d = DateTime(date.year, date.month, date.day);
-    final n = DateTime(today.year, today.month, today.day);
-    final mondayD = d.subtract(Duration(days: d.weekday - DateTime.monday));
-    final mondayN = n.subtract(Duration(days: n.weekday - DateTime.monday));
-    final days =
-        mondayD.difference(mondayN).inDays; // 다음 주 월요일이면 대략 +7
-    if (days >= 7) return 1;
-    return 0;
-  }
+  /// 반 시간표는 매주 동일하므로 항상 `class_timetable.week_offset = 0`만 사용한다.
+  static const int classTimetableWeekOffset = 0;
 
   /// 병합된 교시별 과목·교실. `period` 오름차순.
   static Future<List<Map<String, dynamic>>> fetchRowsForDate({
@@ -50,13 +40,12 @@ class MergedSchoolTimetable {
     final classByPeriod = <int, Map<String, dynamic>>{};
 
     if (grade != null && classNum != null) {
-      final wo = weekOffsetForDate(date);
       final ctRes = await supabase
           .from('class_timetable')
           .select('period, subject, room')
           .eq('grade', grade)
           .eq('class_number', classNum)
-          .eq('week_offset', wo)
+          .eq('week_offset', classTimetableWeekOffset)
           .eq('day_of_week', dayOfWeek)
           .order('period', ascending: true);
 

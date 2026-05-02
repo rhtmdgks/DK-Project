@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
@@ -51,8 +54,21 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
+  static const _loginStepTimeout = Duration(seconds: 30);
+
+  Future<T> _withLoginTimeout<T>(Future<T> future, String step) {
+    return future.timeout(
+      _loginStepTimeout,
+      onTimeout: () =>
+          throw TimeoutException('로그인 단계 시간 초과 ($step)', _loginStepTimeout),
+    );
+  }
+
   /// Supabase 로그인 예외를 사용자용 문구로 변환한다.
   String _mapLoginError(Object e) {
+    if (e is TimeoutException) {
+      return '서버 응답이 너무 오래 걸립니다. 네트워크 연결을 확인한 뒤 다시 시도해 주세요.';
+    }
     final message = e.toString();
     if (message.contains('Invalid login credentials')) {
       return '학번, 비밀번호가 맞지 않습니다. 다시 확인해주세요.';
@@ -104,10 +120,16 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       final studentId = _studentIdController.text.trim();
       final password = _passwordController.text;
-      final resolvedEmail = await _resolveLoginEmail(
-        studentId: studentId,
-        password: password,
+      if (kDebugMode) {
+        debugPrint('[login] RPC login_from_profiles 시작');
+      }
+      final resolvedEmail = await _withLoginTimeout(
+        _resolveLoginEmail(studentId: studentId, password: password),
+        'login_from_profiles',
       );
+      if (kDebugMode) {
+        debugPrint('[login] RPC 완료 → 후보 이메일: $resolvedEmail');
+      }
 
       final emailCandidates = <String>{
         resolvedEmail,
@@ -120,9 +142,15 @@ class _LoginScreenState extends State<LoginScreen> {
       for (final email in emailCandidates) {
         for (int attempt = 0; attempt < 2; attempt++) {
           try {
-            authResponse = await supabase.auth.signInWithPassword(
-              email: email,
-              password: password,
+            if (kDebugMode) {
+              debugPrint('[login] signInWithPassword 시도: $email');
+            }
+            authResponse = await _withLoginTimeout(
+              supabase.auth.signInWithPassword(
+                email: email,
+                password: password,
+              ),
+              'signInWithPassword($email)',
             );
             if (authResponse.session != null && authResponse.user != null) {
               break;
@@ -147,13 +175,18 @@ class _LoginScreenState extends State<LoginScreen> {
         throw Exception('세션을 생성하지 못했습니다.');
       }
 
-      final profile = await AuthRepository.instance.getCurrentProfile();
+      if (kDebugMode) {
+        debugPrint('[login] 세션 수립됨 → 프로필 조회');
+      }
+      final profile = await _withLoginTimeout(
+        AuthRepository.instance.getCurrentProfile(),
+        'getCurrentProfile',
+      );
       if (!mounted) return;
 
       if (profile == null) {
         setState(() {
           _error = '프로필을 찾을 수 없습니다. 관리자에게 문의해 주세요.';
-          _loading = false;
         });
         return;
       }
@@ -174,8 +207,11 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) return;
       setState(() {
         _error = _mapLoginError(e);
-        _loading = false;
       });
+    } finally {
+      if (mounted) {
+        setState(() => _loading = false);
+      }
     }
   }
 

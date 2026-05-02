@@ -38,7 +38,7 @@ class MealNotificationService {
           const AndroidNotificationChannel(
             _channelId,
             _channelName,
-            importance: Importance.defaultImportance,
+            importance: Importance.high,
           ),
         );
 
@@ -127,6 +127,8 @@ class MealNotificationService {
         _channelId,
         _channelName,
         channelDescription: '급식 출발 알림',
+        importance: Importance.high,
+        priority: Priority.high,
       ),
       iOS: const DarwinNotificationDetails(),
     );

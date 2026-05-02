@@ -39,7 +39,7 @@ class ClassMoveNotificationService {
           const AndroidNotificationChannel(
             _channelId,
             _channelName,
-            importance: Importance.defaultImportance,
+            importance: Importance.high,
           ),
         );
 
@@ -139,6 +139,8 @@ class ClassMoveNotificationService {
                   _channelId,
                   _channelName,
                   channelDescription: '이동 수업 알림',
+                  importance: Importance.high,
+                  priority: Priority.high,
                 ),
                 iOS: const DarwinNotificationDetails(),
               ),
@@ -158,6 +160,8 @@ class ClassMoveNotificationService {
                     _channelId,
                     _channelName,
                     channelDescription: '이동 수업 알림',
+                    importance: Importance.high,
+                    priority: Priority.high,
                   ),
                   iOS: const DarwinNotificationDetails(),
                 ),

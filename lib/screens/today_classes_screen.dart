@@ -826,8 +826,6 @@ class _TodayClassesScreenState extends State<TodayClassesScreen> {
     final dayLabel = latestLog.dayOfWeek >= 1 && latestLog.dayOfWeek <= 5
         ? dayNames[latestLog.dayOfWeek - 1]
         : '${latestLog.dayOfWeek}요일';
-    final weekLabel = latestLog.weekOffset == 0 ? '이번 주' : '다음 주';
-
     String changeText;
     if (latestLog.previousSubject != null &&
         latestLog.previousSubject!.isNotEmpty) {
@@ -880,7 +878,7 @@ class _TodayClassesScreenState extends State<TodayClassesScreen> {
                     ),
                     SizedBox(height: context.rh(2)),
                     Text(
-                      '$weekLabel $dayLabel ${latestLog.period}교시 · $changeText',
+                      '$dayLabel ${latestLog.period}교시 · $changeText',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: AppFonts.scaled(
@@ -927,7 +925,6 @@ class _TodayClassesScreenState extends State<TodayClassesScreen> {
                   final dl = log.dayOfWeek >= 1 && log.dayOfWeek <= 5
                       ? dayNames[log.dayOfWeek - 1]
                       : '${log.dayOfWeek}요일';
-                  final wl = log.weekOffset == 0 ? '이번 주' : '다음 주';
                   String ct;
                   if (log.previousSubject != null &&
                       log.previousSubject!.isNotEmpty) {
@@ -941,7 +938,7 @@ class _TodayClassesScreenState extends State<TodayClassesScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          '$wl $dl ${log.period}교시',
+                          '$dl ${log.period}교시',
                           style: AppFonts.scaled(
                             context,
                             AppFonts.captionMedium,

@@ -283,7 +283,12 @@ class _NotificationTile extends StatelessWidget {
                   notification.body,
                   style: AppFonts.scaled(context, AppFonts.smallRegular)
                       .copyWith(color: AppColors.textSecondary),
-                  maxLines: 2,
+                  // 날씨·급식 등 본문이 긴 알림은 패널에서도 읽을 수 있도록 줄 수 확대 (배너/시스템 알림 한계와 별개)
+                  maxLines: notification.type == NotificationType.weather
+                      ? 8
+                      : notification.type == NotificationType.meal
+                          ? 5
+                          : 2,
                   overflow: TextOverflow.ellipsis,
                 ),
               ],

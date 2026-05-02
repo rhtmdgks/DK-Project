@@ -188,6 +188,7 @@ class NotificationService {
     required String body,
     required NotificationType type,
     String? payload,
+    String? subtitle,
   }) async {
     final notification = NotificationItem(
       id: '${type.name}_${DateTime.now().millisecondsSinceEpoch}',
@@ -209,6 +210,10 @@ class NotificationService {
 
     // 2) 로컬(시스템) 알림 표시
     try {
+      final androidHigh =
+          type == NotificationType.weather ||
+          type == NotificationType.meal ||
+          type == NotificationType.classMove;
       await _plugin.show(
         id,
         title,
@@ -217,14 +222,17 @@ class NotificationService {
           android: AndroidNotificationDetails(
             _getChannelId(type),
             _getChannelName(type),
-            importance: Importance.defaultImportance,
-            priority: Priority.defaultPriority,
+            importance: androidHigh
+                ? Importance.high
+                : Importance.defaultImportance,
+            priority: androidHigh ? Priority.high : Priority.defaultPriority,
             styleInformation: BigTextStyleInformation(body),
           ),
-          iOS: const DarwinNotificationDetails(
+          iOS: DarwinNotificationDetails(
             presentAlert: true,
             presentBadge: true,
             presentSound: true,
+            subtitle: subtitle,
           ),
         ),
         payload: payload,

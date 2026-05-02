@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:myapp/core/auth/auth_state.dart';
+import 'package:myapp/core/routing/app_router.dart';
 import 'package:myapp/core/theme/app_theme.dart';
 import 'package:myapp/core/theme/responsive.dart';
 
@@ -115,6 +116,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             _buildHeader(),
                             SizedBox(height: context.rh(32)),
                             _buildInfoCard(),
+                            SizedBox(height: context.rh(16)),
+                            _buildTimetableEditCard(context),
                           ],
                         ),
                       ),
@@ -216,6 +219,65 @@ class _ProfileScreenState extends State<ProfileScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: rows,
+      ),
+    );
+  }
+
+  /// 개인 시간표는 [TodayClassesScreen]에서 수정한다.
+  Widget _buildTimetableEditCard(BuildContext context) {
+    return Material(
+      color: AppColors.white,
+      borderRadius: BorderRadius.circular(AppShapes.radiusLarge),
+      child: InkWell(
+        onTap: () => context.push(AppRoute.todayClasses.path),
+        borderRadius: BorderRadius.circular(AppShapes.radiusLarge),
+        child: Container(
+          padding: EdgeInsets.all(context.rs(20)),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(AppShapes.radiusLarge),
+            border: Border.all(color: AppColors.borderLight),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.04),
+                offset: const Offset(0, 2),
+                blurRadius: 8,
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Icon(
+                Icons.edit_calendar_outlined,
+                size: context.rs(26),
+                color: AppColors.primaryBlue,
+              ),
+              SizedBox(width: context.rs(16)),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '시간표 수정',
+                      style: AppFonts.scaled(context, AppFonts.titleSemiBold)
+                          .copyWith(color: AppColors.textDark),
+                    ),
+                    SizedBox(height: context.rh(4)),
+                    Text(
+                      '월~금 요일별 과목·교실을 바꾸고, 이동 수업 표시도 할 수 있어요.',
+                      style: AppFonts.scaled(context, AppFonts.captionMedium)
+                          .copyWith(color: AppColors.textSecondary),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                CupertinoIcons.chevron_forward,
+                size: context.rs(18),
+                color: AppColors.textSecondary,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

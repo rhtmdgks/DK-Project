@@ -7,7 +7,8 @@ import 'package:timezone/data/latest_all.dart' as tz_data;
 
 import 'package:myapp/models/notification_item.dart';
 import 'package:myapp/services/notification_service.dart';
-import 'package:myapp/services/weather_service.dart';
+import 'package:myapp/services/weather_service.dart'
+    show MorningWeatherNotificationCopy, WeatherService;
 
 /// 날씨 알림: 매일 AM 06:30에 알림이 뜨도록 예약.
 ///
@@ -184,13 +185,14 @@ class WeatherNotificationService {
     final lon = prefs.getDouble(_keyWeatherLon);
     String title = _scheduledFallbackTitle;
     String body = _scheduledFallbackBody;
+    MorningWeatherNotificationCopy? scheduledCopy;
     try {
-      final copy = await WeatherService.getMorningNotificationCopy(
+      scheduledCopy = await WeatherService.getMorningNotificationCopy(
         latitude: lat,
         longitude: lon,
       ).timeout(const Duration(seconds: 8));
-      title = copy.title;
-      body = copy.body;
+      title = scheduledCopy.title;
+      body = scheduledCopy.body;
     } catch (e) {
       debugPrint('날씨 예약 문구 생성 실패(기본 문구 사용): $e');
     }
@@ -207,10 +209,11 @@ class WeatherNotificationService {
       priority: Priority.high,
       styleInformation: BigTextStyleInformation(body),
     );
-    const iosDetails = DarwinNotificationDetails(
+    final iosDetails = DarwinNotificationDetails(
       presentAlert: true,
       presentBadge: true,
       presentSound: true,
+      subtitle: scheduledCopy?.subtitle,
     );
 
     try {
@@ -285,6 +288,7 @@ class WeatherNotificationService {
         body: copy.body,
         type: NotificationType.weather,
         payload: 'weather',
+        subtitle: copy.subtitle,
       );
     } catch (e) {
       debugPrint('날씨 정보 조회 실패: $e');

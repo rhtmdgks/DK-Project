@@ -22,6 +22,9 @@ class _AppState extends State<App> with WidgetsBindingObserver {
     defaultValue: 'group.com.wearegoodwill.laon',
   );
 
+  /// 빌드마다 새 GoRouter를 만들면 네비게이션·세션이 리셋될 수 있으므로 한 번만 생성한다.
+  late final GoRouter _router = createAppRouter();
+
   late final NotificationProvider _notificationProvider;
   StreamSubscription<Uri?>? _widgetClickedSubscription;
 
@@ -117,7 +120,7 @@ class _AppState extends State<App> with WidgetsBindingObserver {
           child: MaterialApp.router(
             title: 'LAON',
             theme: buildAppTheme(),
-            routerConfig: createAppRouter(),
+            routerConfig: _router,
           ),
         ),
       ),

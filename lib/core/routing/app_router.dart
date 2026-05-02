@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:myapp/core/auth/auth_repository.dart';
+import 'package:myapp/core/supabase_client.dart';
 import 'package:myapp/core/theme/app_motion.dart';
 import 'package:myapp/screens/app_info_screen.dart';
 import 'package:myapp/screens/blocked_users_screen.dart';
@@ -55,6 +58,25 @@ const String kTermsAgreedKey = 'terms_agreed';
 /// 알림 탭 등 외부에서 홈 탭 이동 시 사용 (예: 공지사항 알림 → 공지/투표 탭).
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
 
+/// Supabase 세션 변경 시 `redirect`를 다시 평가하기 위한 [GoRouter.refreshListenable].
+///
+/// go_router v14에서는 `GoRouterRefreshStream`이 제거되어 로컬 Listenable로 연결한다.
+final class _SupabaseAuthRefreshListenable extends ChangeNotifier {
+  _SupabaseAuthRefreshListenable() {
+    _subscription = supabase.auth.onAuthStateChange.listen((_) {
+      notifyListeners();
+    });
+  }
+
+  late final StreamSubscription<dynamic> _subscription;
+
+  @override
+  void dispose() {
+    _subscription.cancel();
+    super.dispose();
+  }
+}
+
 /// Material 3 Motion: Shared Axis(수평) + Fade 페이지 전환.
 CustomTransitionPage<void> _m3Page(GoRouterState state, Widget child) {
   return CustomTransitionPage<void>(
@@ -89,9 +111,11 @@ CustomTransitionPage<void> _m3Page(GoRouterState state, Widget child) {
 /// 4. 비밀번호 변경 필요 → 비밀번호 변경
 /// 5. 이미 인증된 사용자가 로그인 페이지 접근 → 홈
 GoRouter createAppRouter() {
+  final authRefresh = _SupabaseAuthRefreshListenable();
   return GoRouter(
     navigatorKey: rootNavigatorKey,
     initialLocation: AppRoute.splash.path,
+    refreshListenable: authRefresh,
     redirect: _handleRedirect,
     routes: [
       GoRoute(
