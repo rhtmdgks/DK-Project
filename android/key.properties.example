@@ -8,6 +8,10 @@
 #   ANDROID_UPLOAD_STORE_PASSWORD=...
 #   ANDROID_UPLOAD_KEY_ALIAS=...
 #   ANDROID_UPLOAD_KEY_PASSWORD=...
+#
+# Play 업로드 없이 Release만 디버그 키로 빌드하려면 android/gradle.properties 에
+#   android.signReleaseWithDebug=true
+# 또는 환경 변수 ANDROID_SIGN_RELEASE_WITH_DEBUG=1 (Play 업로드 불가).
 
 storePassword=변경하세요
 keyPassword=변경하세요

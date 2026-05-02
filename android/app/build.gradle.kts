@@ -11,7 +11,14 @@ plugins {
 }
 
 // Release 서명 (순서): ① android/key.properties ② 환경 변수 ANDROID_UPLOAD_*
-// 둘 다 없으면 release가 debug 키로 서명되어 Play 업로드가 거절되므로, bundle/assemble Release 시 빌드를 중단한다.
+// android.signReleaseWithDebug=true (또는 ANDROID_SIGN_RELEASE_WITH_DEBUG=1) 이면 Release도 디버그 키로 서명 — Play 업로드 불가.
+val signReleaseWithDebug =
+    (
+        (rootProject.findProperty("android.signReleaseWithDebug")?.toString()?.equals("true", ignoreCase = true) == true) ||
+            (System.getenv("ANDROID_SIGN_RELEASE_WITH_DEBUG")?.equals("true", ignoreCase = true) == true) ||
+            (System.getenv("ANDROID_SIGN_RELEASE_WITH_DEBUG") == "1")
+    )
+
 val keystorePropertiesFile = rootProject.file("key.properties")
 val keystoreProperties = Properties().apply {
     if (keystorePropertiesFile.exists()) {
@@ -56,54 +63,61 @@ android {
     }
 
     signingConfigs {
-        val propsPath = keystoreProperties.getProperty("storeFile")
-        val propsStoreFile = propsPath?.let { rootProject.file(it) }
-        val propsOk =
-            keystorePropertiesFile.exists() &&
-                propsStoreFile != null &&
-                propsStoreFile.isFile &&
-                !keystoreProperties.getProperty("storePassword").isNullOrBlank() &&
-                !keystoreProperties.getProperty("keyPassword").isNullOrBlank() &&
-                !keystoreProperties.getProperty("keyAlias").isNullOrBlank()
+        if (!signReleaseWithDebug) {
+            val propsPath = keystoreProperties.getProperty("storeFile")
+            val propsStoreFile = propsPath?.let { rootProject.file(it) }
+            val propsOk =
+                keystorePropertiesFile.exists() &&
+                    propsStoreFile != null &&
+                    propsStoreFile.isFile &&
+                    !keystoreProperties.getProperty("storePassword").isNullOrBlank() &&
+                    !keystoreProperties.getProperty("keyPassword").isNullOrBlank() &&
+                    !keystoreProperties.getProperty("keyAlias").isNullOrBlank()
 
-        val envStoreFile = uploadStoreFileEnv?.let { rootProject.file(it) }
-        val envOk =
-            uploadStoreFileEnv != null &&
-                envStoreFile != null &&
-                envStoreFile.isFile &&
-                uploadKeyAliasEnv != null &&
-                uploadStorePasswordEnv.isNotBlank() &&
-                uploadKeyPasswordEnv.isNotBlank()
+            val envStoreFile = uploadStoreFileEnv?.let { rootProject.file(it) }
+            val envOk =
+                uploadStoreFileEnv != null &&
+                    envStoreFile != null &&
+                    envStoreFile.isFile &&
+                    uploadKeyAliasEnv != null &&
+                    uploadStorePasswordEnv.isNotBlank() &&
+                    uploadKeyPasswordEnv.isNotBlank()
 
-        when {
-            propsOk ->
-                create("release") {
-                    keyAlias = keystoreProperties.getProperty("keyAlias")
-                    keyPassword = keystoreProperties.getProperty("keyPassword")
-                    storeFile = propsStoreFile
-                    storePassword = keystoreProperties.getProperty("storePassword")
-                }
-            envOk ->
-                create("release") {
-                    storeFile = envStoreFile
-                    storePassword = uploadStorePasswordEnv
-                    keyAlias = uploadKeyAliasEnv!!
-                    keyPassword = uploadKeyPasswordEnv
-                }
+            when {
+                propsOk ->
+                    create("release") {
+                        keyAlias = keystoreProperties.getProperty("keyAlias")
+                        keyPassword = keystoreProperties.getProperty("keyPassword")
+                        storeFile = propsStoreFile
+                        storePassword = keystoreProperties.getProperty("storePassword")
+                    }
+                envOk ->
+                    create("release") {
+                        storeFile = envStoreFile
+                        storePassword = uploadStorePasswordEnv
+                        keyAlias = uploadKeyAliasEnv!!
+                        keyPassword = uploadKeyPasswordEnv
+                    }
+            }
         }
     }
 
     buildTypes {
         release {
             signingConfig =
-                signingConfigs.findByName("release")
-                    ?: signingConfigs.getByName("debug")
+                if (signReleaseWithDebug) {
+                    signingConfigs.getByName("debug")
+                } else {
+                    signingConfigs.findByName("release")
+                        ?: signingConfigs.getByName("debug")
+                }
         }
     }
 }
 
-/** Release가 디버그 키로 묶이면 Play 업로드 시 서명 불일치가 나므로 즉시 실패시킨다. */
+/** 업로드 키 없이 Release 빌드하면 Play 거절되므로 기본은 중단. signReleaseWithDebug 시에는 생략. */
 afterEvaluate {
+    if (signReleaseWithDebug) return@afterEvaluate
     listOf("bundleRelease", "assembleRelease").forEach { taskName ->
         tasks.findByName(taskName)?.doFirst {
             if (android.signingConfigs.findByName("release") == null) {
