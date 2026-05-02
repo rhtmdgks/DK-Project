@@ -6,7 +6,8 @@
 #   2) 기존 키 분실 시: Play Console에서 계정 소유자가「업로드 키 재설정」요청 후 PEM 제출
 #   3) 승인되면 아래 storeFile·비밀번호·alias 를 그 키스토어에 맞게 설정
 #
-# storeFile 은 android 폴더 기준 상대 경로 권장 (예: app/upload-keystore.jks)
+# storeFile 은 android 폴더 기준 상대 경로 권장
+#   예: app/upload-keystore.jks  또는  app/upload-keystore.p12 (OpenSSL로 생성한 경우)
 #
 # 대안: 환경 변수만 설정해도 됩니다 (CI 등).
 #   ANDROID_UPLOAD_STORE_FILE=/절대경로/upload-keystore.jks
