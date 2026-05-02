@@ -44,16 +44,32 @@ def patch_app_links_generated_plugin_registrant!
   return unless File.file?(path)
 
   contents = File.read(path)
-  return if contents.include?('app_links-Swift.h')
+  # Pods-Runner.xcconfig 의 HEADER_SEARCH_PATH 는 …/app_links.framework/Headers 이므로
+  # 실제 파일명은 <app_links-Swift.h> (중첩 app_links/ 경로 아님).
+  replacement = <<~'PATCH'.strip
+// Swift 전용 app_links (pod install 시 재적용 — flutter pub get 이 원복함)
+#if __has_include(<app_links-Swift.h>)
+#import <app_links-Swift.h>
+#elif __has_include(<app_links/app_links-Swift.h>)
+#import <app_links/app_links-Swift.h>
+#elif __has_include(<app_links/AppLinksIosPlugin.h>)
+#import <app_links/AppLinksIosPlugin.h>
+#else
+@import app_links;
+#endif
+PATCH
 
-  old_block = <<~'PATCH'
+  return if contents.include?('#if __has_include(<app_links-Swift.h>)')
+
+  vanilla = <<~'PATCH'.strip
 #if __has_include(<app_links/AppLinksIosPlugin.h>)
 #import <app_links/AppLinksIosPlugin.h>
 #else
 @import app_links;
 #endif
 PATCH
-  new_block = <<~'PATCH'
+
+  legacy_patch = <<~'PATCH'.strip
 // Swift 전용 app_links: 생성 헤더 우선 (flutter pub get 이 덮어쓰므로 pod install 시 재적용)
 #if __has_include(<app_links/app_links-Swift.h>)
 #import <app_links/app_links-Swift.h>
@@ -63,13 +79,16 @@ PATCH
 @import app_links;
 #endif
 PATCH
-  unless contents.include?(old_block.strip)
-    STDERR.puts "[Podfile] GeneratedPluginRegistrant.m: app_links 블록이 예상과 다릅니다. 수동으로 Swift 헤더 분기를 확인하세요."
-    return
-  end
 
-  File.write(path, contents.sub(old_block.strip, new_block.strip))
-  STDERR.puts '[Podfile] GeneratedPluginRegistrant.m: app_links → app_links-Swift.h 분기 적용됨'
+  if contents.include?(legacy_patch)
+    File.write(path, contents.sub(legacy_patch, replacement))
+    STDERR.puts '[Podfile] GeneratedPluginRegistrant.m: app_links 헤더를 <app_links-Swift.h> 로 수정'
+  elsif contents.include?(vanilla)
+    File.write(path, contents.sub(vanilla, replacement))
+    STDERR.puts '[Podfile] GeneratedPluginRegistrant.m: app_links Swift 헤더 분기 적용됨'
+  else
+    STDERR.puts '[Podfile] GeneratedPluginRegistrant.m: app_links 블록을 찾지 못했습니다.'
+  end
 end
 
 post_install do |installer|
