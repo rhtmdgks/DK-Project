@@ -1,0 +1,15 @@
+# Google Play에 등록한 업로드 키로 서명합니다.
+# 이 파일을 복사해 key.properties 로 저장하고 값만 채운 뒤 절대 커밋하지 마세요.
+#
+# storeFile 은 android 폴더 기준 상대 경로 권장 (예: app/upload-keystore.jks)
+#
+# 대안: 환경 변수만 설정해도 됩니다 (CI 등).
+#   ANDROID_UPLOAD_STORE_FILE=/절대경로/upload-keystore.jks
+#   ANDROID_UPLOAD_STORE_PASSWORD=...
+#   ANDROID_UPLOAD_KEY_ALIAS=...
+#   ANDROID_UPLOAD_KEY_PASSWORD=...
+
+storePassword=변경하세요
+keyPassword=변경하세요
+keyAlias=업로드키_별칭
+storeFile=app/upload-keystore.jks
