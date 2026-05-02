@@ -1,6 +1,11 @@
 # Google Play에 등록한 업로드 키로 서명합니다.
 # 이 파일을 복사해 key.properties 로 저장하고 값만 채운 뒤 절대 커밋하지 마세요.
 #
+# 새 업로드 키가 필요하면 (문서: Use Play App Signing — answer 9842756):
+#   1) android/scripts/create_upload_keystore.sh 실행 → .jks + *_certificate.pem 생성
+#   2) 기존 키 분실 시: Play Console에서 계정 소유자가「업로드 키 재설정」요청 후 PEM 제출
+#   3) 승인되면 아래 storeFile·비밀번호·alias 를 그 키스토어에 맞게 설정
+#
 # storeFile 은 android 폴더 기준 상대 경로 권장 (예: app/upload-keystore.jks)
 #
 # 대안: 환경 변수만 설정해도 됩니다 (CI 등).

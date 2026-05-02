@@ -12,3 +12,5 @@ GeneratedPluginRegistrant.java
 key.properties
 **/*.keystore
 **/*.jks
+# create_upload_keystore.sh 가 내보낸 업로드 인증서(공개); 저장소에 올리지 마세요.
+**/*_certificate.pem
