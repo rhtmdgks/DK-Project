@@ -1,16 +1,18 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:myapp/components/components.dart';
 import 'package:myapp/core/auth/auth_repository.dart';
 import 'package:myapp/core/auth/auth_state.dart';
 import 'package:myapp/core/routing/app_router.dart';
 import 'package:myapp/core/supabase_client.dart';
 import 'package:myapp/core/theme/app_theme.dart';
+import 'package:myapp/core/theme/apple_design_tokens.dart' show AppleShape;
 import 'package:myapp/core/theme/responsive.dart';
 import 'package:myapp/core/widgets/async_body.dart';
 import 'package:myapp/core/widgets/dismiss_keyboard.dart';
-import 'package:myapp/core/widgets/tab_page_header.dart';
 import 'package:myapp/core/widgets/m3_list.dart';
+import 'package:myapp/design/design.dart';
 import 'package:myapp/repositories/content_report_repository.dart';
 import 'package:myapp/repositories/suggestions_repository.dart';
 import 'package:myapp/repositories/user_block_repository.dart';
@@ -217,58 +219,64 @@ class _SuggestionsTabState extends State<SuggestionsTab>
   Widget build(BuildContext context) {
     return DismissKeyboard(
       child: Scaffold(
-        backgroundColor: AppColors.background,
+        backgroundColor: AppDesignColors.groupedBackground(context),
         body: Column(
-          mainAxisSize: MainAxisSize.min,
           children: [
             SafeArea(
-              top: true,
               bottom: false,
-              minimum: EdgeInsets.zero,
               child: Padding(
-                padding: EdgeInsets.only(left: context.rs(16)),
-                child: TabPageHeader(
-                  title: '건의함',
-                  subtitle: '건의 목록을 확인하거나 질문을 등록하세요.',
-                  contentPadding: EdgeInsets.zero,
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.md,
+                  AppSpacing.xs,
+                  AppSpacing.md,
+                  AppSpacing.sm,
                 ),
-              ),
-            ),
-            Expanded(
-              child: Material(
-                type: MaterialType.transparency,
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    TabBar.secondary(
-                      controller: _tabController,
-                      indicatorColor: AppColors.primaryBlue500,
-                      padding: EdgeInsets.zero,
-                      labelPadding: EdgeInsets.zero,
-                      tabs: const [
-                        Tab(text: '건의 목록'),
-                        Tab(text: '채팅하기'),
-                      ],
+                    Text('건의함', style: AppTypography.largeTitle(context)),
+                    const SizedBox(height: AppSpacing.xs),
+                    Text(
+                      '학교 운영에 대한 의견을 남기거나 학생회와 바로 채팅하세요.',
+                      style: AppTypography.subheadline(context),
                     ),
-                    Expanded(
-                      child: TabBarView(
-                        controller: _tabController,
-                        children: [_buildListBody(), _buildChatSection()],
-                      ),
+                    const SizedBox(height: AppSpacing.md),
+                    CupertinoSlidingSegmentedControl<int>(
+                      groupValue: _tabController.index,
+                      children: const <int, Widget>{
+                        0: Padding(
+                          padding: EdgeInsets.symmetric(vertical: AppSpacing.xs),
+                          child: Text('건의 목록'),
+                        ),
+                        1: Padding(
+                          padding: EdgeInsets.symmetric(vertical: AppSpacing.xs),
+                          child: Text('채팅하기'),
+                        ),
+                      },
+                      onValueChanged: (int? value) {
+                        if (value == null) return;
+                        _tabController.animateTo(value);
+                      },
                     ),
                   ],
                 ),
               ),
             ),
+            Expanded(
+              child: TabBarView(
+                controller: _tabController,
+                children: [_buildListBody(), _buildChatSection()],
+              ),
+            ),
           ],
         ),
         floatingActionButton: _tabController.index == 0
-            ? FloatingActionButton(
+            ? CupertinoButton(
+                padding: const EdgeInsets.all(AppSpacing.sm),
+                color: AppDesignColors.primary(context),
+                borderRadius: BorderRadius.circular(999),
                 onPressed: _showAddSuggestionBottomSheet,
-                backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-                foregroundColor: Theme.of(
-                  context,
-                ).colorScheme.onPrimaryContainer,
-                child: const Icon(Icons.add),
+                child: const Icon(CupertinoIcons.add),
               )
             : null,
         floatingActionButtonLocation: _tabController.index == 0
@@ -285,19 +293,29 @@ class _SuggestionsTabState extends State<SuggestionsTab>
       isEmpty: _list.isEmpty,
       onRetry: _fetch,
       emptyMessage: '등록된 건의가 없습니다.',
-      child: RefreshIndicator(
-        onRefresh: _fetch,
-        child: ListView.separated(
-          padding: EdgeInsets.symmetric(vertical: context.rh(16)),
-          itemCount: _list.length,
-          separatorBuilder: (_, __) => Divider(height: 1),
-          itemBuilder: (context, i) => _buildSuggestionTile(_list[i]),
-        ),
+      child: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+        slivers: [
+          CupertinoSliverRefreshControl(onRefresh: _fetch),
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.md,
+              AppSpacing.xs,
+              AppSpacing.md,
+              AppSpacing.xl,
+            ),
+            sliver: SliverList.separated(
+              itemBuilder: (_, index) => _buildCupertinoSuggestionTile(_list[index]),
+              separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.sm),
+              itemCount: _list.length,
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildSuggestionTile(Map<String, dynamic> item) {
+  Widget _buildCupertinoSuggestionTile(Map<String, dynamic> item) {
     final title = item['title'] as String? ?? '';
     final body = item['body'] as String? ?? '';
     final status = item['status'] as String? ?? 'pending';
@@ -321,63 +339,17 @@ class _SuggestionsTabState extends State<SuggestionsTab>
       _ => AppColors.textSecondary,
     };
 
-    return M3ListTileInbox(
-      title: title.isEmpty ? '(제목 없음)' : title,
-      subtitle: body.isEmpty ? null : body,
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (dateStr.isNotEmpty)
-            Text(
-              dateStr,
-              style: AppFonts.scaled(context, AppFonts.captionRegular),
-            ),
-          if (dateStr.isNotEmpty) SizedBox(width: context.rs(8)),
-          if (adminComment.isNotEmpty) ...[
-            Container(
-              padding: EdgeInsets.symmetric(
-                horizontal: context.rs(6),
-                vertical: context.rh(2),
-              ),
-              decoration: BoxDecoration(
-                color: AppColors.primaryBlue.withValues(alpha: 0.08),
-                borderRadius: AppShapes.borderRadiusExtraSmall,
-              ),
-              child: Text(
-                '답변 있음',
-                style: AppFonts.scaled(
-                  context,
-                  AppFonts.captionMedium,
-                ).copyWith(color: AppColors.primaryBlue),
-              ),
-            ),
-            SizedBox(width: context.rs(6)),
-          ],
-          Container(
-            padding: EdgeInsets.symmetric(
-              horizontal: context.rs(8),
-              vertical: context.rh(2),
-            ),
-            decoration: BoxDecoration(
-              color: statusColor.withValues(alpha: 0.12),
-              borderRadius: AppShapes.borderRadiusExtraSmall,
-            ),
-            child: Text(
-              statusLabel,
-              style: AppFonts.scaled(
-                context,
-                AppFonts.captionMedium,
-              ).copyWith(color: statusColor),
-            ),
-          ),
-          SizedBox(width: context.rs(4)),
-          Icon(
-            Icons.chevron_right,
-            size: context.rs(20),
-            color: AppColors.hint,
-          ),
-        ],
-      ),
+    final titleStyle = AppFonts.scaled(
+      context,
+      AppFonts.bodyMedium,
+    ).copyWith(color: AppColors.textDark);
+    final subStyle = AppFonts.scaled(
+      context,
+      AppFonts.smallRegular,
+    ).copyWith(color: AppColors.textSecondary, height: 1.47);
+    final chipStyle = AppFonts.scaled(context, AppFonts.captionMedium);
+
+    return AppleCard(
       onTap: () async {
         final baseBody = body.isEmpty ? '내용 없음' : body;
         final sections = <String>[baseBody];
@@ -393,9 +365,7 @@ class _SuggestionsTabState extends State<SuggestionsTab>
             ctx,
             title: title.isEmpty ? '(제목 없음)' : title,
             body: fullBody,
-            secondary: dateStr.isNotEmpty
-                ? '$dateStr · $statusLabel'
-                : statusLabel,
+            secondary: dateStr.isNotEmpty ? '$dateStr · $statusLabel' : statusLabel,
           );
           return;
         }
@@ -404,21 +374,127 @@ class _SuggestionsTabState extends State<SuggestionsTab>
           ctx,
           title: title.isEmpty ? '(제목 없음)' : title,
           body: fullBody,
-          secondary: dateStr.isNotEmpty
-              ? '$dateStr · $statusLabel'
-              : statusLabel,
+          secondary: dateStr.isNotEmpty ? '$dateStr · $statusLabel' : statusLabel,
           bodyWidget: _SuggestionDetailBodyWidget(
             suggestionId: suggestionId,
             baseBody: baseBody,
             adminComment: adminComment,
-            onReportSuggestion: () =>
-                _showReportDialog(context, 'suggestion', suggestionId),
-            onBlockAuthor: authorProfileId == null
-                ? null
-                : () => _blockAuthorAndRefresh(authorProfileId),
+            onReportSuggestion: () => _showReportDialog(context, 'suggestion', suggestionId),
+            onBlockAuthor: authorProfileId == null ? null : () => _blockAuthorAndRefresh(authorProfileId),
           ),
         );
       },
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  title.isEmpty ? '(제목 없음)' : title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: titleStyle,
+                ),
+              ),
+              if (dateStr.isNotEmpty)
+                Text(
+                  dateStr,
+                  style: AppTypography.caption(context),
+                ),
+              const SizedBox(width: AppSpacing.xs),
+              Icon(
+                CupertinoIcons.chevron_right,
+                size: 16,
+                color: AppDesignColors.tertiaryLabel(context),
+              ),
+            ],
+          ),
+          if (body.isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.xs),
+            Text(body, maxLines: 2, overflow: TextOverflow.ellipsis, style: subStyle),
+          ],
+          const SizedBox(height: AppSpacing.sm),
+          Wrap(
+            spacing: AppSpacing.xs,
+            runSpacing: AppSpacing.xs,
+            children: [
+              _buildStatusChip(
+                context: context,
+                text: statusLabel,
+                color: statusColor,
+                style: chipStyle,
+              ),
+              if (adminComment.isNotEmpty)
+                _buildStatusChip(
+                  context: context,
+                  text: '답변 있음',
+                  color: AppColors.primaryBlue,
+                  style: chipStyle,
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatusChip({
+    required BuildContext context,
+    required String text,
+    required Color color,
+    required TextStyle style,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
+      decoration: BoxDecoration(
+        color: AppDesignColors.elevatedSurface(context),
+        borderRadius: BorderRadius.circular(AppleShape.radiusSmHairline),
+        border: Border.all(color: AppDesignColors.separator(context)),
+      ),
+      child: Text(text, style: style.copyWith(color: color)),
+    );
+  }
+
+  Widget _buildChatSection() {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.md,
+        AppSpacing.xs,
+        AppSpacing.md,
+        AppSpacing.xl,
+      ),
+      children: [
+        AppleCard(
+          child: Column(
+            children: [
+              Icon(
+                CupertinoIcons.chat_bubble_2_fill,
+                size: context.rs(48),
+                color: AppColors.primaryBlue,
+              ),
+              const SizedBox(height: AppSpacing.md),
+              Text(
+                '학생회 1:1 채팅',
+                style: AppTypography.title2(context),
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                '건의 내용이 길거나 빠른 응답이 필요하면 채팅으로 바로 문의하세요.',
+                textAlign: TextAlign.center,
+                style: AppTypography.subheadline(context),
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              AppleButton(
+                label: '채팅 시작하기',
+                fullWidth: true,
+                icon: CupertinoIcons.arrow_up_right_circle_fill,
+                onPressed: _startDirectChat,
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -529,44 +605,6 @@ class _SuggestionsTabState extends State<SuggestionsTab>
     }
   }
 
-  Widget _buildChatSection() {
-    return Center(
-      child: Padding(
-        padding: EdgeInsets.symmetric(vertical: context.rh(22)),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              CupertinoIcons.chat_bubble_2_fill,
-              size: context.rs(64),
-              color: AppColors.primaryBlue,
-            ),
-            SizedBox(height: context.rh(24)),
-            Text('채팅하기', style: AppFonts.scaled(context, AppFonts.titleBold)),
-            SizedBox(height: context.rh(12)),
-            Text(
-              '대덕고등학교 학생회와 직접 소통하여 궁금한 것을 물어보세요!',
-              textAlign: TextAlign.center,
-              style: AppFonts.scaled(context, AppFonts.bodyRegular),
-            ),
-            SizedBox(height: context.rh(32)),
-            FilledButton.icon(
-              onPressed: _startDirectChat,
-              icon: const Icon(Icons.chat_bubble_outline),
-              label: const Text('채팅 시작하기'),
-              style: FilledButton.styleFrom(
-                padding: EdgeInsets.symmetric(
-                  horizontal: context.rs(24),
-                  vertical: context.rh(16),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   void _showAddSuggestionBottomSheet() {
     final titleController = TextEditingController();
     final bodyController = TextEditingController();
@@ -581,393 +619,121 @@ class _SuggestionsTabState extends State<SuggestionsTab>
       builder: (sheetContext) {
         return DraggableScrollableSheet(
           expand: false,
-          initialChildSize: 0.7,
-          minChildSize: 0.4,
-          maxChildSize: 0.95,
-          builder: (ctx, scrollController) {
+          initialChildSize: 0.66,
+          minChildSize: 0.38,
+          maxChildSize: 0.92,
+          builder: (_, scrollController) {
             return StatefulBuilder(
               builder: (innerContext, setSheetState) {
                 return Container(
                   decoration: BoxDecoration(
-                    color: Theme.of(innerContext).colorScheme.surface,
-                    borderRadius: BorderRadius.vertical(
-                      top: Radius.circular(AppShapes.radiusLarge),
+                    color: AppDesignColors.elevatedSurface(innerContext),
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(AppRadius.lg),
                     ),
                   ),
-                  child: SafeArea(
-                    top: false,
-                    child: Column(
-                      children: [
-                        // 드래그 핸들
-                        Padding(
-                          padding: EdgeInsets.only(top: innerContext.rh(12)),
-                          child: Container(
-                            width: innerContext.rs(36),
-                            height: 4,
-                            decoration: BoxDecoration(
-                              color: AppColors.hint.withValues(alpha: 0.5),
-                              borderRadius: BorderRadius.circular(2),
-                            ),
-                          ),
-                        ),
-                        Padding(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: innerContext.rs(22),
-                            vertical: innerContext.rh(16),
-                          ),
-                          child: Row(
-                            children: [
-                              Text(
-                                '건의하기',
-                                style: AppFonts.scaled(
-                                  innerContext,
-                                  AppFonts.titleBold,
-                                ),
-                              ),
-                              const Spacer(),
-                              IconButton(
-                                onPressed: () =>
-                                    Navigator.of(sheetContext).pop(false),
-                                icon: const Icon(Icons.close),
-                                style: IconButton.styleFrom(
-                                  foregroundColor: AppColors.textSecondary,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Expanded(
-                          child: SingleChildScrollView(
-                            controller: scrollController,
-                            padding: EdgeInsets.fromLTRB(
-                              innerContext.rs(22),
-                              0,
-                              innerContext.rs(22),
-                              innerContext.rh(24),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                TextField(
-                                  controller: titleController,
-                                  decoration: InputDecoration(
-                                    labelText: '제목',
-                                    filled: true,
-                                    fillColor: Theme.of(innerContext)
-                                        .colorScheme
-                                        .surfaceContainerHighest
-                                        .withValues(alpha: 0.5),
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(
-                                        AppShapes.radiusSmall,
-                                      ),
-                                      borderSide: BorderSide(
-                                        color: AppColors.border,
-                                      ),
-                                    ),
-                                    enabledBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(
-                                        AppShapes.radiusSmall,
-                                      ),
-                                      borderSide: BorderSide(
-                                        color: AppColors.border,
-                                      ),
-                                    ),
-                                    focusedBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(
-                                        AppShapes.radiusSmall,
-                                      ),
-                                      borderSide: BorderSide(
-                                        color: Theme.of(
-                                          innerContext,
-                                        ).colorScheme.primary,
-                                        width: 2,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                SizedBox(height: innerContext.rh(16)),
-                                TextField(
-                                  controller: bodyController,
-                                  decoration: InputDecoration(
-                                    labelText: '내용 (선택)',
-                                    filled: true,
-                                    fillColor: Theme.of(innerContext)
-                                        .colorScheme
-                                        .surfaceContainerHighest
-                                        .withValues(alpha: 0.5),
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(
-                                        AppShapes.radiusSmall,
-                                      ),
-                                      borderSide: BorderSide(
-                                        color: AppColors.border,
-                                      ),
-                                    ),
-                                    enabledBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(
-                                        AppShapes.radiusSmall,
-                                      ),
-                                      borderSide: BorderSide(
-                                        color: AppColors.border,
-                                      ),
-                                    ),
-                                    focusedBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(
-                                        AppShapes.radiusSmall,
-                                      ),
-                                      borderSide: BorderSide(
-                                        color: Theme.of(
-                                          innerContext,
-                                        ).colorScheme.primary,
-                                        width: 2,
-                                      ),
-                                    ),
-                                  ),
-                                  maxLines: 4,
-                                ),
-                                SizedBox(height: innerContext.rh(24)),
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: OutlinedButton(
-                                        onPressed: submitting
-                                            ? null
-                                            : () => Navigator.of(
-                                                sheetContext,
-                                              ).pop(false),
-                                        child: const Text('취소'),
-                                      ),
-                                    ),
-                                    SizedBox(width: innerContext.rs(12)),
-                                    Expanded(
-                                      child: FilledButton(
-                                        onPressed: submitting
-                                            ? null
-                                            : () async {
-                                                // 프로필이 아직 없다면 한 번 더 시도
-                                                AppProfile? profile = _profile;
-                                                profile ??= await AuthRepository
-                                                    .instance
-                                                    .getCurrentProfile();
-                                                if (mounted) {
-                                                  setState(
-                                                    () => _profile = profile,
-                                                  );
-                                                }
-
-                                                if (profile == null) {
-                                                  if (sheetContext.mounted) {
-                                                    ScaffoldMessenger.of(
-                                                      innerContext,
-                                                    ).showSnackBar(
-                                                      SnackBar(
-                                                        content: const Text(
-                                                          '로그인 후 건의를 등록할 수 있습니다.',
-                                                        ),
-                                                        behavior:
-                                                            SnackBarBehavior
-                                                                .floating,
-                                                        shape: RoundedRectangleBorder(
-                                                          borderRadius:
-                                                              BorderRadius.circular(
-                                                                8,
-                                                              ),
-                                                        ),
-                                                      ),
-                                                    );
-                                                  }
-                                                  return;
-                                                }
-
-                                                final title = titleController
-                                                    .text
-                                                    .trim();
-                                                final bodyText = bodyController
-                                                    .text
-                                                    .trim();
-                                                if (title.isEmpty) {
-                                                  if (innerContext.mounted) {
-                                                    ScaffoldMessenger.of(
-                                                      innerContext,
-                                                    ).showSnackBar(
-                                                      SnackBar(
-                                                        content: const Text(
-                                                          '제목을 입력해 주세요.',
-                                                        ),
-                                                        behavior:
-                                                            SnackBarBehavior
-                                                                .floating,
-                                                        shape: RoundedRectangleBorder(
-                                                          borderRadius:
-                                                              BorderRadius.circular(
-                                                                8,
-                                                              ),
-                                                        ),
-                                                      ),
-                                                    );
-                                                  }
-                                                  return;
-                                                }
-
-                                                // 욕설/불건전 표현 필터
-                                                final moderation =
-                                                    ContentModerationService.checkText(
-                                                      '$title\n$bodyText',
-                                                    );
-                                                if (moderation.hasAbuse) {
-                                                  if (innerContext.mounted) {
-                                                    ScaffoldMessenger.of(
-                                                      innerContext,
-                                                    ).showSnackBar(
-                                                      const SnackBar(
-                                                        content: Text(
-                                                          '부적절한 표현이 포함되어 있어 건의를 등록할 수 없습니다. 표현을 수정해 주세요.',
-                                                        ),
-                                                        behavior:
-                                                            SnackBarBehavior
-                                                                .floating,
-                                                        backgroundColor:
-                                                            AppColors.error,
-                                                      ),
-                                                    );
-                                                  }
-                                                  return;
-                                                }
-
-                                                setSheetState(
-                                                  () => submitting = true,
-                                                );
-
-                                                try {
-                                                  try {
-                                                    await supabase.rpc(
-                                                      'insert_suggestion',
-                                                      params: {
-                                                        'p_title': title,
-                                                        'p_body':
-                                                            bodyText.isEmpty
-                                                            ? null
-                                                            : bodyText,
-                                                      },
-                                                    );
-                                                  } catch (rpcError) {
-                                                    final msg = rpcError
-                                                        .toString();
-                                                    final isFunctionMissing =
-                                                        msg.contains(
-                                                          'insert_suggestion',
-                                                        ) ||
-                                                        msg.contains(
-                                                          'PGRST202',
-                                                        ) ||
-                                                        msg.contains(
-                                                          'Could not find the function',
-                                                        );
-                                                    if (isFunctionMissing) {
-                                                      await supabase
-                                                          .from('suggestions')
-                                                          .insert({
-                                                            'author_id':
-                                                                profile.id,
-                                                            'title': title,
-                                                            'body':
-                                                                bodyText.isEmpty
-                                                                ? null
-                                                                : bodyText,
-                                                          });
-                                                    } else {
-                                                      rethrow;
-                                                    }
-                                                  }
-                                                  if (sheetContext.mounted) {
-                                                    Navigator.of(
-                                                      sheetContext,
-                                                    ).pop(true);
-                                                  }
-                                                } catch (e) {
-                                                  if (!sheetContext.mounted) {
-                                                    return;
-                                                  }
-                                                  setSheetState(
-                                                    () => submitting = false,
-                                                  );
-                                                  final msg = e.toString();
-                                                  final isSessionError =
-                                                      msg.contains('P0001') ||
-                                                      msg.contains(
-                                                        '로그인 세션이 없습니다',
-                                                      ) ||
-                                                      msg.contains(
-                                                        'row-level security',
-                                                      ) ||
-                                                      msg.contains('42501');
-                                                  if (isSessionError) {
-                                                    ScaffoldMessenger.of(
-                                                      innerContext,
-                                                    ).showSnackBar(
-                                                      SnackBar(
-                                                        content: const Text(
-                                                          '세션이 만료되었습니다. 다시 로그인해 주세요.',
-                                                        ),
-                                                        behavior:
-                                                            SnackBarBehavior
-                                                                .floating,
-                                                        backgroundColor:
-                                                            AppColors.error,
-                                                        shape: RoundedRectangleBorder(
-                                                          borderRadius:
-                                                              BorderRadius.circular(
-                                                                8,
-                                                              ),
-                                                        ),
-                                                      ),
-                                                    );
-                                                  } else {
-                                                    ScaffoldMessenger.of(
-                                                      innerContext,
-                                                    ).showSnackBar(
-                                                      SnackBar(
-                                                        content: Text(
-                                                          '등록 중 오류가 발생했습니다: $e',
-                                                        ),
-                                                        behavior:
-                                                            SnackBarBehavior
-                                                                .floating,
-                                                        backgroundColor:
-                                                            AppColors.error,
-                                                        shape: RoundedRectangleBorder(
-                                                          borderRadius:
-                                                              BorderRadius.circular(
-                                                                8,
-                                                              ),
-                                                        ),
-                                                      ),
-                                                    );
-                                                  }
-                                                }
-                                              },
-                                        child: submitting
-                                            ? const SizedBox(
-                                                height: 20,
-                                                width: 20,
-                                                child:
-                                                    CircularProgressIndicator(
-                                                      strokeWidth: 2,
-                                                    ),
-                                              )
-                                            : const Text('등록하기'),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
+                  child: ListView(
+                    controller: scrollController,
+                    padding: const EdgeInsets.fromLTRB(
+                      AppSpacing.md,
+                      AppSpacing.sm,
+                      AppSpacing.md,
+                      AppSpacing.xl,
                     ),
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 36,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: AppDesignColors.separator(innerContext),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                      Text('건의 등록', style: AppTypography.title2(innerContext)),
+                      const SizedBox(height: AppSpacing.md),
+                      AppleTextField(controller: titleController, placeholder: '제목'),
+                      const SizedBox(height: AppSpacing.sm),
+                      AppleTextField(
+                        controller: bodyController,
+                        placeholder: '내용 (선택)',
+                        maxLines: 4,
+                      ),
+                      const SizedBox(height: AppSpacing.lg),
+                      AppleButton(
+                        label: '등록하기',
+                        fullWidth: true,
+                        loading: submitting,
+                        onPressed: submitting
+                            ? null
+                            : () async {
+                                AppProfile? profile = _profile;
+                                profile ??=
+                                    await AuthRepository.instance.getCurrentProfile();
+                                if (mounted) {
+                                  setState(() => _profile = profile);
+                                }
+                                if (profile == null) return;
+
+                                final title = titleController.text.trim();
+                                final bodyText = bodyController.text.trim();
+                                if (title.isEmpty) return;
+
+                                final moderation =
+                                    ContentModerationService.checkText('$title\n$bodyText');
+                                if (moderation.hasAbuse) {
+                                  if (innerContext.mounted) {
+                                    ScaffoldMessenger.of(innerContext).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          '부적절한 표현이 포함되어 있어 건의를 등록할 수 없습니다.',
+                                        ),
+                                        backgroundColor: AppColors.error,
+                                      ),
+                                    );
+                                  }
+                                  return;
+                                }
+
+                                setSheetState(() => submitting = true);
+                                try {
+                                  try {
+                                    await supabase.rpc(
+                                      'insert_suggestion',
+                                      params: {
+                                        'p_title': title,
+                                        'p_body': bodyText.isEmpty ? null : bodyText,
+                                      },
+                                    );
+                                  } catch (rpcError) {
+                                    final msg = rpcError.toString();
+                                    final isFunctionMissing =
+                                        msg.contains('insert_suggestion') ||
+                                        msg.contains('PGRST202') ||
+                                        msg.contains('Could not find the function');
+                                    if (isFunctionMissing) {
+                                      await supabase.from('suggestions').insert({
+                                        'author_id': profile.id,
+                                        'title': title,
+                                        'body': bodyText.isEmpty ? null : bodyText,
+                                      });
+                                    } else {
+                                      rethrow;
+                                    }
+                                  }
+                                  if (sheetContext.mounted) {
+                                    Navigator.of(sheetContext).pop(true);
+                                  }
+                                } catch (_) {
+                                  if (innerContext.mounted) {
+                                    setSheetState(() => submitting = false);
+                                  }
+                                }
+                              },
+                      ),
+                    ],
                   ),
                 );
               },
@@ -976,24 +742,17 @@ class _SuggestionsTabState extends State<SuggestionsTab>
         );
       },
     ).then((success) {
-      // 시트 제거 직후 트리 정리와 겹치지 않도록 다음 프레임으로 미룸
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        titleController.dispose();
-        bodyController.dispose();
-        if (success == true && mounted) {
-          _fetch();
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text('등록되었습니다.'),
-              behavior: SnackBarBehavior.floating,
-              backgroundColor: AppColors.success,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-          );
-        }
-      });
+      titleController.dispose();
+      bodyController.dispose();
+      if (success == true && mounted) {
+        _fetch();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('등록되었습니다.'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
     });
   }
 }
@@ -1326,24 +1085,30 @@ class _SuggestionDetailBodyWidgetState
     final storedPassword = comment['password'] as String? ?? '';
     if (id == null) return;
     final controller = TextEditingController();
-    final ok = await showDialog<bool>(
+    final ok = await showCupertinoDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
+      builder: (ctx) => CupertinoAlertDialog(
         title: const Text('비공개 댓글'),
-        content: TextField(
-          controller: controller,
-          obscureText: true,
-          decoration: const InputDecoration(
-            labelText: '비밀번호',
-            hintText: '비밀번호를 입력하세요',
+        content: Padding(
+          padding: const EdgeInsets.only(top: 12),
+          child: CupertinoTextField(
+            controller: controller,
+            obscureText: true,
+            placeholder: '비밀번호를 입력하세요',
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: CupertinoColors.systemGrey6.resolveFrom(ctx),
+              borderRadius: BorderRadius.circular(8),
+            ),
           ),
         ),
         actions: [
-          TextButton(
+          CupertinoDialogAction(
             onPressed: () => Navigator.of(ctx).pop(false),
             child: const Text('취소'),
           ),
-          FilledButton(
+          CupertinoDialogAction(
+            isDefaultAction: true,
             onPressed: () => Navigator.of(ctx).pop(true),
             child: const Text('확인'),
           ),
@@ -1552,80 +1317,84 @@ class _SuggestionDetailBodyWidgetState
         _buildSectionHeader(
           ctx,
           title: '내용',
-          trailing: PopupMenuButton<String>(
-            icon: const Icon(Icons.more_horiz),
-            onSelected: (value) {
-              if (value == 'report') {
-                widget.onReportSuggestion();
-                return;
-              }
-              if (value == 'block') {
-                widget.onBlockAuthor?.call();
-              }
-            },
-            itemBuilder: (menuContext) => [
-              const PopupMenuItem<String>(value: 'report', child: Text('신고')),
-              if (widget.onBlockAuthor != null)
-                const PopupMenuItem<String>(
-                  value: 'block',
-                  child: Text('작성자 차단'),
+          trailing: CupertinoButton(
+            padding: EdgeInsets.zero,
+            minimumSize: const Size(44, 44),
+            onPressed: () {
+              showCupertinoModalPopup<void>(
+                context: ctx,
+                builder: (sheetCtx) => CupertinoActionSheet(
+                  actions: [
+                    CupertinoActionSheetAction(
+                      onPressed: () {
+                        Navigator.of(sheetCtx).pop();
+                        widget.onReportSuggestion();
+                      },
+                      child: const Text('신고'),
+                    ),
+                    if (widget.onBlockAuthor != null)
+                      CupertinoActionSheetAction(
+                        isDestructiveAction: true,
+                        onPressed: () {
+                          Navigator.of(sheetCtx).pop();
+                          widget.onBlockAuthor!();
+                        },
+                        child: const Text('작성자 차단'),
+                      ),
+                  ],
+                  cancelButton: CupertinoActionSheetAction(
+                    isDefaultAction: true,
+                    onPressed: () => Navigator.of(sheetCtx).pop(),
+                    child: const Text('취소'),
+                  ),
                 ),
-            ],
+              );
+            },
+            child: Icon(
+              CupertinoIcons.ellipsis_circle,
+              color: AppDesignColors.primary(ctx),
+              size: 24,
+            ),
           ),
         ),
-        SizedBox(height: ctx.rh(8)),
-        Container(
-          width: double.infinity,
-          padding: EdgeInsets.all(ctx.rs(12)),
-          decoration: BoxDecoration(
-            color: AppColors.background,
-            borderRadius: BorderRadius.circular(AppShapes.radiusSmall),
-            border: Border.all(color: AppColors.borderLight),
-          ),
+        const SizedBox(height: AppSpacing.xs),
+        AppleCard(
+          padding: const EdgeInsets.all(AppSpacing.md),
           child: Text(
             widget.baseBody,
-            style: AppFonts.scaled(
-              ctx,
-              AppFonts.bodyRegular,
-            ).copyWith(color: AppColors.textPrimary),
+            style: AppTypography.body(ctx).copyWith(
+              color: AppDesignColors.label(ctx),
+            ),
           ),
         ),
         if (widget.adminComment.isNotEmpty) ...[
-          SizedBox(height: ctx.rh(16)),
+          const SizedBox(height: AppSpacing.md),
           _buildSectionHeader(ctx, title: '관리자 댓글'),
-          SizedBox(height: ctx.rh(8)),
-          Container(
-            width: double.infinity,
-            padding: EdgeInsets.all(ctx.rs(12)),
-            decoration: BoxDecoration(
-              color: AppColors.primaryBlue.withValues(alpha: 0.06),
-              borderRadius: BorderRadius.circular(AppShapes.radiusSmall),
-              border: Border.all(color: AppColors.primaryBlueLight),
-            ),
+          const SizedBox(height: AppSpacing.xs),
+          AppleCard(
+            padding: const EdgeInsets.all(AppSpacing.md),
             child: Text(
               widget.adminComment,
-              style: AppFonts.scaled(
-                ctx,
-                AppFonts.bodyRegular,
-              ).copyWith(color: AppColors.primaryBlue),
+              style: AppTypography.body(ctx).copyWith(
+                color: AppDesignColors.primary(ctx),
+              ),
             ),
           ),
         ],
-        SizedBox(height: ctx.rh(20)),
-        Divider(height: 1, color: AppColors.borderLight),
-        SizedBox(height: ctx.rh(12)),
+        const SizedBox(height: AppSpacing.lg),
+        Container(height: 1, color: AppDesignColors.separator(ctx)),
+        const SizedBox(height: AppSpacing.sm),
         Row(
           children: [
             Expanded(
               child: Text(
                 '댓글',
-                style: AppFonts.scaled(
-                  ctx,
-                  AppFonts.captionMedium,
-                ).copyWith(color: AppColors.textSecondary),
+                style: AppTypography.footnote(ctx),
               ),
             ),
-            TextButton.icon(
+            AppleButton(
+              label: '댓글 작성',
+              variant: AppleButtonVariant.plain,
               onPressed: _loading
                   ? null
                   : () async {
@@ -1634,28 +1403,23 @@ class _SuggestionDetailBodyWidgetState
                         _loadComments();
                       }
                     },
-              icon: const Icon(Icons.add, size: 18),
-              label: const Text('댓글 작성'),
             ),
           ],
         ),
-        SizedBox(height: ctx.rh(8)),
+        const SizedBox(height: AppSpacing.xs),
         if (_loading)
-          const Center(
+          Center(
             child: Padding(
-              padding: EdgeInsets.all(16),
-              child: CircularProgressIndicator(),
+              padding: const EdgeInsets.all(AppSpacing.md),
+              child: const CupertinoActivityIndicator(radius: 12),
             ),
           )
         else if (_comments.isEmpty)
           Padding(
-            padding: EdgeInsets.symmetric(vertical: ctx.rh(8)),
+            padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
             child: Text(
               '등록된 댓글이 없습니다.',
-              style: AppFonts.scaled(
-                ctx,
-                AppFonts.smallRegular,
-              ).copyWith(color: AppColors.hint),
+              style: AppTypography.footnote(ctx),
             ),
           )
         else
@@ -1674,14 +1438,48 @@ class _SuggestionDetailBodyWidgetState
         Expanded(
           child: Text(
             title,
-            style: AppFonts.scaled(
-              context,
-              AppFonts.captionMedium,
-            ).copyWith(color: AppColors.textSecondary),
+            style: AppTypography.footnote(context),
           ),
         ),
         if (trailing != null) trailing,
       ],
+    );
+  }
+
+  void _openCommentOverflowMenu(
+    BuildContext context,
+    Map<String, dynamic> comment,
+  ) {
+    final id = comment['id'] as String?;
+    final authorId = comment['author_id']?.toString();
+    showCupertinoModalPopup<void>(
+      context: context,
+      builder: (sheetCtx) => CupertinoActionSheet(
+        actions: [
+          if (id != null)
+            CupertinoActionSheetAction(
+              onPressed: () {
+                Navigator.of(sheetCtx).pop();
+                _reportComment(id);
+              },
+              child: const Text('신고'),
+            ),
+          if (authorId != null)
+            CupertinoActionSheetAction(
+              isDestructiveAction: true,
+              onPressed: () {
+                Navigator.of(sheetCtx).pop();
+                _blockAuthor(authorId);
+              },
+              child: const Text('작성자 차단'),
+            ),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          isDefaultAction: true,
+          onPressed: () => Navigator.of(sheetCtx).pop(),
+          child: const Text('취소'),
+        ),
+      ),
     );
   }
 
@@ -1696,38 +1494,30 @@ class _SuggestionDetailBodyWidgetState
     final authorId = comment['author_id']?.toString();
 
     return Padding(
-      padding: EdgeInsets.only(bottom: context.rh(10)),
-      child: Container(
-        width: double.infinity,
-        padding: EdgeInsets.all(context.rs(10)),
-        decoration: BoxDecoration(
-          color: AppColors.surfaceContainerLowest,
-          borderRadius: BorderRadius.circular(AppShapes.radiusSmall),
-          border: Border.all(color: AppColors.borderLight),
-        ),
+      padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+      child: AppleCard(
+        padding: const EdgeInsets.all(AppSpacing.sm),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(
               child: isPrivate && !unlocked
-                  ? InkWell(
+                  ? GestureDetector(
+                      behavior: HitTestBehavior.opaque,
                       onTap: () => _showUnlockDialog(comment),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Icon(
-                            Icons.lock_outline,
-                            size: context.rs(16),
-                            color: AppColors.textSecondary,
+                            CupertinoIcons.lock_fill,
+                            size: 16,
+                            color: AppDesignColors.secondaryLabel(context),
                           ),
-                          SizedBox(width: context.rs(6)),
+                          const SizedBox(width: AppSpacing.xs),
                           Expanded(
                             child: Text(
                               '비공개 댓글입니다. 탭하여 비밀번호 입력',
-                              style: AppFonts.scaled(
-                                context,
-                                AppFonts.smallRegular,
-                              ).copyWith(color: AppColors.textSecondary),
+                              style: AppTypography.footnote(context),
                             ),
                           ),
                         ],
@@ -1735,38 +1525,22 @@ class _SuggestionDetailBodyWidgetState
                     )
                   : Text(
                       content.isEmpty ? '(내용 없음)' : content,
-                      style: AppFonts.scaled(
-                        context,
-                        AppFonts.smallRegular,
-                      ).copyWith(color: AppColors.textPrimary),
+                      style: AppTypography.body(context).copyWith(
+                        color: AppDesignColors.label(context),
+                      ),
                     ),
             ),
-            PopupMenuButton<String>(
-              icon: const Icon(Icons.more_horiz),
-              onSelected: (value) {
-                if (value == 'report') {
-                  if (id != null) {
-                    _reportComment(id);
-                  }
-                  return;
-                }
-                if (value == 'block' && authorId != null) {
-                  _blockAuthor(authorId);
-                }
-              },
-              itemBuilder: (menuContext) => [
-                if (id != null)
-                  const PopupMenuItem<String>(
-                    value: 'report',
-                    child: Text('신고'),
-                  ),
-                if (authorId != null)
-                  const PopupMenuItem<String>(
-                    value: 'block',
-                    child: Text('작성자 차단'),
-                  ),
-              ],
-            ),
+            if (id != null || authorId != null)
+              CupertinoButton(
+                padding: EdgeInsets.zero,
+                minimumSize: const Size(44, 36),
+                onPressed: () => _openCommentOverflowMenu(context, comment),
+                child: Icon(
+                  CupertinoIcons.ellipsis_vertical,
+                  size: 18,
+                  color: AppDesignColors.secondaryLabel(context),
+                ),
+              ),
           ],
         ),
       ),

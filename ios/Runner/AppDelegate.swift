@@ -2,7 +2,6 @@ import Flutter
 import UIKit
 import CoreLocation
 import WeatherKit
-import app_links
 
 @main
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
@@ -18,10 +17,6 @@ import app_links
 
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
-    // app_links 는 ObjC GeneratedPluginRegistrant 에서 제외(Podfile 스크립트). Swift 에서만 등록.
-    if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "AppLinksIosPlugin") {
-      AppLinksIosPlugin.register(with: registrar)
-    }
   }
 }
 

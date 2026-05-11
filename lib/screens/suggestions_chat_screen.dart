@@ -206,7 +206,10 @@ class _SuggestionsChatScreenState extends State<SuggestionsChatScreen> {
         leading: CupertinoButton(
           padding: EdgeInsets.zero,
           onPressed: () => Navigator.of(context).pop(),
-          child: const Icon(CupertinoIcons.back),
+          child: Icon(
+            CupertinoIcons.back,
+            color: AppColors.primaryBlue,
+          ),
         ),
         middle: Text(
           '질문하기 채팅',
@@ -342,15 +345,6 @@ class _SuggestionsChatScreenState extends State<SuggestionsChatScreen> {
                       border: isMe
                           ? null
                           : Border.all(color: AppColors.borderLight),
-                      boxShadow: isMe
-                          ? null
-                          : const [
-                              BoxShadow(
-                                color: AppColors.cardShadow,
-                                offset: Offset(0, 1),
-                                blurRadius: 4,
-                              ),
-                            ],
                     ),
                     child: Text(
                       content,
@@ -382,7 +376,10 @@ class _SuggestionsChatScreenState extends State<SuggestionsChatScreen> {
   Widget _buildInputBar() {
     return Container(
       padding: EdgeInsets.all(context.rs(8)),
-      color: AppColors.white,
+      decoration: const BoxDecoration(
+        color: AppColors.white,
+        border: Border(top: BorderSide(color: AppColors.border, width: 0.5)),
+      ),
       child: SafeArea(
         top: false,
         child: Row(
@@ -436,85 +433,41 @@ class _SuggestionsChatScreenState extends State<SuggestionsChatScreen> {
     final id = message['id'] as String?;
     if (id == null) return;
 
-    final controller = TextEditingController();
-    String? selectedReason;
+    const reasons = [
+      '욕설/비하',
+      '괴롭힘/따돌림',
+      '스팸',
+      '불법/위험 행위',
+      '기타',
+    ];
 
-    final confirmed = await showDialog<bool>(
+    final selected = await showCupertinoModalPopup<String>(
       context: context,
-      builder: (ctx) {
-        return AlertDialog(
-          title: const Text('메시지 신고'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              DropdownButtonFormField<String>(
-                initialValue: selectedReason,
-                decoration: const InputDecoration(
-                  labelText: '사유 선택',
-                ),
-                items: const [
-                  DropdownMenuItem(
-                    value: '욕설/비하',
-                    child: Text('욕설/비하'),
-                  ),
-                  DropdownMenuItem(
-                    value: '괴롭힘/따돌림',
-                    child: Text('괴롭힘/따돌림'),
-                  ),
-                  DropdownMenuItem(
-                    value: '스팸',
-                    child: Text('스팸'),
-                  ),
-                  DropdownMenuItem(
-                    value: '불법/위험 행위',
-                    child: Text('불법/위험 행위'),
-                  ),
-                  DropdownMenuItem(
-                    value: '기타',
-                    child: Text('기타 (직접 입력)'),
-                  ),
-                ],
-                onChanged: (v) {
-                  selectedReason = v;
-                },
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: controller,
-                maxLines: 2,
-                decoration: const InputDecoration(
-                  labelText: '상세 사유 (선택)',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(false),
-              child: const Text('취소'),
+      builder: (ctx) => CupertinoActionSheet(
+        title: const Text('메시지 신고'),
+        message: const Text('사유를 선택하세요.'),
+        actions: [
+          for (final r in reasons)
+            CupertinoActionSheetAction(
+              onPressed: () => Navigator.of(ctx).pop(r),
+              child: Text(r),
             ),
-            FilledButton(
-              onPressed: () => Navigator.of(ctx).pop(true),
-              child: const Text('신고'),
-            ),
-          ],
-        );
-      },
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          isDefaultAction: true,
+          onPressed: () => Navigator.of(ctx).pop(),
+          child: const Text('취소'),
+        ),
+      ),
     );
 
-    if (confirmed != true) return;
-
-    final baseReason = selectedReason ?? '기타';
-    final extra = controller.text.trim();
-    final reason =
-        extra.isEmpty ? baseReason : '$baseReason - $extra';
+    if (selected == null || !mounted) return;
 
     try {
       await _contentReportRepo.reportContent(
         contentType: 'chat_message',
         contentId: id,
-        reason: reason,
+        reason: selected,
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:myapp/core/theme/app_theme.dart';
+import 'package:myapp/design/app_colors.dart';
 import 'package:myapp/core/widgets/app_bottom_nav_bar.dart';
 import 'package:myapp/features/home/home_tab.dart';
 import 'package:myapp/features/meal/meal_tab.dart';
@@ -55,7 +55,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _handledNoticeTab = false;
     }
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: AppDesignColors.background(context),
       resizeToAvoidBottomInset: false,
       body: Material(
         type: MaterialType.transparency,

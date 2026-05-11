@@ -43,6 +43,10 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# iOS build artifacts (Xcode/CocoaPods caches)
+/ios/build/
+**/ios/build/
 # Logs
 logs
 *.log

@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'package:myapp/core/auth/auth_state.dart';
 import 'package:myapp/core/routing/app_router.dart';
 import 'package:myapp/core/supabase_client.dart';
+import 'package:myapp/components/apple_button.dart';
 import 'package:myapp/core/theme/app_theme.dart';
 import 'package:myapp/core/utils/merged_school_timetable.dart';
 import 'package:myapp/core/utils/timetable_utils.dart';
@@ -490,9 +491,10 @@ class _HomeTabState extends State<HomeTab> {
                 style: AppFonts.scaled(context, AppFonts.sectionTitle),
               ),
               const Spacer(),
-              TextButton(
+              AppleButton(
+                label: '더보기',
+                variant: AppleButtonVariant.plain,
                 onPressed: () => context.push(AppRoute.todayClasses.path),
-                child: const Text('더보기'),
               ),
             ],
           ),

@@ -1,13 +1,15 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:myapp/components/components.dart';
 import 'package:myapp/core/utils/avatar_url_resolver.dart';
 import 'package:myapp/core/utils/avatar_utils.dart';
 import 'package:myapp/core/supabase_client.dart';
 import 'package:myapp/core/theme/app_theme.dart';
+import 'package:myapp/core/theme/apple_design_tokens.dart' show AppleShape;
 import 'package:myapp/core/theme/responsive.dart';
 import 'package:myapp/core/widgets/async_body.dart';
 import 'package:myapp/core/widgets/m3_list.dart';
-import 'package:myapp/core/widgets/tab_page_header.dart';
+import 'package:myapp/design/design.dart';
 import 'package:myapp/features/notice_poll/notice_poll_viewmodel.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -146,6 +148,9 @@ class _NoticePollTabState extends State<NoticePollTab>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _tabController.addListener(() {
+      if (mounted) setState(() {});
+    });
     _viewModel = NoticePollViewModel()..addListener(_onViewModelChanged);
     _viewModel.fetchAnnouncements();
     _viewModel.fetchPolls();
@@ -182,49 +187,56 @@ class _NoticePollTabState extends State<NoticePollTab>
   @override
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: AppDesignColors.groupedBackground(context),
       child: Column(
         children: [
           SafeArea(
-            top: true,
             bottom: false,
-            minimum: EdgeInsets.zero,
             child: Padding(
-              padding: EdgeInsets.only(left: context.rs(16)),
-              child: TabPageHeader(
-                title: '공지 / 투표',
-                subtitle: '공지사항과 투표를 확인하세요.',
-                contentPadding: EdgeInsets.zero,
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.md,
+                AppSpacing.xs,
+                AppSpacing.md,
+                AppSpacing.sm,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('공지 / 투표', style: AppTypography.largeTitle(context)),
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(
+                    '학교 공지와 실시간 투표를 한 화면에서 확인하세요.',
+                    style: AppTypography.subheadline(context),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  CupertinoSlidingSegmentedControl<int>(
+                    groupValue: _tabController.index,
+                    children: const <int, Widget>{
+                      0: Padding(
+                        padding: EdgeInsets.symmetric(vertical: AppSpacing.xs),
+                        child: Text('공지사항'),
+                      ),
+                      1: Padding(
+                        padding: EdgeInsets.symmetric(vertical: AppSpacing.xs),
+                        child: Text('투표'),
+                      ),
+                    },
+                    onValueChanged: (int? value) {
+                      if (value == null) return;
+                      _tabController.animateTo(value);
+                    },
+                  ),
+                ],
               ),
             ),
           ),
           Expanded(
-            child: Material(
-              type: MaterialType.transparency,
-              child: Column(
-                children: [
-                  Padding(
-                    padding: EdgeInsets.symmetric(horizontal: context.rs(22)),
-                    child: TabBar.secondary(
-                      controller: _tabController,
-                      indicatorColor: AppColors.primaryBlue500,
-                      tabs: const [
-                        Tab(text: '공지사항'),
-                        Tab(text: '투표'),
-                      ],
-                    ),
-                  ),
-                  Expanded(
-                    child: TabBarView(
-                      controller: _tabController,
-                      children: [
-                        _buildAnnouncementsBody(),
-                        _buildPollsBody(),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                _buildAnnouncementsBody(),
+                _buildPollsBody(),
+              ],
             ),
           ),
         ],
@@ -239,47 +251,81 @@ class _NoticePollTabState extends State<NoticePollTab>
       isEmpty: _viewModel.announcements.isEmpty,
       onRetry: _viewModel.fetchAnnouncements,
       emptyMessage: '공지사항이 없습니다.',
-      child: RefreshIndicator(
-        onRefresh: _viewModel.fetchAnnouncements,
-        color: Theme.of(context).colorScheme.primary,
-        child: ListView.separated(
-          padding: EdgeInsets.fromLTRB(
-            context.rs(22),
-            context.rh(16),
-            context.rs(22),
-            context.rh(16),
-          ),
-          itemCount: _viewModel.announcements.length,
-          separatorBuilder: (_, __) => Divider(height: 1),
-          itemBuilder: (context, i) {
-            final a = _viewModel.announcements[i];
-            final title = a['title'] as String? ?? '';
-            final body = a['body'] as String? ?? '';
-            final dateStr = _formatDate(a['created_at'] as String?);
-            return M3ListTileInbox(
-              title: title.isEmpty ? '(제목 없음)' : title,
-              subtitle: body.isEmpty ? null : body,
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (dateStr.isNotEmpty)
-                    Text(
-                      dateStr,
-                      style: AppFonts.scaled(context, AppFonts.captionRegular),
-                    ),
-                  SizedBox(width: context.rs(4)),
-                  Icon(Icons.chevron_right, size: context.rs(20), color: AppColors.hint),
-                ],
-              ),
-              onTap: () => showM3DetailSheet(
-                context,
-                title: title.isEmpty ? '(제목 없음)' : title,
-                body: body.isEmpty ? '내용 없음' : body,
-                secondary: dateStr,
-              ),
-            );
-          },
+      child: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(
+          parent: BouncingScrollPhysics(),
         ),
+        slivers: [
+          CupertinoSliverRefreshControl(
+            onRefresh: _viewModel.fetchAnnouncements,
+          ),
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.md,
+              AppSpacing.xs,
+              AppSpacing.md,
+              AppSpacing.xl,
+            ),
+            sliver: SliverList.separated(
+              itemCount: _viewModel.announcements.length,
+              separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.sm),
+              itemBuilder: (context, index) =>
+                  _buildAnnouncementTile(context, _viewModel.announcements[index]),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAnnouncementTile(BuildContext context, Map<String, dynamic> a) {
+    final title = a['title'] as String? ?? '';
+    final body = a['body'] as String? ?? '';
+    final dateStr = _formatDate(a['created_at'] as String?);
+    return AppleCard(
+      onTap: () => showM3DetailSheet(
+        context,
+        title: title.isEmpty ? '(제목 없음)' : title,
+        body: body.isEmpty ? '내용 없음' : body,
+        secondary: dateStr,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  title.isEmpty ? '(제목 없음)' : title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTypography.headline(context).copyWith(
+                    color: AppDesignColors.label(context),
+                  ),
+                ),
+              ),
+              if (dateStr.isNotEmpty) ...[
+                const SizedBox(width: AppSpacing.xs),
+                Text(dateStr, style: AppTypography.caption(context)),
+              ],
+              const SizedBox(width: AppSpacing.xs),
+              Icon(
+                CupertinoIcons.chevron_right,
+                size: 16,
+                color: AppDesignColors.tertiaryLabel(context),
+              ),
+            ],
+          ),
+          if (body.isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              body,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: AppTypography.subheadline(context),
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -291,30 +337,40 @@ class _NoticePollTabState extends State<NoticePollTab>
       isEmpty: _viewModel.polls.isEmpty,
       onRetry: _viewModel.fetchPolls,
       emptyMessage: '투표가 없습니다.',
-      child: RefreshIndicator(
-        onRefresh: _viewModel.fetchPolls,
-        color: Theme.of(context).colorScheme.primary,
-        child: ListView.separated(
-          padding: EdgeInsets.fromLTRB(
-            context.rs(22),
-            context.rh(16),
-            context.rs(22),
-            context.rh(24),
-          ),
-          itemCount: _viewModel.polls.length,
-          separatorBuilder: (_, __) => SizedBox(height: context.rh(16)),
-          itemBuilder: (context, i) {
-            final poll = _viewModel.polls[i];
-            final pollId = poll['id'] as String?;
-            return PollPostCard(
-              poll: poll,
-              onTap: () => _showPollDetail(context, poll),
-              onLikeTap: pollId != null
-                  ? () => _onLikeTap(context, pollId)
-                  : null,
-            );
-          },
+      child: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(
+          parent: BouncingScrollPhysics(),
         ),
+        slivers: [
+          CupertinoSliverRefreshControl(onRefresh: _viewModel.fetchPolls),
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.md,
+              AppSpacing.sm,
+              AppSpacing.md,
+              AppSpacing.xl,
+            ),
+            sliver: SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (context, i) {
+                  final poll = _viewModel.polls[i];
+                  final pollId = poll['id'] as String?;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                    child: PollPostCard(
+                      poll: poll,
+                      onTap: () => _showPollDetail(context, poll),
+                      onLikeTap: pollId != null
+                          ? () => _onLikeTap(context, pollId)
+                          : null,
+                    ),
+                  );
+                },
+                childCount: _viewModel.polls.length,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -346,34 +402,34 @@ class _NoticePollTabState extends State<NoticePollTab>
       builder: (ctx) {
         return DraggableScrollableSheet(
           expand: false,
-          initialChildSize: 0.82,
-          minChildSize: 0.5,
+          initialChildSize: 0.86,
+          minChildSize: 0.45,
           maxChildSize: 0.95,
           builder: (sheetContext, scrollController) {
             return Container(
               decoration: BoxDecoration(
-                color: Theme.of(sheetContext).colorScheme.surface,
-                borderRadius: BorderRadius.vertical(
-                  top: Radius.circular(AppShapes.radiusLarge),
+                color: AppDesignColors.elevatedSurface(sheetContext),
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(AppRadius.lg),
                 ),
               ),
               child: SafeArea(
                 top: false,
                 child: Column(
                   children: [
-                    SizedBox(height: context.rh(12)),
+                    const SizedBox(height: AppSpacing.sm),
                     Container(
                       width: 40,
                       height: 4,
                       decoration: BoxDecoration(
-                        color: AppColors.border,
+                        color: AppDesignColors.separator(sheetContext),
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
                     Expanded(
                       child: SingleChildScrollView(
                         controller: scrollController,
-                        padding: EdgeInsets.all(context.rs(16)),
+                        padding: const EdgeInsets.all(AppSpacing.md),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -385,12 +441,12 @@ class _NoticePollTabState extends State<NoticePollTab>
                                 if (sheetContext.mounted) Navigator.of(sheetContext).pop();
                               },
                             ),
-                            SizedBox(height: context.rh(24)),
+                            const SizedBox(height: AppSpacing.lg),
                             Text(
                               '댓글',
-                              style: AppFonts.scaled(sheetContext, AppFonts.titleSemiBold),
+                              style: AppTypography.title3(sheetContext),
                             ),
-                            SizedBox(height: context.rh(12)),
+                            const SizedBox(height: AppSpacing.sm),
                             _PollCommentsSection(
                               pollId: poll['id'] as String? ?? '',
                               viewModel: _viewModel,
@@ -457,7 +513,7 @@ class PollPostCard extends StatelessWidget {
 
     return Material(
       color: AppColors.white,
-      borderRadius: BorderRadius.circular(AppShapes.radiusSmall),
+      borderRadius: BorderRadius.circular(AppleShape.radiusUtilityCard),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
@@ -465,15 +521,8 @@ class PollPostCard extends StatelessWidget {
           padding: EdgeInsets.all(context.rs(16)),
           decoration: BoxDecoration(
             color: AppColors.white,
-            borderRadius: BorderRadius.circular(AppShapes.radiusSmall),
-            border: Border.all(color: AppColors.borderLight),
-            boxShadow: const [
-              BoxShadow(
-                color: AppColors.cardShadow,
-                offset: Offset(0, 2),
-                blurRadius: 8,
-              ),
-            ],
+            borderRadius: BorderRadius.circular(AppleShape.radiusUtilityCard),
+            border: Border.all(color: AppColors.border),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -489,20 +538,31 @@ class PollPostCard extends StatelessWidget {
                       children: [
                         Text(
                           poll['author_name'] as String? ?? '대덕고등학교 학생회',
-                          style: AppFonts.scaled(context, AppFonts.titleSemiBold),
+                          style: AppFonts.scaled(context, AppFonts.titleSemiBold).copyWith(
+                            color: AppColors.textPrimary,
+                          ),
                         ),
                         Text(
                           _formatTimeAgo(createdAt),
-                          style: AppFonts.scaled(context, AppFonts.captionRegular),
+                          style: AppFonts.scaled(context, AppFonts.captionRegular).copyWith(
+                            color: AppColors.textSecondary,
+                          ),
                         ),
                       ],
                     ),
                   ),
-                  IconButton(
-                    icon: Icon(Icons.more_vert, size: context.rs(24), color: AppColors.textPrimary),
-                    onPressed: () {},
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                  SizedBox(
+                    width: 44,
+                    height: 44,
+                    child: CupertinoButton(
+                      padding: EdgeInsets.zero,
+                      onPressed: () {},
+                      child: Icon(
+                        CupertinoIcons.ellipsis_vertical,
+                        size: context.rs(22),
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -510,14 +570,18 @@ class PollPostCard extends StatelessWidget {
               // 투표 질문 영역
               Text(
                 question.isEmpty ? '(투표)' : question,
-                style: AppFonts.scaled(context, AppFonts.titleSemiBold),
+                style: AppFonts.scaled(context, AppFonts.titleSemiBold).copyWith(
+                  color: AppColors.textDark,
+                ),
               ),
               SizedBox(height: context.rh(4)),
               Text(
                 totalVotes > 0
                     ? '$totalVotes표 • 결과 보려면 투표하세요'
                     : '투표하면 결과 보기',
-                style: AppFonts.scaled(context, AppFonts.captionRegular),
+                style: AppFonts.scaled(context, AppFonts.captionRegular).copyWith(
+                  color: AppColors.textSecondary,
+                ),
               ),
               SizedBox(height: context.rh(12)),
               // 옵션 바 (녹색/회색/보라 변형 + 체크 + 아바타·%)
@@ -547,18 +611,22 @@ class PollPostCard extends StatelessWidget {
               // 바닥글: 공개 투표 | N일 남음
               Row(
                 children: [
-                  Icon(Icons.visibility_outlined, size: context.rs(14), color: AppColors.textSecondary),
+                  Icon(CupertinoIcons.eye, size: context.rs(14), color: AppColors.textSecondary),
                   SizedBox(width: context.rs(4)),
                   Text(
                     isEnded ? '투표 종료' : '공개 투표',
-                    style: AppFonts.scaled(context, AppFonts.captionRegular),
+                    style: AppFonts.scaled(context, AppFonts.captionRegular).copyWith(
+                      color: AppColors.textSecondary,
+                    ),
                   ),
                   const Spacer(),
-                  Icon(Icons.schedule, size: context.rs(14), color: AppColors.textSecondary),
+                  Icon(CupertinoIcons.time, size: context.rs(14), color: AppColors.textSecondary),
                   SizedBox(width: context.rs(4)),
                   Text(
                     _formatEndsAt(endsAt),
-                    style: AppFonts.scaled(context, AppFonts.captionRegular),
+                    style: AppFonts.scaled(context, AppFonts.captionRegular).copyWith(
+                      color: AppColors.textSecondary,
+                    ),
                   ),
                 ],
               ),
@@ -578,24 +646,51 @@ class PollPostCard extends StatelessWidget {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
-                            userHasLiked ? Icons.favorite : Icons.favorite_border,
-                            size: context.rs(24),
-                            color: userHasLiked ? AppColors.error : AppColors.textSecondary,
+                            userHasLiked
+                                ? CupertinoIcons.heart_fill
+                                : CupertinoIcons.heart,
+                            size: context.rs(22),
+                            color: userHasLiked
+                                ? AppColors.error
+                                : AppColors.textSecondary,
                           ),
                           SizedBox(width: context.rs(4)),
-                          Text('$likeCount', style: AppFonts.scaled(context, AppFonts.smallMedium)),
+                          Text(
+                            '$likeCount',
+                            style: AppFonts.scaled(context, AppFonts.smallMedium).copyWith(
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
                         ],
                       ),
                     ),
                   ),
                   SizedBox(width: context.rs(20)),
-                  Icon(Icons.chat_bubble_outline, size: context.rs(24), color: AppColors.textSecondary),
+                  Icon(
+                    CupertinoIcons.chat_bubble_2,
+                    size: context.rs(22),
+                    color: AppColors.textSecondary,
+                  ),
                   SizedBox(width: context.rs(4)),
-                  Text('$commentCount', style: AppFonts.scaled(context, AppFonts.smallMedium)),
+                  Text(
+                    '$commentCount',
+                    style: AppFonts.scaled(context, AppFonts.smallMedium).copyWith(
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
                   const Spacer(),
-                  Text('공유', style: AppFonts.scaled(context, AppFonts.smallMedium)),
+                  Text(
+                    '공유',
+                    style: AppFonts.scaled(context, AppFonts.smallMedium).copyWith(
+                      color: AppColors.primaryBlue,
+                    ),
+                  ),
                   SizedBox(width: context.rs(4)),
-                  Icon(Icons.arrow_outward, size: context.rs(18), color: AppColors.textPrimary),
+                  Icon(
+                    CupertinoIcons.share,
+                    size: context.rs(18),
+                    color: AppColors.primaryBlue,
+                  ),
                 ],
               ),
             ],
@@ -623,24 +718,22 @@ class _PollOptionBar extends StatelessWidget {
   /// 해당 옵션에 투표한 사람들의 프로필 사진 URL (먼저 투표한 순, 1등 4개·2등 3개·나머지 2개).
   final List<String?> voterAvatarUrls;
 
-  static const _greenBg = Color(0xFFE8F5EC);
-  static const _greenCheck = Color(0xFF22C55E);
-  static const _grayBg = Color(0xFFF0F2F5);
-  static const _purpleBg = Color(0xFFF3EEFC);
-
   @override
   Widget build(BuildContext context) {
     final bg = isLeading
-        ? _greenBg
-        : (optionIndex % 2 == 0 ? _grayBg : _purpleBg);
+        ? AppColors.primaryBlue.withValues(alpha: 0.08)
+        : (optionIndex.isEven
+            ? AppColors.surfaceContainerLowest
+            : AppColors.white);
 
     return Container(
       padding: EdgeInsets.symmetric(horizontal: context.rs(12), vertical: context.rh(10)),
       decoration: BoxDecoration(
         color: bg,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(AppleShape.radiusSmHairline),
         border: Border.all(
-          color: isLeading ? _greenCheck.withValues(alpha: 0.5) : AppColors.border,
+          color: isLeading ? AppColors.primaryBlue : AppColors.border,
+          width: isLeading ? 2 : 1,
         ),
       ),
       child: Row(
@@ -648,12 +741,18 @@ class _PollOptionBar extends StatelessWidget {
           if (isLeading)
             Padding(
               padding: EdgeInsets.only(right: context.rs(8)),
-              child: Icon(Icons.check_circle, size: context.rs(18), color: _greenCheck),
+              child: Icon(
+                CupertinoIcons.check_mark_circled_solid,
+                size: context.rs(18),
+                color: AppColors.primaryBlue,
+              ),
             ),
           Expanded(
             child: Text(
               label,
-              style: AppFonts.scaled(context, AppFonts.smallMedium),
+              style: AppFonts.scaled(context, AppFonts.smallMedium).copyWith(
+                color: AppColors.textPrimary,
+              ),
               overflow: TextOverflow.ellipsis,
             ),
           ),
@@ -661,7 +760,9 @@ class _PollOptionBar extends StatelessWidget {
           if (percent > 0) SizedBox(width: context.rs(8)),
           Text(
             '$percent%',
-            style: AppFonts.scaled(context, AppFonts.smallMedium),
+            style: AppFonts.scaled(context, AppFonts.smallMedium).copyWith(
+              color: AppColors.textSecondary,
+            ),
           ),
         ],
       ),
@@ -806,15 +907,9 @@ class _PollCommentsSectionState extends State<_PollCommentsSection> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return Padding(
-        padding: EdgeInsets.symmetric(vertical: context.rh(16)),
-        child: Center(
-          child: SizedBox(
-            width: context.rs(24),
-            height: context.rs(24),
-            child: const CircularProgressIndicator(strokeWidth: 2),
-          ),
-        ),
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: AppSpacing.md),
+        child: Center(child: CupertinoActivityIndicator()),
       );
     }
     return Column(
@@ -827,70 +922,62 @@ class _PollCommentsSectionState extends State<_PollCommentsSection> {
           final body = c['content'] as String? ?? '';
           final createdAt = c['created_at'] as String?;
           return Padding(
-            padding: EdgeInsets.only(bottom: context.rh(12)),
-            child: Row(
+            padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+            child: AppleCard(
+              padding: const EdgeInsets.all(AppSpacing.sm),
+              child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _buildCommentAuthorAvatar(context, author, authorId, avatarUrl),
-                SizedBox(width: context.rs(10)),
+                const SizedBox(width: AppSpacing.xs),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         author,
-                        style: AppFonts.scaled(context, AppFonts.smallMedium).copyWith(
+                        style: AppTypography.subheadline(context).copyWith(
                           fontWeight: FontWeight.w600,
+                          color: AppDesignColors.label(context),
                         ),
                       ),
                       if (createdAt != null)
                         Text(
                           _formatTimeAgo(createdAt),
-                          style: AppFonts.scaled(context, AppFonts.captionRegular),
+                          style: AppTypography.caption(context),
                         ),
-                      SizedBox(height: context.rh(4)),
+                      const SizedBox(height: AppSpacing.xxs),
                       Text(
                         body,
-                        style: AppFonts.scaled(context, AppFonts.bodyRegular),
+                        style: AppTypography.body(context).copyWith(
+                          color: AppDesignColors.label(context),
+                        ),
                       ),
                     ],
                   ),
                 ),
               ],
             ),
+            ),
           );
         }),
-        SizedBox(height: context.rh(16)),
+        const SizedBox(height: AppSpacing.sm),
         Row(
           children: [
             Expanded(
-              child: TextField(
+              child: AppleTextField(
                 controller: _controller,
-                decoration: InputDecoration(
-                  hintText: '댓글 입력...',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(AppShapes.radiusSmall),
-                  ),
-                  contentPadding: EdgeInsets.symmetric(
-                    horizontal: context.rs(12),
-                    vertical: context.rh(10),
-                  ),
-                ),
+                placeholder: '댓글 입력...',
                 maxLines: 2,
                 textInputAction: TextInputAction.send,
                 onSubmitted: (_) => _sendComment(),
               ),
             ),
-            SizedBox(width: context.rs(8)),
-            FilledButton(
+            const SizedBox(width: AppSpacing.xs),
+            AppleButton(
+              label: '전송',
+              loading: _sending,
               onPressed: _sending ? null : _sendComment,
-              child: _sending
-                  ? SizedBox(
-                      width: context.rs(20),
-                      height: context.rs(20),
-                      child: const CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                    )
-                  : const Text('전송'),
             ),
           ],
         ),
@@ -980,125 +1067,114 @@ class _PollCardState extends State<_PollCard> {
         options.map((e) => e is String ? e : e.toString()).toList();
     final createdAt = widget.poll['created_at'] as String?;
 
-    return Container(
-      margin: EdgeInsets.only(bottom: context.rh(12)),
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.borderLight),
-        boxShadow: const [
-          BoxShadow(
-            color: AppColors.cardShadow,
-            offset: Offset(0, 2),
-            blurRadius: 8,
-          ),
-        ],
-      ),
-      padding: EdgeInsets.all(context.rs(16)),
+    return AppleCard(
+      margin: const EdgeInsets.only(bottom: AppSpacing.sm),
       child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
                 _buildAuthorAvatar(context, widget.poll['author_avatar_url'] as String?),
-                SizedBox(width: context.rs(12)),
+                const SizedBox(width: AppSpacing.sm),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         widget.poll['author_name'] as String? ?? '대덕고등학교 학생회',
-                        style: AppFonts.scaled(context, AppFonts.titleSemiBold),
+                        style: AppTypography.subheadline(context).copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: AppDesignColors.label(context),
+                        ),
                       ),
                       if (createdAt != null && createdAt.isNotEmpty)
                         Text(
                           _formatTimeAgo(createdAt),
-                          style: AppFonts.scaled(context, AppFonts.captionRegular),
+                          style: AppTypography.caption(context),
                         ),
                     ],
                   ),
                 ),
               ],
             ),
-            SizedBox(height: context.rh(12)),
+            const SizedBox(height: AppSpacing.sm),
             Text(
               question,
-              style: AppFonts.scaled(context, AppFonts.bodyMedium),
+              style: AppTypography.headline(context).copyWith(
+                color: AppDesignColors.label(context),
+              ),
             ),
             if (_error != null)
               Padding(
-                padding: EdgeInsets.only(top: context.rh(4)),
+                padding: const EdgeInsets.only(top: AppSpacing.xxs),
                 child: Text(
                   _error!,
-                  style: AppFonts.scaled(context, AppFonts.smallRegular)
-                      .copyWith(color: AppColors.error),
+                  style: AppTypography.footnote(context).copyWith(
+                    color: AppDesignColors.destructive(context),
+                  ),
                 ),
               ),
-            Theme(
-              data: Theme.of(context).copyWith(
-                radioTheme: RadioThemeData(
-                  fillColor: WidgetStateProperty.resolveWith<Color>((states) {
-                    if (states.contains(WidgetState.selected)) {
-                      return AppColors.primaryBlue;
-                    }
-                    return AppColors.textSecondary;
-                  }),
-                ),
-              ),
-              child: Column(
-                children: optionsList.asMap().entries.map((e) {
-                  final idx = e.key;
-                  final opt = e.value;
-                  return Padding(
-                    padding: EdgeInsets.only(top: context.rh(8)),
-                    child: RadioListTile<int>(
-                      value: idx,
-                      // ignore: deprecated_member_use
-                      groupValue: _selectedIndex ?? -1,
-                      // ignore: deprecated_member_use
-                      onChanged: _voted
-                          ? null
-                          : (int? v) {
-                              if (v != null) setState(() => _selectedIndex = v);
-                            },
-                      title: Text(
-                        opt,
-                        style: AppFonts.scaled(context, AppFonts.smallMedium),
+            const SizedBox(height: AppSpacing.sm),
+            ...optionsList.asMap().entries.map((e) {
+              final idx = e.key;
+              final opt = e.value;
+              final selected = _selectedIndex == idx;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+                child: CupertinoButton(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.sm,
+                    vertical: AppSpacing.sm,
+                  ),
+                  color: selected
+                      ? AppDesignColors.primary(context).withValues(alpha: 0.12)
+                      : AppDesignColors.surface(context),
+                  borderRadius: BorderRadius.circular(AppRadius.sm),
+                  onPressed: _voted ? null : () => setState(() => _selectedIndex = idx),
+                  child: Row(
+                    children: [
+                      Icon(
+                        selected
+                            ? CupertinoIcons.check_mark_circled_solid
+                            : CupertinoIcons.circle,
+                        size: 20,
+                        color: selected
+                            ? AppDesignColors.primary(context)
+                            : AppDesignColors.secondaryLabel(context),
                       ),
-                      contentPadding: EdgeInsets.zero,
-                      dense: true,
-                    ),
-                  );
-                }).toList(),
-              ),
-            ),
+                      const SizedBox(width: AppSpacing.xs),
+                      Expanded(
+                        child: Text(
+                          opt,
+                          style: AppTypography.body(context).copyWith(
+                            color: AppDesignColors.label(context),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }),
             if (!_voted && _selectedIndex != null)
               Padding(
-                padding: EdgeInsets.only(top: context.rh(8)),
+                padding: const EdgeInsets.only(top: AppSpacing.xs),
                 child: SizedBox(
                   width: double.infinity,
-                  child: CupertinoButton(
-                    padding: EdgeInsets.symmetric(vertical: context.rh(12)),
-                    color: AppColors.primaryBlue,
+                  child: AppleButton(
+                    label: '투표하기',
+                    loading: _loading,
+                    fullWidth: true,
                     onPressed: _loading ? null : _vote,
-                    child: _loading
-                        ? const CupertinoActivityIndicator(
-                            color: AppColors.white,
-                          )
-                        : Text(
-                            '투표하기',
-                            style: AppFonts.scaled(context, AppFonts.titleSemiBold)
-                                .copyWith(color: AppColors.white),
-                          ),
                   ),
                 ),
               ),
             if (_voted)
               Padding(
-                padding: EdgeInsets.only(top: context.rh(8)),
+                padding: const EdgeInsets.only(top: AppSpacing.xs),
                 child: Text(
                   '투표 완료',
-                  style: AppFonts.scaled(context, AppFonts.captionRegular),
+                  style: AppTypography.caption(context),
                 ),
               ),
           ],

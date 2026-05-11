@@ -28,10 +28,9 @@ require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelpe
 flutter_ios_podfile_setup
 
 # flutter pub get 후에는 반드시 `cd ios && pod install` 을 실행하세요.
-# (GeneratedPluginRegistrant 에서 app_links ObjC 참조를 제거하고 AppDelegate.swift 에서 등록합니다.)
 
 target 'Runner' do
-  use_frameworks! :linkage => :static
+  use_frameworks! :linkage => :dynamic
   use_modular_headers!
 
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
@@ -40,37 +39,8 @@ target 'Runner' do
   end
 end
 
-# app_links 는 Swift 전용 플러그인이라 ObjC GeneratedPluginRegistrant 에서 @import 하면
-# Xcode 환경마다 모듈/헤더 경로가 깨지기 쉬움 → import·등록 줄을 제거하고 AppDelegate.swift 에서만 등록.
-def strip_app_links_from_objc_registrant!
-  path = File.join(__dir__, 'Runner', 'GeneratedPluginRegistrant.m')
-  return unless File.file?(path)
-
-  contents = File.read(path)
-  original = contents.dup
-
-  contents.gsub!(
-    %r{(?:^\s*//[^\n]*\n)*^\s*#if __has_include\(<app_links[\s\S]*?^\s*#endif\s*\n}m,
-    "// app_links: ObjC 미사용 — Runner/AppDelegate.swift 에서 등록\n",
-  )
-  contents.gsub!(
-    %r{^\s*\[AppLinksIosPlugin registerWithRegistrar:\[registry registrarForPlugin:@"AppLinksIosPlugin"\]\];\s*\n}m,
-    '',
-  )
-
-  if contents.match?(/@import app_links\b|\[AppLinksIosPlugin|#if __has_include\(<app_links/)
-    STDERR.puts '[Podfile] 경고: GeneratedPluginRegistrant.m 에 app_links ObjC 참조가 남았습니다.'
-  end
-
-  return if contents == original
-
-  File.write(path, contents)
-  STDERR.puts '[Podfile] GeneratedPluginRegistrant.m: app_links ObjC 블록 제거 완료'
-end
-
 post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
   end
-  strip_app_links_from_objc_registrant!
 end

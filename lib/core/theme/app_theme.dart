@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:myapp/core/theme/app_motion.dart';
 import 'package:myapp/core/theme/responsive.dart';
+import 'package:myapp/design/app_theme.dart' as app_design;
 
 /// Figma DK-Project에서 추출한 디자인 토큰.
 ///
@@ -432,13 +433,5 @@ class _M3PageTransitionsBuilder extends PageTransitionsBuilder {
   }
 }
 
-/// Cupertino 전역 테마. 화이트·블루 유지, iOS 스타일 적용.
-CupertinoThemeData buildCupertinoTheme() {
-  return CupertinoThemeData(
-    primaryColor: AppColors.primaryBlue,
-    primaryContrastingColor: AppColors.white,
-    barBackgroundColor: AppColors.white,
-    scaffoldBackgroundColor: AppColors.background,
-    brightness: Brightness.light,
-  );
-}
+/// Cupertino 전역 테마. [app_design.buildAppCupertinoTheme]에 위임.
+CupertinoThemeData buildCupertinoTheme() => app_design.buildAppCupertinoTheme();

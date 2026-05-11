@@ -1,5 +1,8 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:myapp/core/theme/app_theme.dart';
+import 'package:myapp/core/theme/apple_design_tokens.dart' show AppleShape;
+import 'package:myapp/core/theme/ios_system_text.dart';
 import 'package:myapp/core/theme/responsive.dart';
 
 /// Material 3 리스트용 인박스 스타일 타일.
@@ -79,7 +82,8 @@ class M3ListTileInbox extends StatelessWidget {
   }
 }
 
-/// 상세 내용을 Material 3 스타일 모달 바텀 시트로 표시.
+/// 상세 내용을 **iOS Human Interface** 스타일 바텀 시트로 표시한다.
+/// (SF Pro 계열 타이포·그랩 핸들·시스템형 닫기·구분선 — 브랜드 색은 [AppColors].)
 void showM3DetailSheet(
   BuildContext context, {
   required String title,
@@ -128,99 +132,135 @@ class _M3DetailSheetContent extends StatelessWidget {
   final String body;
   final String? secondary;
   final List<Widget>? actions;
-   final Widget? bodyWidget;
+  final Widget? bodyWidget;
   final ScrollController scrollController;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final radius = BorderRadius.vertical(
+      top: Radius.circular(AppleShape.radiusUtilityCard),
+    );
 
     return SafeArea(
       top: false,
-      child: Container(
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surface,
-          borderRadius: BorderRadius.vertical(
-            top: Radius.circular(AppShapes.radiusLarge),
-          ),
-        ),
-        child: Column(
-          children: [
-            SizedBox(height: context.rh(12)),
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: AppColors.border,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            Padding(
-              padding: EdgeInsets.fromLTRB(
-                context.rs(20),
-                context.rh(16),
-                context.rs(20),
-                context.rh(8),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          title,
-                          style: AppFonts.scaled(context, AppFonts.titleSemiBold)
-                              .copyWith(color: AppColors.textDark),
-                        ),
-                      ),
-                      IconButton(
-                        onPressed: () => Navigator.of(context).pop(),
-                        icon: const Icon(Icons.close),
-                      ),
-                    ],
+      child: ClipRRect(
+        borderRadius: radius,
+        child: ColoredBox(
+          color: AppColors.white,
+          child: Column(
+            children: [
+              SizedBox(height: context.rh(8)),
+              Center(
+                child: Container(
+                  width: context.rs(36),
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: AppColors.hint.withValues(alpha: 0.45),
+                    borderRadius: BorderRadius.circular(2.5),
                   ),
-                  if (secondary != null && secondary!.isNotEmpty)
-                    Padding(
-                      padding: EdgeInsets.only(
-                        left: 0,
-                        right: 0,
-                        top: context.rh(4),
-                        bottom: 0,
-                      ),
-                      child: Text(
-                        secondary!,
-                        style: AppFonts.scaled(context, AppFonts.captionRegular),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            Divider(height: 1, color: theme.dividerColor),
-            Expanded(
-              child: SingleChildScrollView(
-                controller: scrollController,
-                padding: EdgeInsets.all(context.rs(20)),
-                child: bodyWidget ??
-                    Text(
-                      body,
-                      style: AppFonts.scaled(context, AppFonts.bodyRegular)
-                          .copyWith(color: AppColors.textPrimary),
-                    ),
-              ),
-            ),
-            if (actions != null && actions!.isNotEmpty) ...[
-              Divider(height: 1, color: theme.dividerColor),
-              Padding(
-                padding: EdgeInsets.all(context.rs(16)),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: actions!,
                 ),
               ),
+              Padding(
+                padding: EdgeInsets.fromLTRB(
+                  context.rs(12),
+                  context.rh(12),
+                  context.rs(8),
+                  context.rh(4),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Padding(
+                        padding: EdgeInsets.only(left: context.rs(8), top: context.rh(2)),
+                        child: Text(
+                          title,
+                          style: IosSystemText.title2(
+                            context,
+                            color: AppColors.textDark,
+                          ),
+                        ),
+                      ),
+                    ),
+                    CupertinoButton(
+                      padding: EdgeInsets.zero,
+                      minimumSize: const Size(44, 44),
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: Icon(
+                        CupertinoIcons.xmark_circle_fill,
+                        size: context.rs(28),
+                        color: AppColors.hint,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (secondary != null && secondary!.isNotEmpty)
+                Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    context.rs(20),
+                    0,
+                    context.rs(20),
+                    context.rh(8),
+                  ),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      secondary!,
+                      style: IosSystemText.footnote(
+                        context,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ),
+                ),
+              Container(height: 1, color: AppColors.border.withValues(alpha: 0.75)),
+              Expanded(
+                child: CupertinoScrollbar(
+                  controller: scrollController,
+                  child: SingleChildScrollView(
+                    controller: scrollController,
+                    physics: const BouncingScrollPhysics(
+                      parent: AlwaysScrollableScrollPhysics(),
+                    ),
+                    padding: EdgeInsets.fromLTRB(
+                      context.rs(20),
+                      context.rh(16),
+                      context.rs(20),
+                      context.rh(28),
+                    ),
+                    child: DefaultTextStyle(
+                      style: IosSystemText.body(
+                        context,
+                        color: AppColors.textPrimary,
+                      ),
+                      child: bodyWidget ??
+                          SelectableText(
+                            body,
+                            style: IosSystemText.body(
+                              context,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                    ),
+                  ),
+                ),
+              ),
+              if (actions != null && actions!.isNotEmpty) ...[
+                Container(height: 1, color: AppColors.border.withValues(alpha: 0.75)),
+                Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: context.rs(16),
+                    vertical: context.rh(12),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: actions!,
+                  ),
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );

@@ -122,12 +122,15 @@ class _ChatListScreenState extends State<ChatListScreen> {
       navigationBar: CupertinoNavigationBar(
         heroTag: 'nav-chat-list',
         transitionBetweenRoutes: true,
-        backgroundColor: AppColors.white,
+        backgroundColor: AppColors.white.withValues(alpha: 0.92),
         border: null,
         leading: CupertinoButton(
           padding: EdgeInsets.zero,
           onPressed: () => context.go(AppRoute.home.path),
-          child: const Icon(CupertinoIcons.back),
+          child: Icon(
+            CupertinoIcons.back,
+            color: AppColors.primaryBlue,
+          ),
         ),
         middle: Text(
           '채팅',
@@ -143,36 +146,44 @@ class _ChatListScreenState extends State<ChatListScreen> {
         isEmpty: _rooms.isEmpty,
         onRetry: _fetch,
         emptyMessage: '참여 중인 채팅방이 없습니다.',
-        child: ListView.builder(
-          padding: context.horizontalPadding.copyWith(
-            top: context.rh(16),
-            bottom: context.rh(16),
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(
+            parent: BouncingScrollPhysics(),
           ),
-          itemCount: _rooms.length,
-          itemBuilder: (context, i) {
-            final room = _rooms[i];
-            final id = room['id'] as String? ?? '';
-            final displayName = _roomDisplayNames[id] ?? room['name'] as String? ?? '채팅방';
-            return CupertinoButton(
-              padding: EdgeInsets.symmetric(
-                vertical: context.rh(12),
-                horizontal: context.rs(16),
-              ),
-              onPressed: () => context.push('${AppRoute.chatList.path}/$id'),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
+          slivers: [
+            CupertinoSliverRefreshControl(onRefresh: _fetch),
+            SliverToBoxAdapter(
+              child: CupertinoListSection.insetGrouped(
+                margin: EdgeInsets.fromLTRB(
+                  context.rs(16),
+                  context.rh(16),
+                  context.rs(16),
+                  context.rh(24),
+                ),
+                backgroundColor: AppColors.background,
+                header: Text(
+                  '1:1 및 그룹',
+                  style: AppFonts.scaled(context, AppFonts.captionMedium).copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                children: _rooms.map((room) {
+                  final id = room['id'] as String? ?? '';
+                  final displayName =
+                      _roomDisplayNames[id] ?? room['name'] as String? ?? '채팅방';
+                  return CupertinoListTile(
+                    title: Text(
                       displayName,
                       style: AppFonts.scaled(context, AppFonts.bodyMedium)
                           .copyWith(color: AppColors.textDark),
                     ),
-                  ),
-                  const Icon(CupertinoIcons.chevron_right, size: 18),
-                ],
+                    trailing: const CupertinoListTileChevron(),
+                    onTap: () => context.push('${AppRoute.chatList.path}/$id'),
+                  );
+                }).toList(),
               ),
-            );
-          },
+            ),
+          ],
         ),
       ),
     ),
