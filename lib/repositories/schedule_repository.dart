@@ -81,21 +81,43 @@ class ScheduleRepository {
       if (aaYmd.length != 8) continue;
       final eventNm = m['EVENT_NM'] as String? ?? '';
       final eventCntnt = m['EVENT_CNTNT'] as String? ?? '';
+      // SBTR_DD_SC_NM: 휴업일/공휴일 구분 (예: '휴업일', '공휴일'). 방학·재량휴업 표시용.
+      final sbtr = (m['SBTR_DD_SC_NM'] as String? ?? '').trim();
+      final isDayOff = sbtr.contains('휴업') || sbtr.contains('공휴');
       final y = int.tryParse(aaYmd.substring(0, 4)) ?? 0;
       final mo = int.tryParse(aaYmd.substring(4, 6)) ?? 0;
       final d = int.tryParse(aaYmd.substring(6, 8)) ?? 0;
       final startAt = DateTime.utc(y, mo, d).toIso8601String();
       neisList.add({
-        'id': 'neis_$aaYmd',
+        'id': 'neis_${aaYmd}_$eventNm',
         'title': eventNm,
         'description': eventCntnt.isEmpty ? null : eventCntnt,
         'start_at': startAt,
         'end_at': startAt,
         'is_neis': true,
+        'is_day_off': isDayOff,
       });
     }
 
     return neisList;
+  }
+
+  /// 해당 월의 법정공휴일 목록. 반환: { holiday_date: 'yyyy-MM-dd', name }.
+  Future<List<Map<String, dynamic>>> fetchPublicHolidays(
+    DateTime viewMonth,
+  ) async {
+    final firstDay = DateTime(viewMonth.year, viewMonth.month, 1);
+    final lastDay = DateTime(viewMonth.year, viewMonth.month + 1, 0);
+    String fmt(DateTime d) =>
+        '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+    final res = await _client
+        .from('public_holidays')
+        .select('holiday_date, name')
+        .gte('holiday_date', fmt(firstDay))
+        .lte('holiday_date', fmt(lastDay))
+        .order('holiday_date', ascending: true);
+    return List<Map<String, dynamic>>.from(res as List);
   }
 
   /// 학교 일정 추가 (council/admin용). [createdBy]는 profiles.id.

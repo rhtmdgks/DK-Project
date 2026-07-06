@@ -6,6 +6,7 @@ import 'package:home_widget/home_widget.dart';
 import 'package:myapp/core/routing/app_router.dart';
 import 'package:myapp/core/theme/app_theme.dart';
 import 'package:myapp/providers/notification_provider.dart';
+import 'package:myapp/providers/user_preferences_provider.dart';
 import 'package:myapp/services/notification_service.dart';
 import 'package:provider/provider.dart';
 
@@ -26,6 +27,7 @@ class _AppState extends State<App> with WidgetsBindingObserver {
   late final GoRouter _router = createAppRouter();
 
   late final NotificationProvider _notificationProvider;
+  late final UserPreferencesProvider _userPreferencesProvider;
   StreamSubscription<Uri?>? _widgetClickedSubscription;
 
   @override
@@ -35,6 +37,7 @@ class _AppState extends State<App> with WidgetsBindingObserver {
 
     // NotificationProvider 초기화
     _notificationProvider = NotificationProvider();
+    _userPreferencesProvider = UserPreferencesProvider();
 
     // 통합 알림 서비스 초기화
     Future.microtask(() => NotificationService.initialize(_notificationProvider))
@@ -111,18 +114,37 @@ class _AppState extends State<App> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider.value(
-      value: _notificationProvider,
-      child: CupertinoTheme(
-        data: buildCupertinoTheme(),
-        child: Material(
-          type: MaterialType.transparency,
-          child: MaterialApp.router(
-            title: 'LAON',
-            theme: buildAppTheme(),
-            routerConfig: _router,
-          ),
-        ),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider.value(value: _notificationProvider),
+        ChangeNotifierProvider.value(value: _userPreferencesProvider),
+      ],
+      child: Consumer<UserPreferencesProvider>(
+        builder: (context, prefs, _) {
+          return CupertinoTheme(
+            data: buildCupertinoTheme(),
+            child: Material(
+              type: MaterialType.transparency,
+              child: MaterialApp.router(
+                title: 'LAON',
+                theme: buildAppTheme(),
+                darkTheme: buildAppDarkTheme(),
+                themeMode: prefs.themeMode,
+                routerConfig: _router,
+                builder: (context, child) {
+                  // 사용자 글자 크기 설정 반영. 시스템 배율과 곱하지 않고
+                  // 앱 설정만 적용해 responsive.dart 스케일과 중복 확대를 방지.
+                  return MediaQuery(
+                    data: MediaQuery.of(context).copyWith(
+                      textScaler: TextScaler.linear(prefs.fontScale),
+                    ),
+                    child: child ?? const SizedBox.shrink(),
+                  );
+                },
+              ),
+            ),
+          );
+        },
       ),
     );
   }

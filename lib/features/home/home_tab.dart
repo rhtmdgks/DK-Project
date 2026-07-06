@@ -355,6 +355,8 @@ class _HomeTabState extends State<HomeTab> {
           _buildAnnouncementsSection(),
           SizedBox(height: context.rh(18)),
           _buildActivePollSection(),
+          SizedBox(height: context.rh(18)),
+          _buildOpinionsEntrySection(),
           if (_homeFeedError != null) ...[
             SizedBox(height: context.rh(12)),
             Text(
@@ -964,6 +966,47 @@ class _HomeTabState extends State<HomeTab> {
               );
             }),
         ],
+      ),
+    );
+  }
+
+  /// 학생 의견 모집 진입 카드.
+  Widget _buildOpinionsEntrySection() {
+    return _buildGlassCard(
+      child: InkWell(
+        onTap: () => context.push(AppRoute.opinions.path),
+        borderRadius: BorderRadius.circular(12),
+        child: Row(
+          children: [
+            Icon(
+              Icons.lightbulb_outline_rounded,
+              size: context.rs(22),
+              color: AppColors.primaryBlue,
+            ),
+            SizedBox(width: context.rs(10)),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '학생 의견 모집',
+                    style: AppFonts.scaled(context, AppFonts.titleMedium),
+                  ),
+                  SizedBox(height: context.rh(2)),
+                  Text(
+                    '학교에 전하고 싶은 의견을 익명으로 제출해 보세요.',
+                    style: AppFonts.scaled(context, AppFonts.captionRegular),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.chevron_right_rounded,
+              size: context.rs(22),
+              color: AppColors.hint,
+            ),
+          ],
+        ),
       ),
     );
   }

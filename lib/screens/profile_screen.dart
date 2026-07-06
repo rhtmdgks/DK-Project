@@ -66,6 +66,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
               .copyWith(color: AppColors.textDark),
         ),
         centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(CupertinoIcons.pencil),
+            color: AppColors.textDark,
+            tooltip: '프로필 편집',
+            onPressed: () async {
+              final changed =
+                  await context.push<bool>(AppRoute.profileEdit.path);
+              if (changed == true) _loadProfile();
+            },
+          ),
+        ],
       ),
       body: SafeArea(
         top: false,
@@ -200,6 +212,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         '번호',
         numberInClass != null ? '$numberInClass번' : '-',
       ));
+      rows.add(_buildInfoRow('목표 대학', p.targetUniversity ?? '-'));
     }
 
     return Container(

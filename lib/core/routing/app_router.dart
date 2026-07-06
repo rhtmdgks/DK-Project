@@ -13,8 +13,10 @@ import 'package:myapp/screens/chat_screen.dart';
 import 'package:myapp/screens/home_screen.dart';
 import 'package:myapp/screens/login_screen.dart';
 import 'package:myapp/screens/meal_departure_alert_screen.dart';
+import 'package:myapp/screens/opinions_screen.dart';
 import 'package:myapp/screens/password_change_screen.dart';
 import 'package:myapp/screens/privacy_policy_screen.dart';
+import 'package:myapp/screens/profile_edit_screen.dart';
 import 'package:myapp/screens/profile_screen.dart';
 import 'package:myapp/screens/settings_screen.dart';
 import 'package:myapp/screens/class_photo_shares_screen.dart';
@@ -46,6 +48,8 @@ enum AppRoute {
   suggestionsChat('/suggestions/chat'),
   todayClasses('/today-classes'),
   profile('/profile'),
+  profileEdit('/profile/edit'),
+  opinions('/opinions'),
   classPhotoShares('/class-photo-shares');
 
   const AppRoute(this.path);
@@ -202,6 +206,17 @@ GoRouter createAppRouter() {
         path: AppRoute.profile.path,
         pageBuilder: (_, state) =>
             _m3Page(state, const ProfileScreen()),
+        routes: [
+          GoRoute(
+            path: 'edit',
+            pageBuilder: (_, state) =>
+                _m3Page(state, const ProfileEditScreen()),
+          ),
+        ],
+      ),
+      GoRoute(
+        path: AppRoute.opinions.path,
+        pageBuilder: (_, state) => _m3Page(state, const OpinionsScreen()),
       ),
       GoRoute(
         path: AppRoute.classPhotoShares.path,

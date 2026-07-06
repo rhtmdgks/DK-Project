@@ -503,7 +503,13 @@ class _ChatScreenState extends State<ChatScreen> {
       if (mounted) setState(() => _sending = false);
       debugPrint('Chat send error: $e\n$stack');
       final msg = e.toString().toLowerCase();
-      if (msg.contains('insert_chat_message') || msg.contains('function') || msg.contains('not_room_member')) {
+      if (msg.contains('message_blocked')) {
+        // 서버 측 금칙어 검열 (클라이언트 검사 우회 시)
+        _showErrorDialog(
+          '전송 불가',
+          '부적절한 표현이 포함되어 있어 메시지를 보낼 수 없습니다. 표현을 수정해 주세요.',
+        );
+      } else if (msg.contains('insert_chat_message') || msg.contains('function') || msg.contains('not_room_member')) {
         _showErrorDialog(
           '전송 실패',
           '사진/동영상 전송을 위해 서버(Supabase)에 run_on_remote_fix_chat_and_profiles.sql 적용이 필요합니다.',

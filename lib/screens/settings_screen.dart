@@ -7,8 +7,11 @@ import 'package:go_router/go_router.dart';
 import 'package:myapp/core/auth/auth_repository.dart';
 import 'package:myapp/core/auth/auth_state.dart';
 import 'package:myapp/core/routing/app_router.dart';
+import 'package:myapp/providers/user_preferences_provider.dart';
 import 'package:myapp/repositories/account_repository.dart';
 import 'package:myapp/repositories/notification_settings_repository.dart';
+import 'package:myapp/repositories/user_preferences_repository.dart';
+import 'package:provider/provider.dart';
 import 'package:myapp/core/theme/app_theme.dart';
 import 'package:myapp/core/theme/responsive.dart';
 import 'package:myapp/services/announcement_notification_service.dart';
@@ -189,6 +192,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
               SizedBox(height: context.rh(12)),
               _buildNotificationSection(),
               SizedBox(height: context.rh(24)),
+              _buildDisplaySection(),
+              SizedBox(height: context.rh(24)),
               _buildAccountSection(),
               SizedBox(height: context.rh(24)),
               _buildCommunitySection(),
@@ -359,6 +364,116 @@ class _SettingsScreenState extends State<SettingsScreen> {
       decoration: BoxDecoration(
         color: AppColors.border,
         borderRadius: BorderRadius.circular(80),
+      ),
+    );
+  }
+
+  // ── 표시 설정 섹션 (다크모드·글자 크기) ──
+
+  static const _themeModeLabels = {
+    ThemeMode.system: '시스템 설정',
+    ThemeMode.light: '라이트',
+    ThemeMode.dark: '다크',
+  };
+
+  static const _fontScaleLabels = ['작게', '기본', '크게', '아주 크게'];
+
+  Widget _buildDisplaySection() {
+    final prefs = context.watch<UserPreferencesProvider>();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: EdgeInsets.only(left: context.rs(10)),
+          child: Text(
+            '표시 설정',
+            style: AppFonts.scaled(context, _Styles.sectionTitle),
+          ),
+        ),
+        SizedBox(height: context.rh(12)),
+        Container(
+          decoration: BoxDecoration(
+            color: AppColors.borderLight,
+            borderRadius: BorderRadius.circular(context.rs(24)),
+          ),
+          padding: EdgeInsets.symmetric(vertical: context.rh(4)),
+          child: Column(
+            children: [
+              _buildLinkItem(
+                icon: Icons.dark_mode_rounded,
+                iconColor: const Color(0xFF5C6BC0),
+                title: '다크 모드 · ${_themeModeLabels[prefs.themeMode]}',
+                onTap: () => _showThemeModeSheet(prefs),
+              ),
+              _buildItemDivider(),
+              _buildLinkItem(
+                icon: Icons.format_size_rounded,
+                iconColor: const Color(0xFF26A69A),
+                title:
+                    '글자 크기 · ${_fontScaleLabelFor(prefs.fontScale)}',
+                onTap: () => _showFontScaleSheet(prefs),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _fontScaleLabelFor(double scale) {
+    final idx = UserPreferencesRepository.fontScaleSteps.indexOf(scale);
+    return idx >= 0 ? _fontScaleLabels[idx] : '기본';
+  }
+
+  void _showThemeModeSheet(UserPreferencesProvider prefs) {
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (sheetContext) => SafeArea(
+        child: RadioGroup<ThemeMode>(
+          groupValue: prefs.themeMode,
+          onChanged: (v) {
+            if (v != null) prefs.setThemeMode(v);
+            Navigator.of(sheetContext).pop();
+          },
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (final mode in ThemeMode.values)
+                RadioListTile<ThemeMode>(
+                  value: mode,
+                  title: Text(_themeModeLabels[mode]!),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showFontScaleSheet(UserPreferencesProvider prefs) {
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (sheetContext) => SafeArea(
+        child: RadioGroup<double>(
+          groupValue: prefs.fontScale,
+          onChanged: (v) {
+            if (v != null) prefs.setFontScale(v);
+            Navigator.of(sheetContext).pop();
+          },
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (var i = 0;
+                  i < UserPreferencesRepository.fontScaleSteps.length;
+                  i++)
+                RadioListTile<double>(
+                  value: UserPreferencesRepository.fontScaleSteps[i],
+                  title: Text(_fontScaleLabels[i]),
+                ),
+            ],
+          ),
+        ),
       ),
     );
   }

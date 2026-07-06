@@ -403,6 +403,135 @@ ThemeData buildAppTheme() {
   );
 }
 
+/// 다크 모드용 색상 토큰. 라이트 [AppColors]와 짝을 이룬다.
+abstract final class AppDarkColors {
+  static const background = Color(0xFF12151F);
+  static const surface = Color(0xFF1A1E2B);
+  static const surfaceHigh = Color(0xFF232838);
+  static const border = Color(0xFF2E3446);
+  static const textPrimary = Color(0xFFDDE2F0);
+  static const textSecondary = Color(0xFF9AA1B8);
+}
+
+/// 앱 전역 다크 [ThemeData]. 라이트 테마와 동일한 Shape/Motion 토큰 사용.
+ThemeData buildAppDarkTheme() {
+  const noUnderline = TextStyle(decoration: TextDecoration.none);
+  final colorScheme = ColorScheme.fromSeed(
+    seedColor: AppColors.primaryBlue,
+    surface: AppDarkColors.background,
+    brightness: Brightness.dark,
+  );
+
+  return ThemeData(
+    useMaterial3: true,
+    fontFamily: AppFonts.fontFamily,
+    scaffoldBackgroundColor: AppDarkColors.background,
+    colorScheme: colorScheme,
+    cardTheme: CardThemeData(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: AppShapes.borderRadiusMedium,
+        side: const BorderSide(color: AppDarkColors.border, width: 1),
+      ),
+      color: AppDarkColors.surface,
+      clipBehavior: Clip.antiAlias,
+      margin: EdgeInsets.zero,
+    ),
+    elevatedButtonTheme: ElevatedButtonThemeData(
+      style: ElevatedButton.styleFrom(
+        elevation: 0,
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+        shape: RoundedRectangleBorder(
+          borderRadius: AppShapes.borderRadiusMedium,
+        ),
+      ),
+    ),
+    filledButtonTheme: FilledButtonThemeData(
+      style: FilledButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+        shape: RoundedRectangleBorder(
+          borderRadius: AppShapes.borderRadiusMedium,
+        ),
+      ),
+    ),
+    inputDecorationTheme: InputDecorationTheme(
+      filled: true,
+      fillColor: AppDarkColors.surface,
+      border: OutlineInputBorder(
+        borderRadius: AppShapes.borderRadiusMedium,
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: AppShapes.borderRadiusMedium,
+        borderSide: const BorderSide(color: AppDarkColors.border),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: AppShapes.borderRadiusMedium,
+        borderSide: const BorderSide(color: AppColors.primaryBlue500, width: 2),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: AppShapes.borderRadiusMedium,
+        borderSide: const BorderSide(color: AppColors.error),
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+    ),
+    chipTheme: ChipThemeData(
+      shape: RoundedRectangleBorder(
+        borderRadius: AppShapes.borderRadiusExtraLarge,
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+    ),
+    appBarTheme: AppBarTheme(
+      elevation: 0,
+      scrolledUnderElevation: 0,
+      centerTitle: true,
+      surfaceTintColor: Colors.transparent,
+      backgroundColor: AppDarkColors.surface,
+    ),
+    bottomNavigationBarTheme: BottomNavigationBarThemeData(
+      elevation: 0,
+      type: BottomNavigationBarType.fixed,
+    ),
+    listTileTheme: ListTileThemeData(
+      shape: RoundedRectangleBorder(
+        borderRadius: AppShapes.borderRadiusMedium,
+      ),
+    ),
+    dialogTheme: DialogThemeData(
+      shape: RoundedRectangleBorder(
+        borderRadius: AppShapes.borderRadiusLarge,
+      ),
+      elevation: 0,
+    ),
+    dividerTheme: const DividerThemeData(
+      color: AppDarkColors.border,
+      thickness: 1,
+    ),
+    textTheme: TextTheme(
+      displayLarge: noUnderline,
+      displayMedium: noUnderline,
+      displaySmall: noUnderline,
+      headlineLarge: noUnderline,
+      headlineMedium: noUnderline,
+      headlineSmall: noUnderline,
+      titleLarge: noUnderline,
+      titleMedium: noUnderline,
+      titleSmall: noUnderline,
+      bodyLarge: noUnderline,
+      bodyMedium: noUnderline,
+      bodySmall: noUnderline,
+      labelLarge: noUnderline,
+      labelMedium: noUnderline,
+      labelSmall: noUnderline,
+    ),
+    pageTransitionsTheme: PageTransitionsTheme(
+      builders: {
+        for (final platform in TargetPlatform.values)
+          platform: _M3PageTransitionsBuilder(),
+      },
+    ),
+  );
+}
+
 /// Material 3 Shared Axis(수평) + Fade 스타일 페이지 전환.
 /// [AppMotion] duration/curve 적용.
 class _M3PageTransitionsBuilder extends PageTransitionsBuilder {

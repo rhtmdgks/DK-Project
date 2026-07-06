@@ -18,6 +18,26 @@
 | content_reports | 커뮤니티 신고 내역 | 앱에서 신고 생성 | 신고 검토·상태 변경 |
 | greetings | 응원 문구 | 읽기 | CRUD |
 | meal_departure_* | 급식 출발 관련 | 읽기/알림 | 설정·전송 |
+| public_holidays | 대한민국 법정공휴일 (연도별 시드) | 읽기 | 읽기(시드는 마이그레이션) |
+| personal_event_attachments | 개인 일정 첨부파일 메타 | 본인 CRUD | 읽기(선택) |
+| opinion_campaigns | 학생 의견 모집 캠페인 | 읽기(open만) | CRUD |
+| opinion_submissions | 의견 제출 (앱은 익명 표시, author_id 저장) | 본인 등록/조회 | 전체 조회(작성자 실명 노출) |
+| moderation_keywords | 채팅/댓글 금칙어 | 읽기 | CRUD |
+
+### profiles 추가 컬럼
+
+- `target_university` (text, nullable): 학생이 앱 프로필 편집에서 설정하는 목표 대학. 본인만 UPDATE.
+
+### 아바타 업로드 (앱)
+
+- 버킷 `avatars`, 경로 `{user_id}/{timestamp}.{ext}` (RLS: 본인 폴더만 쓰기).
+- `profiles.avatar_url`에는 공개 전체 URL만 저장.
+
+### 의견 모집 익명 규칙
+
+- `opinion_submissions.author_id`는 항상 저장하되, **앱 UI에서는 작성자를 노출하지 않는다** ("익명" 표시).
+- 백오피스는 council/admin 권한으로 author 프로필(학번·이름)을 조인해 표시한다.
+- RLS: 학생은 본인 제출만 SELECT 가능, council/admin은 전체 SELECT.
 
 NEIS 학사일정: 백오피스 /api/neis-academic-sync 로 DB 동기화. 앱은 동기화된 테이블만 조회.
 

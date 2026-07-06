@@ -1,3 +1,6 @@
+import 'dart:io';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:myapp/core/auth/auth_state.dart';
@@ -10,6 +13,9 @@ import 'package:myapp/core/widgets/async_body.dart';
 import 'package:myapp/core/widgets/dismiss_keyboard.dart';
 import 'package:myapp/core/widgets/m3_list.dart';
 import 'package:myapp/core/widgets/tab_page_header.dart';
+import 'package:myapp/repositories/personal_event_attachment_repository.dart';
+import 'package:myapp/repositories/schedule_repository.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 /// [DateTime]이 같은 날인지 비교 (로컬 날짜 기준).
 bool _isSameDay(DateTime a, DateTime b) {
@@ -46,6 +52,9 @@ class _ScheduleTabState extends State<ScheduleTab> {
   List<Map<String, dynamic>> _classEvents = [];
   /// NEIS 학사일정 (시도교육청·학교 코드는 급식과 동일한 env 사용)
   List<Map<String, dynamic>> _neisItems = [];
+  /// 법정공휴일: 'yyyy-MM-dd' → 공휴일명
+  Map<String, String> _holidays = {};
+  final _scheduleRepo = ScheduleRepository();
   AppProfile? _profile;
   String? _currentUserId;
 
@@ -122,8 +131,25 @@ class _ScheduleTabState extends State<ScheduleTab> {
             .toList();
       }
 
-      // 학사일정(NEIS)은 연동하지 않고, 앱/백오피스에서 등록한 일정만 표시한다.
-      final neisList = <Map<String, dynamic>>[];
+      // NEIS 학사일정 (방학·재량휴업 등). 실패해도 나머지 일정은 표시.
+      var neisList = <Map<String, dynamic>>[];
+      try {
+        neisList = await _scheduleRepo.fetchAcademicCalendar(_viewMonth);
+      } catch (_) {
+        neisList = [];
+      }
+
+      // 법정공휴일 (빨간 날 표시). 실패해도 무시.
+      var holidayMap = <String, String>{};
+      try {
+        final holidayRes = await _scheduleRepo.fetchPublicHolidays(_viewMonth);
+        holidayMap = {
+          for (final h in holidayRes)
+            (h['holiday_date'] ?? '').toString(): (h['name'] ?? '').toString(),
+        };
+      } catch (_) {
+        holidayMap = {};
+      }
 
       if (!mounted) return;
       setState(() {
@@ -131,6 +157,7 @@ class _ScheduleTabState extends State<ScheduleTab> {
         _personalEvents = personalRes;
         _classEvents = classRes;
         _neisItems = neisList;
+        _holidays = holidayMap;
         _currentUserId = uid;
         _loading = false;
       });
@@ -156,6 +183,22 @@ class _ScheduleTabState extends State<ScheduleTab> {
     final allItems = [..._items, ..._neisItems, ..._classEvents, ..._personalEvents];
     return allItems.any((item) => _eventOverlapsDay(item, day));
   }
+
+  String _dateKey(DateTime d) =>
+      '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+  /// 법정공휴일명. 공휴일이 아니면 null.
+  String? _holidayNameOnDate(DateTime day) => _holidays[_dateKey(day)];
+
+  /// NEIS 휴업일(방학·재량휴업 등) 여부.
+  bool _isNeisDayOff(DateTime day) {
+    return _neisItems.any((item) =>
+        item['is_day_off'] == true && _eventOverlapsDay(item, day));
+  }
+
+  /// 캘린더에서 빨간 날 표시 대상 (공휴일 또는 NEIS 휴업일).
+  bool _isRedDay(DateTime day) =>
+      _holidayNameOnDate(day) != null || _isNeisDayOff(day);
 
   bool _eventOverlapsDay(Map<String, dynamic> item, DateTime day) {
     final start = _parseUtc(item['start_at'] as String?);
@@ -398,6 +441,7 @@ class _ScheduleTabState extends State<ScheduleTab> {
                             );
                         final isSunday = c == 0;
                         final hasEvent = date != null && _hasEventOnDate(date);
+                        final isRedDay = date != null && _isRedDay(date);
                         return GestureDetector(
                           onTap: isCurrentMonth
                               ? () => setState(() => _selectedDate = date!)
@@ -425,9 +469,13 @@ class _ScheduleTabState extends State<ScheduleTab> {
                                     ).copyWith(
                                       color: isSelected
                                           ? AppColors.white
-                                          : (isSunday
-                                              ? AppColors.textSecondary
-                                              : AppColors.textPrimary),
+                                          : (isRedDay
+                                              ? AppColors.error
+                                              : (isSunday
+                                                  ? AppColors.textSecondary
+                                                  : AppColors.textPrimary)),
+                                      fontWeight:
+                                          isRedDay ? FontWeight.w600 : null,
                                     ),
                                   ),
                                   if (hasEvent) ...[
@@ -464,6 +512,7 @@ class _ScheduleTabState extends State<ScheduleTab> {
     final y = _selectedDate.year;
     final m = _selectedDate.month;
     final d = _selectedDate.day;
+    final holidayName = _holidayNameOnDate(_selectedDate);
     return Padding(
       padding: EdgeInsets.only(left: context.rs(4)),
       child: Row(
@@ -472,6 +521,24 @@ class _ScheduleTabState extends State<ScheduleTab> {
             '$y년 $m월 $d일 일정',
             style: AppFonts.scaled(context, AppFonts.titleMedium),
           ),
+          if (holidayName != null) ...[
+            SizedBox(width: context.rs(8)),
+            Container(
+              padding: EdgeInsets.symmetric(
+                horizontal: context.rs(8),
+                vertical: context.rh(2),
+              ),
+              decoration: BoxDecoration(
+                color: AppColors.error.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(context.rs(8)),
+              ),
+              child: Text(
+                holidayName,
+                style: AppFonts.scaled(context, AppFonts.captionMedium)
+                    .copyWith(color: AppColors.error),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -591,6 +658,17 @@ class _ScheduleTabState extends State<ScheduleTab> {
     final id = item['id'] as String?;
     final isClassOwner = isClass && item['created_by_user_id'] == _currentUserId;
 
+    // 개인 일정: 첨부파일 열람 버튼.
+    if (isPersonal && id != null) {
+      actions.add(
+        TextButton.icon(
+          onPressed: () => _showAttachmentsSheet(id),
+          icon: const Icon(Icons.attach_file_rounded, size: 18),
+          label: const Text('첨부파일'),
+        ),
+      );
+    }
+
     // 학사일정(NEIS)은 삭제 불가. 개인 일정/학교 일정만 삭제 버튼 표시.
     if (!isNeis && id != null && (isPersonal || isClassOwner || _canEdit)) {
       actions.add(
@@ -616,6 +694,75 @@ class _ScheduleTabState extends State<ScheduleTab> {
       body: body,
       secondary: secondary,
       actions: actions.isEmpty ? null : actions,
+    );
+  }
+
+  /// 개인 일정 첨부파일 목록 시트. 탭하면 서명 URL로 연다.
+  Future<void> _showAttachmentsSheet(String eventId) async {
+    List<Map<String, dynamic>> attachments;
+    try {
+      attachments = await PersonalEventAttachmentRepository.instance
+          .fetchAttachments(eventId);
+    } catch (_) {
+      attachments = [];
+    }
+    if (!mounted) return;
+
+    showModalBottomSheet<void>(
+      context: context,
+      useRootNavigator: true,
+      builder: (sheetContext) => SafeArea(
+        child: attachments.isEmpty
+            ? Padding(
+                padding: EdgeInsets.all(sheetContext.rs(32)),
+                child: Text(
+                  '첨부파일이 없습니다.',
+                  textAlign: TextAlign.center,
+                  style: AppFonts.scaled(sheetContext, AppFonts.bodyRegular),
+                ),
+              )
+            : ListView(
+                shrinkWrap: true,
+                children: [
+                  for (final a in attachments)
+                    ListTile(
+                      leading: Icon(
+                        (a['mime_type'] as String? ?? '').contains('pdf')
+                            ? Icons.picture_as_pdf_rounded
+                            : Icons.image_rounded,
+                        color: AppColors.primaryBlue,
+                      ),
+                      title: Text(
+                        a['file_name'] as String? ?? '파일',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      onTap: () async {
+                        final path = a['storage_path'] as String?;
+                        if (path == null) return;
+                        try {
+                          final url = await PersonalEventAttachmentRepository
+                              .instance
+                              .createSignedUrl(path);
+                          await launchUrl(
+                            Uri.parse(url),
+                            mode: LaunchMode.externalApplication,
+                          );
+                        } catch (_) {
+                          if (sheetContext.mounted) {
+                            ScaffoldMessenger.of(sheetContext).showSnackBar(
+                              const SnackBar(
+                                content: Text('파일을 열 수 없습니다.'),
+                                backgroundColor: AppColors.error,
+                              ),
+                            );
+                          }
+                        }
+                      },
+                    ),
+                ],
+              ),
+      ),
     );
   }
 
@@ -805,6 +952,8 @@ class _ScheduleTabState extends State<ScheduleTab> {
     var end = start.add(const Duration(hours: 1));
     var allDay = false;
     var shareWithClass = false;
+    // 첨부할 파일 (개인 일정만 지원). 이미지·PDF.
+    final pickedFiles = <PlatformFile>[];
 
     if (!mounted) return;
     try {
@@ -947,6 +1096,50 @@ class _ScheduleTabState extends State<ScheduleTab> {
                                     onChanged: (dt) => setSheetState(() => end = dt),
                                     enabled: !allDay,
                                   ),
+                                  SizedBox(height: innerContext.rh(8)),
+                                  // 파일 첨부 (개인 일정만). 시험 시간표 이미지·PDF 등.
+                                  if (!shareWithClass) ...[
+                                    OutlinedButton.icon(
+                                      onPressed: () async {
+                                        final result =
+                                            await FilePicker.pickFiles(
+                                          type: FileType.custom,
+                                          allowedExtensions:
+                                              PersonalEventAttachmentRepository
+                                                  .allowedExtensions,
+                                          allowMultiple: true,
+                                        );
+                                        if (result == null) return;
+                                        setSheetState(() {
+                                          pickedFiles.addAll(result.files
+                                              .where((f) => f.path != null));
+                                        });
+                                      },
+                                      icon: const Icon(Icons.attach_file_rounded),
+                                      label: const Text('파일 첨부 (이미지·PDF)'),
+                                    ),
+                                    for (var i = 0; i < pickedFiles.length; i++)
+                                      ListTile(
+                                        dense: true,
+                                        contentPadding: EdgeInsets.zero,
+                                        leading: Icon(
+                                          pickedFiles[i].extension == 'pdf'
+                                              ? Icons.picture_as_pdf_rounded
+                                              : Icons.image_rounded,
+                                          color: AppColors.primaryBlue,
+                                        ),
+                                        title: Text(
+                                          pickedFiles[i].name,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        trailing: IconButton(
+                                          icon: const Icon(Icons.close, size: 18),
+                                          onPressed: () => setSheetState(
+                                              () => pickedFiles.removeAt(i)),
+                                        ),
+                                      ),
+                                  ],
                                 ],
                               ),
                             ),
@@ -1031,14 +1224,37 @@ class _ScheduleTabState extends State<ScheduleTab> {
                                             });
                                           } else {
                                             // Supabase Auth 세션이 있는 경우: RLS(auth.uid() = user_id) 기준으로 직접 insert.
-                                            await supabase.from('personal_events').insert({
-                                              'user_id': uid,
-                                              'title': title,
-                                              'description': description,
-                                              'start_at': start.toIso8601String(),
-                                              'end_at': allDay ? null : end.toIso8601String(),
-                                              'all_day': allDay,
-                                            });
+                                            final inserted = await supabase
+                                                .from('personal_events')
+                                                .insert({
+                                                  'user_id': uid,
+                                                  'title': title,
+                                                  'description': description,
+                                                  'start_at': start.toIso8601String(),
+                                                  'end_at': allDay ? null : end.toIso8601String(),
+                                                  'all_day': allDay,
+                                                })
+                                                .select('id')
+                                                .single();
+
+                                            // 첨부파일 업로드. 실패한 파일은 건너뛴다.
+                                            final eventId =
+                                                inserted['id'] as String?;
+                                            if (eventId != null) {
+                                              for (final f in pickedFiles) {
+                                                final p = f.path;
+                                                if (p == null) continue;
+                                                try {
+                                                  await PersonalEventAttachmentRepository
+                                                      .instance
+                                                      .uploadAttachment(
+                                                    eventId: eventId,
+                                                    file: File(p),
+                                                    fileName: f.name,
+                                                  );
+                                                } catch (_) {}
+                                              }
+                                            }
                                           }
                                         } else {
                                           if (innerContext.mounted) {
@@ -1168,6 +1384,11 @@ class _ScheduleTabState extends State<ScheduleTab> {
     );
 
     if (ok == true) {
+      // 첨부 Storage 파일 정리 (메타는 FK CASCADE 삭제).
+      try {
+        await PersonalEventAttachmentRepository.instance
+            .deleteStorageFilesForEvent(id);
+      } catch (_) {}
       await supabase.from('personal_events').delete().eq('id', id);
       _fetch();
       if (mounted) {

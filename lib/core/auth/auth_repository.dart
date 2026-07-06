@@ -20,7 +20,10 @@ AppProfile _withResolvedAvatar(AppProfile p) {
     grade: p.grade,
     classNum: p.classNum,
     numberInClass: p.numberInClass,
+    teacherSubjects: p.teacherSubjects,
+    teacherRoles: p.teacherRoles,
     classLeaderRole: p.classLeaderRole,
+    targetUniversity: p.targetUniversity,
   );
 }
 
@@ -84,6 +87,7 @@ class AuthRepository {
         teacherSubjects: profile.teacherSubjects,
         teacherRoles: profile.teacherRoles,
         classLeaderRole: profile.classLeaderRole,
+        targetUniversity: profile.targetUniversity,
       );
     }
 

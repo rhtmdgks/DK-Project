@@ -15,6 +15,7 @@ class AppProfile {
     this.teacherSubjects,
     this.teacherRoles,
     this.classLeaderRole,
+    this.targetUniversity,
   });
 
   final String id;
@@ -36,6 +37,8 @@ class AppProfile {
   final List<String>? teacherRoles;
   /// 학급 리더 역할 (정반장/부반장).
   final String? classLeaderRole;
+  /// 목표 대학 (프로필 편집에서 본인이 설정).
+  final String? targetUniversity;
 
   factory AppProfile.fromJson(Map<String, dynamic> json) {
     return AppProfile(
@@ -55,6 +58,9 @@ class AppProfile {
       classLeaderRole: (json['class_leader_role'] as String?)?.trim().isEmpty == true
           ? null
           : (json['class_leader_role'] as String?),
+      targetUniversity: (json['target_university'] as String?)?.trim().isEmpty == true
+          ? null
+          : (json['target_university'] as String?),
     );
   }
 
