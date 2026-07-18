@@ -1,11 +1,12 @@
 import 'dart:io';
 
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:myapp/components/apple_button.dart';
 import 'package:myapp/core/supabase_client.dart';
+import 'package:myapp/core/widgets/app_feedback.dart';
 import 'package:myapp/core/widgets/dismiss_keyboard.dart';
 import 'package:myapp/core/theme/app_theme.dart';
 import 'package:myapp/core/theme/responsive.dart';
@@ -66,9 +67,7 @@ class _BugReportScreenState extends State<BugReportScreen> {
             style: AppFonts.scaled(context, _Styles.pageTitle),
           ),
         ),
-      child: Material(
-        type: MaterialType.transparency,
-        child: SafeArea(
+      child: SafeArea(
           child: ListView(
           padding: EdgeInsets.symmetric(horizontal: context.rs(32)),
           children: [
@@ -94,7 +93,6 @@ class _BugReportScreenState extends State<BugReportScreen> {
           ],
         ),
       ),
-    ),
     ),
     );
   }
@@ -269,9 +267,7 @@ class _BugReportScreenState extends State<BugReportScreen> {
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('이미지를 선택할 수 없습니다: $e')),
-      );
+      AppFeedback.showError(context, '이미지를 선택할 수 없습니다: $e');
     }
   }
 
@@ -279,32 +275,13 @@ class _BugReportScreenState extends State<BugReportScreen> {
 
   Widget _buildSubmitButton() {
     return SizedBox(
-      width: double.infinity,
       height: context.rh(50),
-      child: CupertinoButton(
-        padding: EdgeInsets.zero,
-        borderRadius: BorderRadius.circular(12),
-        color: _submitting
-            ? AppColors.primaryBlue.withAlpha(128)
-            : AppColors.primaryBlue,
+      child: AppleButton(
+        label: '신고하기',
+        icon: CupertinoIcons.arrow_right,
+        fullWidth: true,
+        loading: _submitting,
         onPressed: _submitting ? null : _submit,
-        child: _submitting
-            ? const CupertinoActivityIndicator(color: AppColors.white)
-            : Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    '신고하기',
-                    style: AppFonts.scaled(context, _Styles.submitButton),
-                  ),
-                  SizedBox(width: context.rs(4)),
-                  Icon(
-                    CupertinoIcons.arrow_right,
-                    size: context.rs(16),
-                    color: AppColors.white,
-                  ),
-                ],
-              ),
       ),
     );
   }
@@ -357,12 +334,7 @@ class _BugReportScreenState extends State<BugReportScreen> {
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('버그 신고가 완료되었습니다. 감사합니다!'),
-          backgroundColor: Color(0xFF4CAF50),
-        ),
-      );
+      AppFeedback.showSuccess(context, '버그 신고가 완료되었습니다. 감사합니다!');
 
       context.pop();
     } catch (e) {
@@ -376,12 +348,7 @@ class _BugReportScreenState extends State<BugReportScreen> {
   }
 
   void _showError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: AppColors.error,
-      ),
-    );
+    AppFeedback.showError(context, message);
   }
 }
 
@@ -430,14 +397,5 @@ abstract final class _Styles {
     fontWeight: FontWeight.w400,
     height: 1.4,
     color: AppColors.hint,
-  );
-
-  /// 제출 버튼 – 16px, w500, white
-  static const submitButton = TextStyle(
-    fontFamily: AppFonts.fontFamily,
-    fontSize: 16,
-    fontWeight: FontWeight.w500,
-    height: 1.5,
-    color: AppColors.white,
   );
 }

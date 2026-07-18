@@ -1,13 +1,18 @@
 import 'dart:io';
 
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
+import 'package:myapp/components/apple_button.dart';
+import 'package:myapp/components/apple_navigation_bar.dart';
+import 'package:myapp/components/apple_text_field.dart';
 import 'package:myapp/core/auth/auth_state.dart';
+import 'package:myapp/core/theme/app_resolved_colors.dart';
 import 'package:myapp/core/theme/app_theme.dart';
 import 'package:myapp/core/theme/responsive.dart';
+import 'package:myapp/core/widgets/app_feedback.dart';
 import 'package:myapp/repositories/profile_repository.dart';
 
 /// 프로필 편집 화면: 프로필 사진 변경 + 목표 대학 설정.
@@ -75,48 +80,35 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
           .updateTargetUniversity(_targetUniversityController.text);
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('프로필이 저장되었습니다.'),
-          backgroundColor: AppColors.success,
-        ),
-      );
+      AppFeedback.showSuccess(context, '프로필이 저장되었습니다.');
       context.pop(true);
     } catch (e) {
       if (!mounted) return;
       setState(() => _saving = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('저장에 실패했습니다: $e'),
-          backgroundColor: AppColors.error,
-        ),
-      );
+      AppFeedback.showError(context, '저장에 실패했습니다: $e');
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: AppColors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(CupertinoIcons.back),
-          color: AppColors.textDark,
+    final colors = context.appColors;
+    return GlassScaffold(
+      backgroundColor: colors.background,
+      appBar: AppleNavigationBar(
+        title: '프로필 편집',
+        leading: CupertinoButton(
+          padding: EdgeInsets.zero,
           onPressed: () => context.pop(),
+          child: Icon(
+            CupertinoIcons.back,
+            color: AppColors.textDark,
+          ),
         ),
-        title: Text(
-          '프로필 편집',
-          style: AppFonts.scaled(context, AppFonts.titleSemiBold)
-              .copyWith(color: AppColors.textDark),
-        ),
-        centerTitle: true,
       ),
       body: SafeArea(
         top: false,
         child: _loading
-            ? const Center(child: CircularProgressIndicator())
+            ? const Center(child: CupertinoActivityIndicator(radius: 12))
             : SingleChildScrollView(
                 padding: EdgeInsets.symmetric(
                   horizontal: context.rs(24),
@@ -129,18 +121,11 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                     SizedBox(height: context.rh(32)),
                     _buildTargetUniversityField(),
                     SizedBox(height: context.rh(40)),
-                    FilledButton(
+                    AppleButton(
+                      label: '저장',
+                      fullWidth: true,
+                      loading: _saving,
                       onPressed: _saving ? null : _save,
-                      child: _saving
-                          ? SizedBox(
-                              width: context.rs(20),
-                              height: context.rs(20),
-                              child: const CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: AppColors.white,
-                              ),
-                            )
-                          : const Text('저장'),
                     ),
                   ],
                 ),
@@ -165,17 +150,19 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
         onTap: _pickImage,
         child: Stack(
           children: [
-            CircleAvatar(
-              radius: radius,
-              backgroundColor: AppColors.primaryBlue.withValues(alpha: 0.15),
-              backgroundImage: image,
-              child: image == null
-                  ? Icon(
-                      CupertinoIcons.person_fill,
-                      size: radius,
-                      color: AppColors.primaryBlue,
-                    )
-                  : null,
+            ClipOval(
+              child: Container(
+                width: radius * 2,
+                height: radius * 2,
+                color: AppColors.primaryBlue.withValues(alpha: 0.15),
+                child: image != null
+                    ? Image(image: image, fit: BoxFit.cover)
+                    : Icon(
+                        CupertinoIcons.person_fill,
+                        size: radius,
+                        color: AppColors.primaryBlue,
+                      ),
+              ),
             ),
             Positioned(
               right: 0,
@@ -209,15 +196,9 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
               .copyWith(color: AppColors.textSecondary),
         ),
         SizedBox(height: context.rh(8)),
-        TextField(
+        AppleTextField(
           controller: _targetUniversityController,
-          maxLength: 40,
-          decoration: const InputDecoration(
-            hintText: '예: 서울대학교 컴퓨터공학부',
-            counterText: '',
-          ),
-          style: AppFonts.scaled(context, AppFonts.bodyMedium)
-              .copyWith(color: AppColors.textDark),
+          placeholder: '예: 서울대학교 컴퓨터공학부',
         ),
         SizedBox(height: context.rh(4)),
         Text(

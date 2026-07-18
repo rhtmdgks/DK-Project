@@ -1,7 +1,8 @@
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:myapp/components/apple_button.dart';
+import 'package:myapp/components/apple_text_field.dart';
 import 'package:myapp/core/auth/auth_repository.dart';
 import 'package:myapp/core/routing/app_router.dart';
 import 'package:myapp/core/supabase_client.dart';
@@ -18,7 +19,6 @@ class PasswordChangeScreen extends StatefulWidget {
 }
 
 class _PasswordChangeScreenState extends State<PasswordChangeScreen> {
-  final _formKey = GlobalKey<FormState>();
   final _newPasswordController = TextEditingController();
   final _confirmController = TextEditingController();
 
@@ -77,16 +77,14 @@ class _PasswordChangeScreenState extends State<PasswordChangeScreen> {
       if (userId == null) {
         throw Exception('사용자 ID를 가져올 수 없습니다');
       }
-      
-      // 비밀번호는 Supabase Auth(auth.users)에만 저장한다. profiles에는 password 컬럼이 없음.
+
       if (supabase.auth.currentSession == null) {
         throw Exception('세션이 없습니다');
       }
       await supabase.auth.updateUser(UserAttributes(password: newPw));
 
-      // 첫 로그인 강제 변경 플래그 해제 (001_full_schema: set_must_change_password_false)
       await supabase.rpc('set_must_change_password_false');
-      
+
       if (!mounted) return;
       context.go(AppRoute.home.path);
     } catch (e) {
@@ -108,24 +106,20 @@ class _PasswordChangeScreenState extends State<PasswordChangeScreen> {
       child: CupertinoPageScaffold(
         backgroundColor: AppColors.background,
         navigationBar: CupertinoNavigationBar(
-        backgroundColor: AppColors.white,
-        border: null,
-        middle: Text(
-          '비밀번호 변경',
-          style: AppFonts.scaled(context, AppFonts.titleSemiBold)
-              .copyWith(color: AppColors.textDark),
+          backgroundColor: AppColors.white,
+          border: null,
+          middle: Text(
+            '비밀번호 변경',
+            style: AppFonts.scaled(context, AppFonts.titleSemiBold)
+                .copyWith(color: AppColors.textDark),
+          ),
         ),
-      ),
-      child: Material(
-        type: MaterialType.transparency,
         child: SafeArea(
           child: Center(
-          child: SingleChildScrollView(
-            padding: EdgeInsets.all(pad),
-            child: ResponsiveConstraint(
-              maxWidth: 480,
-              child: Form(
-                key: _formKey,
+            child: SingleChildScrollView(
+              padding: EdgeInsets.all(pad),
+              child: ResponsiveConstraint(
+                maxWidth: 480,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -134,37 +128,20 @@ class _PasswordChangeScreenState extends State<PasswordChangeScreen> {
                       style: AppFonts.scaled(context, AppFonts.bodyRegular),
                     ),
                     SizedBox(height: context.rh(24)),
-                    CupertinoTextField(
+                    AppleTextField(
                       controller: _newPasswordController,
                       placeholder: '새 비밀번호 (8자 이상)',
                       obscureText: true,
                       enabled: !_loading,
-                      padding: EdgeInsets.symmetric(
-                        horizontal: context.rs(16),
-                        vertical: context.rh(12),
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppColors.border),
-                      ),
                     ),
                     SizedBox(height: context.rh(16)),
-                    CupertinoTextField(
+                    AppleTextField(
                       controller: _confirmController,
                       placeholder: '새 비밀번호 확인',
                       obscureText: true,
                       enabled: !_loading,
+                      textInputAction: TextInputAction.done,
                       onSubmitted: (_) => _submit(),
-                      padding: EdgeInsets.symmetric(
-                        horizontal: context.rs(16),
-                        vertical: context.rh(12),
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppColors.border),
-                      ),
                     ),
                     if (_error != null) ...[
                       SizedBox(height: context.rh(16)),
@@ -175,20 +152,11 @@ class _PasswordChangeScreenState extends State<PasswordChangeScreen> {
                       ),
                     ],
                     SizedBox(height: context.rh(24)),
-                    SizedBox(
-                      width: double.infinity,
-                      height: context.rh(50),
-                      child: CupertinoButton(
-                        padding: EdgeInsets.zero,
-                        borderRadius: BorderRadius.circular(12),
-                        color: AppColors.primaryBlue,
-                        onPressed: _loading ? null : _submit,
-                        child: _loading
-                            ? const CupertinoActivityIndicator(
-                                color: AppColors.white,
-                              )
-                            : const Text('변경 후 로그인'),
-                      ),
+                    AppleButton(
+                      label: '변경 후 로그인',
+                      fullWidth: true,
+                      loading: _loading,
+                      onPressed: _loading ? null : _submit,
                     ),
                   ],
                 ),
@@ -197,8 +165,6 @@ class _PasswordChangeScreenState extends State<PasswordChangeScreen> {
           ),
         ),
       ),
-    ),
-    ),
     );
   }
 }

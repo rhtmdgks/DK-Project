@@ -1,16 +1,22 @@
 import 'dart:io';
 
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:myapp/components/apple_button.dart';
+import 'package:myapp/components/apple_card.dart';
+import 'package:myapp/core/auth/app_profile.dart';
 import 'package:myapp/core/auth/auth_repository.dart';
+import 'package:myapp/core/theme/app_resolved_colors.dart';
 import 'package:myapp/core/theme/app_theme.dart';
 import 'package:myapp/core/theme/responsive.dart';
 import 'package:myapp/core/routing/app_router.dart';
+import 'package:myapp/core/widgets/app_feedback.dart';
 import 'package:myapp/core/widgets/tab_page_header.dart';
 import 'package:myapp/core/supabase_client.dart';
+import 'package:myapp/design/glass.dart';
 
 class ClassPhotoSharesScreen extends StatefulWidget {
   const ClassPhotoSharesScreen({super.key});
@@ -30,7 +36,7 @@ class _ClassPhotoSharesScreenState extends State<ClassPhotoSharesScreen> {
   List<Map<String, dynamic>> _items = [];
   String? _userId;
   String? _profileId;
-  String? _role;
+  AppProfile? _profile;
   int? _profileGrade;
   int? _profileClassNumber;
   int _pickedGrade = 1;
@@ -52,7 +58,8 @@ class _ClassPhotoSharesScreenState extends State<ClassPhotoSharesScreen> {
         classNumber <= 10;
   }
 
-  bool get _isStaff => _role == 'admin' || _role == 'teacher';
+  bool get _isStaff =>
+      (_profile?.isSchoolAdmin ?? false) || (_profile?.isTeacher ?? false);
 
   bool get _usesProfileGradeClass =>
       _isValidGradeClass(_profileGrade, _profileClassNumber);
@@ -74,7 +81,7 @@ class _ClassPhotoSharesScreenState extends State<ClassPhotoSharesScreen> {
     setState(() {
       _userId = userId;
       _profileId = profile?.id;
-      _role = profile?.role;
+      _profile = profile;
       _profileGrade = profile?.gradeOrFromStudentId;
       _profileClassNumber = profile?.classNumOrFromStudentId;
       _canManage = profile?.canManageClassResources ?? false;
@@ -150,18 +157,17 @@ class _ClassPhotoSharesScreenState extends State<ClassPhotoSharesScreen> {
     );
     if (picked == null || !mounted) return;
 
-    final confirmed = await showModalBottomSheet<bool>(
+    final confirmed = await GlassSheet.show<bool>(
       context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (context) {
+      quality: kAppGlassQuality,
+      builder: (sheetContext) {
         return SafeArea(
           child: Padding(
             padding: EdgeInsets.fromLTRB(
-              context.rs(20),
-              context.rh(8),
-              context.rs(20),
-              context.rh(20),
+              sheetContext.rs(20),
+              sheetContext.rh(20),
+              sheetContext.rs(20),
+              sheetContext.rh(20),
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -171,23 +177,22 @@ class _ClassPhotoSharesScreenState extends State<ClassPhotoSharesScreen> {
                   child: Image.file(
                     File(picked.path),
                     width: double.infinity,
-                    height: context.rh(240),
+                    height: sheetContext.rh(240),
                     fit: BoxFit.cover,
                   ),
                 ),
-                SizedBox(height: context.rh(16)),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton.icon(
-                    onPressed: () => Navigator.pop(context, true),
-                    icon: const Icon(Icons.cloud_upload_outlined),
-                    label: const Text('업로드'),
-                  ),
+                SizedBox(height: sheetContext.rh(16)),
+                AppleButton(
+                  label: '업로드',
+                  icon: CupertinoIcons.cloud_upload,
+                  fullWidth: true,
+                  onPressed: () => Navigator.pop(sheetContext, true),
                 ),
-                SizedBox(height: context.rh(8)),
-                TextButton(
-                  onPressed: () => Navigator.pop(context, false),
-                  child: const Text('취소'),
+                SizedBox(height: sheetContext.rh(8)),
+                AppleButton(
+                  label: '취소',
+                  variant: AppleButtonVariant.plain,
+                  onPressed: () => Navigator.pop(sheetContext, false),
                 ),
               ],
             ),
@@ -257,9 +262,7 @@ class _ClassPhotoSharesScreenState extends State<ClassPhotoSharesScreen> {
 
   void _showSnack(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
-    );
+    AppFeedback.showToast(context, message);
   }
 
   Widget _buildGradeClassUnavailableCard() {
@@ -335,52 +338,88 @@ class _ClassPhotoSharesScreenState extends State<ClassPhotoSharesScreen> {
     required List<int> items,
     required ValueChanged<int> onChanged,
   }) {
-    return Material(
-      color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
-      borderRadius: BorderRadius.circular(12),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: () async {
-          final selected = await showModalBottomSheet<int>(
-            context: context,
-            showDragHandle: true,
-            builder: (ctx) => SafeArea(
-              child: ListView(
-                shrinkWrap: true,
+    final colors = context.appColors;
+    return AppleCard(
+      padding: EdgeInsets.symmetric(
+        horizontal: context.rs(14),
+        vertical: context.rh(12),
+      ),
+      onTap: () => _showIntPicker(label, value, items, onChanged),
+      child: Row(
+        children: [
+          Text(label, style: AppFonts.scaled(context, AppFonts.captionRegular)),
+          const Spacer(),
+          Text('$value', style: AppFonts.scaled(context, AppFonts.titleMedium)),
+          Icon(
+            CupertinoIcons.chevron_down,
+            size: context.rs(20),
+            color: colors.onSurfaceVariant,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showIntPicker(
+    String label,
+    int currentValue,
+    List<int> options,
+    ValueChanged<int> onChanged,
+  ) async {
+    var selectedIndex = options.indexOf(currentValue);
+    if (selectedIndex < 0) selectedIndex = 0;
+
+    await showCupertinoModalPopup<void>(
+      context: context,
+      builder: (ctx) => Container(
+        height: context.rh(260),
+        color: AppColors.white,
+        child: Column(
+          children: [
+            SizedBox(
+              height: context.rh(44),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  for (final item in items)
-                    ListTile(
-                      title: Text('$label $item'),
-                      trailing: item == value ? const Icon(Icons.check) : null,
-                      onTap: () => Navigator.pop(ctx, item),
-                    ),
+                  CupertinoButton(
+                    onPressed: () => Navigator.of(ctx).pop(),
+                    child: const Text('취소'),
+                  ),
+                  Text(
+                    label,
+                    style: AppFonts.scaled(context, AppFonts.titleMedium),
+                  ),
+                  CupertinoButton(
+                    onPressed: () {
+                      onChanged(options[selectedIndex]);
+                      Navigator.of(ctx).pop();
+                    },
+                    child: const Text('완료'),
+                  ),
                 ],
               ),
             ),
-          );
-          if (selected != null) onChanged(selected);
-        },
-        child: Padding(
-          padding: EdgeInsets.symmetric(
-            horizontal: context.rs(14),
-            vertical: context.rh(12),
-          ),
-          child: Row(
-            children: [
-              Text(label, style: AppFonts.scaled(context, AppFonts.captionRegular)),
-              const Spacer(),
-              Text('$value', style: AppFonts.scaled(context, AppFonts.titleMedium)),
-              Icon(Icons.expand_more, size: context.rs(20), color: AppColors.hint),
-            ],
-          ),
+            Expanded(
+              child: CupertinoPicker(
+                scrollController: FixedExtentScrollController(
+                  initialItem: selectedIndex,
+                ),
+                itemExtent: context.rh(36),
+                onSelectedItemChanged: (index) => selectedIndex = index,
+                children: [
+                  for (final item in options)
+                    Center(child: Text('$label $item')),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 
   Widget _buildUploadZone() {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    final colors = context.appColors;
 
     return Padding(
       padding: EdgeInsets.fromLTRB(
@@ -389,51 +428,33 @@ class _ClassPhotoSharesScreenState extends State<ClassPhotoSharesScreen> {
         context.rs(16),
         context.rh(12),
       ),
-      child: Material(
-        color: theme.cardTheme.color ?? theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        child: InkWell(
-          onTap: _uploading ? null : _pickAndUploadPhoto,
-          borderRadius: BorderRadius.circular(16),
-          child: Container(
-            width: double.infinity,
-            padding: EdgeInsets.symmetric(
-              vertical: context.rh(28),
-              horizontal: context.rs(16),
-            ),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: isDark ? AppDarkColors.border : AppColors.border,
-                width: 1.5,
+      child: AppleCard(
+        onTap: _uploading ? null : _pickAndUploadPhoto,
+        padding: EdgeInsets.symmetric(
+          vertical: context.rh(28),
+          horizontal: context.rs(16),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (_uploading)
+              Padding(
+                padding: EdgeInsets.symmetric(vertical: context.rh(8)),
+                child: CupertinoActivityIndicator(color: colors.primary),
+              )
+            else ...[
+              Icon(
+                CupertinoIcons.photo_on_rectangle,
+                size: context.rs(48),
+                color: AppColors.primaryBlue,
               ),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (_uploading)
-                  Padding(
-                    padding: EdgeInsets.symmetric(vertical: context.rh(8)),
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: theme.colorScheme.primary,
-                    ),
-                  )
-                else ...[
-                  Icon(
-                    Icons.add_photo_alternate_outlined,
-                    size: context.rs(48),
-                    color: AppColors.primaryBlue,
-                  ),
-                  SizedBox(height: context.rh(10)),
-                  Text(
-                    '탭해서 사진 선택',
-                    style: AppFonts.scaled(context, AppFonts.titleMedium),
-                  ),
-                ],
-              ],
-            ),
-          ),
+              SizedBox(height: context.rh(10)),
+              Text(
+                '탭해서 사진 선택',
+                style: AppFonts.scaled(context, AppFonts.titleMedium),
+              ),
+            ],
+          ],
         ),
       ),
     );
@@ -441,17 +462,16 @@ class _ClassPhotoSharesScreenState extends State<ClassPhotoSharesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final colors = context.appColors;
 
-    return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
+    return GlassScaffold(
+      backgroundColor: colors.background,
       body: SafeArea(
         child: Column(
           children: [
             TabPageHeader(
-              leading: IconButton(
-                icon: const Icon(CupertinoIcons.back),
-                color: AppColors.primaryBlue,
+              leading: CupertinoButton(
+                padding: EdgeInsets.zero,
                 onPressed: () {
                   if (context.canPop()) {
                     context.pop();
@@ -459,7 +479,10 @@ class _ClassPhotoSharesScreenState extends State<ClassPhotoSharesScreen> {
                     context.go(AppRoute.home.path);
                   }
                 },
-                tooltip: '뒤로',
+                child: Icon(
+                  CupertinoIcons.back,
+                  color: AppColors.primaryBlue,
+                ),
               ),
               title: '학급 사진 공유',
               subtitle: '같은 반 친구들과 사진을 공유해요.',
@@ -477,12 +500,11 @@ class _ClassPhotoSharesScreenState extends State<ClassPhotoSharesScreen> {
   }
 
   Widget _buildListArea() {
+    final colors = context.appColors;
+
     if (_loading) {
       return Center(
-        child: CircularProgressIndicator(
-          strokeWidth: 2,
-          color: Theme.of(context).colorScheme.primary,
-        ),
+        child: CupertinoActivityIndicator(color: colors.primary),
       );
     }
 
@@ -534,17 +556,22 @@ class _ClassPhotoSharesScreenState extends State<ClassPhotoSharesScreen> {
         final canDelete =
             _canManage || item['uploader_profile_id'] == _profileId;
 
-        return Card(
-          clipBehavior: Clip.antiAlias,
+        return AppleCard(
+          padding: EdgeInsets.zero,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               if (imageUrl != null)
-                Image.network(
-                  imageUrl,
-                  width: double.infinity,
-                  height: context.rh(220),
-                  fit: BoxFit.cover,
+                ClipRRect(
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(12),
+                  ),
+                  child: Image.network(
+                    imageUrl,
+                    width: double.infinity,
+                    height: context.rh(220),
+                    fit: BoxFit.cover,
+                  ),
                 ),
               Padding(
                 padding: EdgeInsets.all(context.rs(12)),
@@ -557,11 +584,13 @@ class _ClassPhotoSharesScreenState extends State<ClassPhotoSharesScreen> {
                       ),
                     ),
                     if (canDelete)
-                      IconButton(
+                      CupertinoButton(
+                        padding: EdgeInsets.zero,
                         onPressed: () => _deleteItem(item),
-                        icon: const Icon(Icons.delete_outline),
-                        color: AppColors.error,
-                        tooltip: '삭제',
+                        child: Icon(
+                          CupertinoIcons.delete,
+                          color: AppColors.error,
+                        ),
                       ),
                   ],
                 ),

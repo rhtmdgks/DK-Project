@@ -1,10 +1,16 @@
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
+import 'package:myapp/components/apple_button.dart';
+import 'package:myapp/components/apple_navigation_bar.dart';
+import 'package:myapp/components/apple_text_field.dart';
 import 'package:myapp/core/auth/auth_state.dart';
+import 'package:myapp/core/theme/app_resolved_colors.dart';
 import 'package:myapp/core/theme/app_theme.dart';
 import 'package:myapp/core/theme/responsive.dart';
+import 'package:myapp/core/widgets/app_feedback.dart';
+import 'package:myapp/design/glass.dart';
 import 'package:myapp/repositories/opinion_repository.dart';
 import 'package:myapp/services/content_moderation_service.dart';
 
@@ -64,41 +70,46 @@ class _OpinionsScreenState extends State<OpinionsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: AppColors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(CupertinoIcons.back),
-          color: AppColors.textDark,
+    final colors = context.appColors;
+    return GlassScaffold(
+      backgroundColor: colors.background,
+      appBar: AppleNavigationBar(
+        title: '학생 의견 모집',
+        leading: CupertinoButton(
+          padding: EdgeInsets.zero,
           onPressed: () => context.pop(),
+          child: Icon(
+            CupertinoIcons.back,
+            color: AppColors.textDark,
+          ),
         ),
-        title: Text(
-          '학생 의견 모집',
-          style: AppFonts.scaled(context, AppFonts.titleSemiBold)
-              .copyWith(color: AppColors.textDark),
-        ),
-        centerTitle: true,
       ),
       body: SafeArea(
         top: false,
         child: _loading
-            ? const Center(child: CircularProgressIndicator())
+            ? const Center(child: CupertinoActivityIndicator(radius: 12))
             : _error != null
                 ? _buildError()
-                : RefreshIndicator(
-                    onRefresh: _fetch,
-                    child: _campaigns.isEmpty
-                        ? _buildEmpty()
-                        : ListView.separated(
-                            padding: EdgeInsets.all(context.rs(20)),
+                : CustomScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(
+                      parent: BouncingScrollPhysics(),
+                    ),
+                    slivers: [
+                      CupertinoSliverRefreshControl(onRefresh: _fetch),
+                      if (_campaigns.isEmpty)
+                        SliverFillRemaining(child: _buildEmpty())
+                      else
+                        SliverPadding(
+                          padding: EdgeInsets.all(context.rs(20)),
+                          sliver: SliverList.separated(
                             itemCount: _campaigns.length,
                             separatorBuilder: (_, __) =>
                                 SizedBox(height: context.rh(12)),
                             itemBuilder: (context, i) =>
                                 _buildCampaignCard(_campaigns[i]),
                           ),
+                        ),
+                    ],
                   ),
       ),
     );
@@ -117,7 +128,7 @@ class _OpinionsScreenState extends State<OpinionsScreen> {
               textAlign: TextAlign.center,
             ),
             SizedBox(height: context.rh(16)),
-            FilledButton(onPressed: _fetch, child: const Text('다시 시도')),
+            AppleButton(label: '다시 시도', onPressed: _fetch),
           ],
         ),
       ),
@@ -125,7 +136,7 @@ class _OpinionsScreenState extends State<OpinionsScreen> {
   }
 
   Widget _buildEmpty() {
-    return ListView(
+    return Column(
       children: [
         SizedBox(height: context.rh(120)),
         Icon(
@@ -211,9 +222,9 @@ class _OpinionsScreenState extends State<OpinionsScreen> {
                             .copyWith(color: AppColors.success),
                       ),
                     )
-                  : FilledButton(
+                  : AppleButton(
+                      label: '의견 제출',
                       onPressed: () => _showSubmitSheet(campaign),
-                      child: const Text('의견 제출'),
                     ),
             ],
           ),
@@ -229,10 +240,9 @@ class _OpinionsScreenState extends State<OpinionsScreen> {
     final controller = TextEditingController();
     final campaignId = (campaign['id'] ?? '').toString();
 
-    final submitted = await showModalBottomSheet<bool>(
+    final submitted = await GlassSheet.show<bool>(
       context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
+      quality: kAppGlassQuality,
       builder: (sheetContext) {
         var submitting = false;
         return StatefulBuilder(
@@ -260,31 +270,28 @@ class _OpinionsScreenState extends State<OpinionsScreen> {
                         AppFonts.scaled(innerContext, AppFonts.captionRegular),
                   ),
                   SizedBox(height: innerContext.rh(16)),
-                  TextField(
+                  AppleTextField(
                     controller: controller,
+                    placeholder: '의견을 입력해 주세요.',
                     maxLines: 6,
-                    maxLength: 1000,
-                    decoration: const InputDecoration(
-                      hintText: '의견을 입력해 주세요.',
-                    ),
                   ),
                   SizedBox(height: innerContext.rh(12)),
-                  FilledButton(
+                  AppleButton(
+                    label: '익명으로 제출',
+                    fullWidth: true,
+                    loading: submitting,
                     onPressed: submitting
                         ? null
                         : () async {
                             final body = controller.text.trim();
                             if (body.isEmpty) return;
 
-                            // 금칙어 검사 (건의함·채팅과 동일 기준)
                             final moderation =
                                 ContentModerationService.checkText(body);
                             if (moderation.hasAbuse) {
-                              ScaffoldMessenger.of(innerContext).showSnackBar(
-                                const SnackBar(
-                                  content: Text('부적절한 표현이 포함되어 있습니다.'),
-                                  backgroundColor: AppColors.error,
-                                ),
+                              AppFeedback.showError(
+                                innerContext,
+                                '부적절한 표현이 포함되어 있습니다.',
                               );
                               return;
                             }
@@ -302,23 +309,13 @@ class _OpinionsScreenState extends State<OpinionsScreen> {
                             } catch (_) {
                               setSheetState(() => submitting = false);
                               if (innerContext.mounted) {
-                                ScaffoldMessenger.of(innerContext).showSnackBar(
-                                  const SnackBar(
-                                    content: Text(
-                                        '제출에 실패했습니다. 이미 제출했거나 마감된 캠페인일 수 있습니다.'),
-                                    backgroundColor: AppColors.error,
-                                  ),
+                                AppFeedback.showError(
+                                  innerContext,
+                                  '제출에 실패했습니다. 이미 제출했거나 마감된 캠페인일 수 있습니다.',
                                 );
                               }
                             }
                           },
-                    child: submitting
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Text('익명으로 제출'),
                   ),
                 ],
               ),
@@ -333,11 +330,9 @@ class _OpinionsScreenState extends State<OpinionsScreen> {
     if (submitted == true) {
       _fetch();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('의견이 제출되었습니다. 소중한 의견 감사합니다!'),
-            backgroundColor: AppColors.success,
-          ),
+        AppFeedback.showSuccess(
+          context,
+          '의견이 제출되었습니다. 소중한 의견 감사합니다!',
         );
       }
     }

@@ -1,10 +1,16 @@
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
+import 'package:myapp/components/apple_button.dart';
+import 'package:myapp/components/apple_navigation_bar.dart';
+import 'package:myapp/components/apple_text_field.dart';
+import 'package:myapp/core/theme/app_resolved_colors.dart';
 import 'package:myapp/core/theme/app_theme.dart';
 import 'package:myapp/core/theme/responsive.dart';
 import 'package:myapp/core/utils/avatar_url_resolver.dart';
 import 'package:myapp/core/utils/timetable_utils.dart';
+import 'package:myapp/core/widgets/app_feedback.dart';
+import 'package:myapp/design/glass.dart';
 import 'package:myapp/screens/today_classes_viewmodel.dart';
 
 class TodayClassesScreen extends StatefulWidget {
@@ -45,30 +51,38 @@ class _TodayClassesScreenState extends State<TodayClassesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return ListenableBuilder(
       listenable: _vm,
-      builder: (context, _) => Scaffold(
-        backgroundColor: AppColors.background,
+      builder: (context, _) => GlassScaffold(
+        backgroundColor: colors.background,
         appBar: _buildAppBar(),
         body: SafeArea(
           top: false,
-          child: RefreshIndicator(
-            onRefresh: _vm.refresh,
-            child: ListView(
-              padding: EdgeInsets.symmetric(
-                horizontal: context.rs(24),
-                vertical: context.rh(16),
-              ),
-              children: [
-                _buildWeekdayStrip(),
-                SizedBox(height: context.rh(12)),
-                _buildTimetableEditorButton(),
-                SizedBox(height: context.rh(24)),
-                _buildClassList(),
-                SizedBox(height: context.rh(32)),
-                _buildChangeLogsSection(),
-              ],
+          child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(
+              parent: BouncingScrollPhysics(),
             ),
+            slivers: [
+              CupertinoSliverRefreshControl(onRefresh: _vm.refresh),
+              SliverPadding(
+                padding: EdgeInsets.symmetric(
+                  horizontal: context.rs(24),
+                  vertical: context.rh(16),
+                ),
+                sliver: SliverList(
+                  delegate: SliverChildListDelegate([
+                    _buildWeekdayStrip(),
+                    SizedBox(height: context.rh(12)),
+                    _buildTimetableEditorButton(),
+                    SizedBox(height: context.rh(24)),
+                    _buildClassList(),
+                    SizedBox(height: context.rh(32)),
+                    _buildChangeLogsSection(),
+                  ]),
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -78,60 +92,62 @@ class _TodayClassesScreenState extends State<TodayClassesScreen> {
   // ─── AppBar ───
 
   PreferredSizeWidget _buildAppBar() {
-    return AppBar(
-      backgroundColor: AppColors.background,
-      elevation: 0,
-      scrolledUnderElevation: 0,
-      leading: IconButton(
-        icon: const Icon(CupertinoIcons.back),
-        color: AppColors.primaryBlue,
+    return AppleNavigationBar(
+      title: _weekdayTimetableTitle(_vm.selectedDate),
+      transparent: true,
+      leading: CupertinoButton(
+        padding: EdgeInsets.zero,
         onPressed: () => context.pop(),
-      ),
-      title: Text(
-        _weekdayTimetableTitle(_vm.selectedDate),
-        style: AppFonts.scaled(context, AppFonts.titleSemiBold).copyWith(
-          color: AppColors.textDark,
-          fontWeight: FontWeight.w800,
+        child: Icon(
+          CupertinoIcons.back,
+          color: AppColors.primaryBlue,
         ),
       ),
-      centerTitle: false,
-      actions: [
-        Padding(
-          padding: EdgeInsets.only(right: context.rs(16)),
-          child: Container(
-            width: context.rs(40),
-            height: context.rs(40),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: AppColors.primaryBlue.withValues(alpha: 0.1),
-                width: 2,
-              ),
-            ),
-            child: ClipOval(
-              child: Builder(builder: (context) {
-                final resolved = resolveAvatarUrl(_vm.avatarUrl);
-                if (resolved != null && resolved.isNotEmpty) {
-                  return Image.network(
-                    resolved,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Icon(
-                      Icons.person,
-                      color: AppColors.textSecondary,
-                      size: context.rs(24),
-                    ),
-                  );
-                }
-                return Icon(
-                  Icons.person,
-                  color: AppColors.textSecondary,
-                  size: context.rs(24),
-                );
-              }),
-            ),
+      middle: Align(
+        alignment: Alignment.centerLeft,
+        child: Text(
+          _weekdayTimetableTitle(_vm.selectedDate),
+          style: AppFonts.scaled(context, AppFonts.titleSemiBold).copyWith(
+            color: AppColors.textDark,
+            fontWeight: FontWeight.w800,
           ),
         ),
-      ],
+      ),
+      trailing: Padding(
+        padding: EdgeInsets.only(right: context.rs(8)),
+        child: Container(
+          width: context.rs(40),
+          height: context.rs(40),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: AppColors.primaryBlue.withValues(alpha: 0.1),
+              width: 2,
+            ),
+          ),
+          child: ClipOval(
+            child: Builder(builder: (context) {
+              final resolved = resolveAvatarUrl(_vm.avatarUrl);
+              if (resolved != null && resolved.isNotEmpty) {
+                return Image.network(
+                  resolved,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => Icon(
+                    CupertinoIcons.person_fill,
+                    color: AppColors.textSecondary,
+                    size: context.rs(24),
+                  ),
+                );
+              }
+              return Icon(
+                CupertinoIcons.person_fill,
+                color: AppColors.textSecondary,
+                size: context.rs(24),
+              );
+            }),
+          ),
+        ),
+      ),
     );
   }
 
@@ -159,22 +175,28 @@ class _TodayClassesScreenState extends State<TodayClassesScreen> {
             itemBuilder: (context, index) {
               final tab = _weekdayTabs[index];
               final isSelected = selectedWeekday == tab.weekday;
-              return ChoiceChip(
-                selected: isSelected,
-                label: Text('${tab.label}요일'),
-                onSelected: (_) => _vm.selectWeekday(tab.weekday),
-                selectedColor: AppColors.primaryBlue,
-                backgroundColor: AppColors.white,
-                labelStyle: AppFonts.scaled(context, AppFonts.bodyMedium).copyWith(
-                  color: isSelected ? AppColors.white : AppColors.textDark,
-                  fontWeight: FontWeight.w700,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(999),
-                  side: BorderSide(
-                    color: isSelected
-                        ? AppColors.primaryBlue
-                        : AppColors.borderLight,
+              return GestureDetector(
+                onTap: () => _vm.selectWeekday(tab.weekday),
+                child: Container(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: context.rs(16),
+                    vertical: context.rh(10),
+                  ),
+                  decoration: BoxDecoration(
+                    color: isSelected ? AppColors.primaryBlue : AppColors.white,
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(
+                      color: isSelected
+                          ? AppColors.primaryBlue
+                          : AppColors.borderLight,
+                    ),
+                  ),
+                  child: Text(
+                    '${tab.label}요일',
+                    style: AppFonts.scaled(context, AppFonts.bodyMedium).copyWith(
+                      color: isSelected ? AppColors.white : AppColors.textDark,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
               );
@@ -188,10 +210,11 @@ class _TodayClassesScreenState extends State<TodayClassesScreen> {
   Widget _buildTimetableEditorButton() {
     return Align(
       alignment: Alignment.centerRight,
-      child: OutlinedButton.icon(
+      child: AppleButton(
+        label: '개인 시간표 수정',
+        icon: CupertinoIcons.calendar,
+        variant: AppleButtonVariant.secondary,
         onPressed: _showTimetableEditDialog,
-        icon: const Icon(Icons.edit_calendar_outlined, size: 18),
-        label: const Text('개인 시간표 수정'),
       ),
     );
   }
@@ -473,23 +496,26 @@ class _TodayClassesScreenState extends State<TodayClassesScreen> {
                             ),
                           ),
                           SizedBox(width: context.rs(8)),
-                          IconButton(
+                          CupertinoButton(
+                            padding: EdgeInsets.zero,
+                            minimumSize: Size.zero,
                             onPressed: () => _showTimetableEditDialog(initial: item),
-                            icon: const Icon(Icons.edit_outlined),
-                            tooltip: '이 교시 수정',
-                            color: AppColors.textSecondary,
-                            visualDensity: VisualDensity.compact,
+                            child: Icon(
+                              CupertinoIcons.pencil,
+                              color: AppColors.textSecondary,
+                              size: context.rs(20),
+                            ),
                           ),
                           if (isCurrent)
                             _buildStateIcon(
-                              icon: Icons.near_me_rounded,
+                              icon: CupertinoIcons.location_fill,
                               background: AppColors.white,
                               color: AppColors.primaryBlue,
                               shadow: true,
                             ),
                           if (isCompleted)
                             _buildStateIcon(
-                              icon: Icons.check_circle,
+                              icon: CupertinoIcons.check_mark_circled_solid,
                               background:
                                   AppColors.primaryBlue.withValues(alpha: 0.08),
                               color: AppColors.primaryBlue,
@@ -499,7 +525,7 @@ class _TodayClassesScreenState extends State<TodayClassesScreen> {
                             Padding(
                               padding: EdgeInsets.only(top: context.rh(4)),
                               child: Icon(
-                                Icons.schedule_rounded,
+                                CupertinoIcons.time,
                                 size: context.rs(20),
                                 color: AppColors.textSecondary
                                     .withValues(alpha: 0.5),
@@ -514,14 +540,24 @@ class _TodayClassesScreenState extends State<TodayClassesScreen> {
                             Expanded(
                               child: ClipRRect(
                                 borderRadius: BorderRadius.circular(999),
-                                child: LinearProgressIndicator(
-                                  value: _vm.currentClassProgress(item),
-                                  minHeight: context.rh(6),
-                                  backgroundColor:
-                                      AppColors.white.withValues(alpha: 0.5),
-                                  valueColor:
-                                      const AlwaysStoppedAnimation<Color>(
-                                    AppColors.primaryBlue,
+                                child: SizedBox(
+                                  height: context.rh(6),
+                                  child: Stack(
+                                    fit: StackFit.expand,
+                                    children: [
+                                      Container(
+                                        color: AppColors.white
+                                            .withValues(alpha: 0.5),
+                                      ),
+                                      FractionallySizedBox(
+                                        alignment: Alignment.centerLeft,
+                                        widthFactor:
+                                            _vm.currentClassProgress(item),
+                                        child: Container(
+                                          color: AppColors.primaryBlue,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ),
@@ -570,7 +606,7 @@ class _TodayClassesScreenState extends State<TodayClassesScreen> {
         boxShadow: shadow
             ? [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.06),
+                  color: context.appColors.shadow.withValues(alpha: 0.06),
                   offset: const Offset(0, 2),
                   blurRadius: 4,
                 ),
@@ -686,7 +722,7 @@ class _TodayClassesScreenState extends State<TodayClassesScreen> {
               borderRadius: BorderRadius.circular(AppShapes.radiusLarge),
             ),
             child: Icon(
-              Icons.auto_awesome,
+              CupertinoIcons.sparkles,
               color: AppColors.primaryBlue,
               size: context.rs(34),
             ),
@@ -729,7 +765,7 @@ class _TodayClassesScreenState extends State<TodayClassesScreen> {
       child: Column(
         children: [
           Icon(
-            Icons.weekend_outlined,
+            CupertinoIcons.sun_max,
             size: context.rs(44),
             color: AppColors.primaryBlue,
           ),
@@ -770,7 +806,7 @@ class _TodayClassesScreenState extends State<TodayClassesScreen> {
       child: Column(
         children: [
           Icon(
-            Icons.cloud_off_rounded,
+            CupertinoIcons.cloud,
             size: context.rs(44),
             color: AppColors.textSecondary,
           ),
@@ -784,17 +820,10 @@ class _TodayClassesScreenState extends State<TodayClassesScreen> {
             ),
           ),
           SizedBox(height: context.rh(16)),
-          FilledButton.icon(
+          AppleButton(
+            label: '다시 시도',
+            icon: CupertinoIcons.refresh,
             onPressed: _vm.refresh,
-            icon: const Icon(Icons.refresh_rounded, size: 18),
-            label: const Text('다시 시도'),
-            style: FilledButton.styleFrom(
-              backgroundColor: AppColors.primaryBlue,
-              foregroundColor: AppColors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
           ),
         ],
       ),
@@ -811,10 +840,7 @@ class _TodayClassesScreenState extends State<TodayClassesScreen> {
           child: SizedBox(
             width: context.rs(24),
             height: context.rs(24),
-            child: CircularProgressIndicator(
-              strokeWidth: 2,
-              color: AppColors.primaryBlue,
-            ),
+            child: CupertinoActivityIndicator(color: AppColors.primaryBlue),
           ),
         ),
       );
@@ -855,7 +881,7 @@ class _TodayClassesScreenState extends State<TodayClassesScreen> {
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: Icon(
-                  Icons.swap_horiz_rounded,
+                  CupertinoIcons.arrow_right_arrow_left,
                   color: AppColors.white,
                   size: context.rs(24),
                 ),
@@ -966,9 +992,10 @@ class _TodayClassesScreenState extends State<TodayClassesScreen> {
                           ),
                         ],
                         if (index < _vm.changeLogs.length - 2)
-                          Divider(
-                            height: context.rh(20),
+                          Container(
+                            height: 1,
                             color: AppColors.borderLight,
+                            margin: EdgeInsets.only(top: context.rh(8)),
                           ),
                       ],
                     ),
@@ -988,9 +1015,7 @@ class _TodayClassesScreenState extends State<TodayClassesScreen> {
     final periods = TimetableUtils.periodNumbersForDate(_vm.selectedDate);
     if (periods.isEmpty) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('주말은 시간표를 수정할 수 없습니다.')),
-      );
+      AppFeedback.showToast(context, '주말은 시간표를 수정할 수 없습니다.');
       return;
     }
 
@@ -1009,131 +1034,256 @@ class _TodayClassesScreenState extends State<TodayClassesScreen> {
       return null;
     }
 
-    final saved = await showDialog<bool>(
+    Future<void> pickPeriod(
+      BuildContext sheetContext,
+      void Function(void Function()) setSheetState,
+    ) async {
+      var selectedIndex = periods.indexOf(selectedPeriod);
+      if (selectedIndex < 0) selectedIndex = 0;
+
+      await showCupertinoModalPopup<void>(
+        context: sheetContext,
+        builder: (ctx) => Container(
+          height: context.rh(260),
+          color: AppColors.white,
+          child: Column(
+            children: [
+              SizedBox(
+                height: context.rh(44),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    CupertinoButton(
+                      onPressed: () => Navigator.of(ctx).pop(),
+                      child: const Text('취소'),
+                    ),
+                    Text(
+                      '교시',
+                      style: AppFonts.scaled(context, AppFonts.titleMedium),
+                    ),
+                    CupertinoButton(
+                      onPressed: () {
+                        setSheetState(() {
+                          selectedPeriod = periods[selectedIndex];
+                          final target = findEntry(selectedPeriod);
+                          subjectController.text = target?.name ?? '';
+                          roomController.text = target?.location ?? '';
+                          isMovingClass = target?.isMovingClass ?? false;
+                        });
+                        Navigator.of(ctx).pop();
+                      },
+                      child: const Text('완료'),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: CupertinoPicker(
+                  scrollController: FixedExtentScrollController(
+                    initialItem: selectedIndex,
+                  ),
+                  itemExtent: context.rh(36),
+                  onSelectedItemChanged: (index) => selectedIndex = index,
+                  children: [
+                    for (final p in periods) Center(child: Text('$p교시')),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final saved = await GlassSheet.show<bool>(
       context: context,
-      builder: (dialogContext) {
-        bool busy = false;
+      quality: kAppGlassQuality,
+      builder: (sheetContext) {
+        var busy = false;
         return StatefulBuilder(
           builder: (dialogContext, setDialogState) {
             final existing = findEntry(selectedPeriod);
-            return AlertDialog(
-              title: const Text('개인 시간표 수정'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  DropdownButtonFormField<int>(
-                    key: ValueKey<int>(selectedPeriod),
-                    initialValue: selectedPeriod,
-                    items: periods
-                        .map((p) => DropdownMenuItem<int>(
-                              value: p,
-                              child: Text('$p교시'),
-                            ))
-                        .toList(),
-                    onChanged: busy
-                        ? null
-                        : (v) {
-                            if (v == null) return;
-                            setDialogState(() {
-                              selectedPeriod = v;
-                              final target = findEntry(v);
-                              subjectController.text = target?.name ?? '';
-                              roomController.text = target?.location ?? '';
-                              isMovingClass = target?.isMovingClass ?? false;
-                            });
-                          },
-                    decoration: const InputDecoration(labelText: '교시'),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: subjectController,
-                    enabled: !busy,
-                    decoration: const InputDecoration(labelText: '과목'),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: roomController,
-                    enabled: !busy,
-                    decoration: const InputDecoration(labelText: '교실(선택)'),
-                  ),
-                  CheckboxListTile(
-                    value: isMovingClass,
-                    onChanged: busy
-                        ? null
-                        : (v) => setDialogState(
-                              () => isMovingClass = v ?? false,
-                            ),
-                    title: const Text('이동 수업으로 표시'),
-                    subtitle: Text(
-                      '알림 설정에서 「이동 수업 알림」을 켠 경우 이 교시 시작 5분 전에 알림을 보냅니다.',
-                      style: AppFonts.scaled(context, AppFonts.captionMedium)
-                          .copyWith(color: AppColors.textSecondary),
-                    ),
-                    controlAffinity: ListTileControlAffinity.leading,
-                    contentPadding: EdgeInsets.zero,
-                  ),
-                  if (existing != null) ...[
-                    const SizedBox(height: 8),
+            return Padding(
+              padding: EdgeInsets.only(
+                left: dialogContext.rs(22),
+                right: dialogContext.rs(22),
+                top: dialogContext.rh(20),
+                bottom: MediaQuery.of(dialogContext).viewInsets.bottom +
+                    dialogContext.rh(20),
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
                     Text(
-                      '현재 등록: ${existing.name}${existing.location.isNotEmpty ? ' (${existing.location})' : ''}',
-                      style: AppFonts.scaled(context, AppFonts.captionMedium)
-                          .copyWith(color: AppColors.textSecondary),
+                      '개인 시간표 수정',
+                      style: AppFonts.scaled(dialogContext, AppFonts.titleBold),
+                    ),
+                    SizedBox(height: dialogContext.rh(16)),
+                    GestureDetector(
+                      onTap: busy
+                          ? null
+                          : () => pickPeriod(dialogContext, setDialogState),
+                      child: Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: dialogContext.rs(14),
+                          vertical: dialogContext.rh(12),
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppColors.border),
+                        ),
+                        child: Row(
+                          children: [
+                            Text(
+                              '교시',
+                              style: AppFonts.scaled(
+                                dialogContext,
+                                AppFonts.captionRegular,
+                              ),
+                            ),
+                            const Spacer(),
+                            Text('$selectedPeriod교시'),
+                            Icon(
+                              CupertinoIcons.chevron_down,
+                              size: dialogContext.rs(16),
+                              color: AppColors.hint,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    SizedBox(height: dialogContext.rh(12)),
+                    AppleTextField(
+                      controller: subjectController,
+                      placeholder: '과목',
+                      enabled: !busy,
+                    ),
+                    SizedBox(height: dialogContext.rh(12)),
+                    AppleTextField(
+                      controller: roomController,
+                      placeholder: '교실(선택)',
+                      enabled: !busy,
+                    ),
+                    SizedBox(height: dialogContext.rh(8)),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        CupertinoSwitch(
+                          value: isMovingClass,
+                          onChanged: busy
+                              ? null
+                              : (v) => setDialogState(() => isMovingClass = v),
+                        ),
+                        SizedBox(width: dialogContext.rs(8)),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '이동 수업으로 표시',
+                                style: AppFonts.scaled(
+                                  dialogContext,
+                                  AppFonts.bodyMedium,
+                                ),
+                              ),
+                              Text(
+                                '알림 설정에서 「이동 수업 알림」을 켠 경우 이 교시 시작 5분 전에 알림을 보냅니다.',
+                                style: AppFonts.scaled(
+                                  dialogContext,
+                                  AppFonts.captionMedium,
+                                ).copyWith(color: AppColors.textSecondary),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (existing != null) ...[
+                      SizedBox(height: dialogContext.rh(8)),
+                      Text(
+                        '현재 등록: ${existing.name}${existing.location.isNotEmpty ? ' (${existing.location})' : ''}',
+                        style: AppFonts.scaled(
+                          dialogContext,
+                          AppFonts.captionMedium,
+                        ).copyWith(color: AppColors.textSecondary),
+                      ),
+                    ],
+                    SizedBox(height: dialogContext.rh(16)),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: AppleButton(
+                            label: '취소',
+                            variant: AppleButtonVariant.plain,
+                            onPressed: busy
+                                ? null
+                                : () => Navigator.of(sheetContext).pop(false),
+                          ),
+                        ),
+                        if (existing != null) ...[
+                          SizedBox(width: dialogContext.rs(8)),
+                          Expanded(
+                            child: AppleButton(
+                              label: '삭제',
+                              variant: AppleButtonVariant.destructive,
+                              loading: busy,
+                              onPressed: busy
+                                  ? null
+                                  : () async {
+                                      setDialogState(() => busy = true);
+                                      try {
+                                        await _vm.deleteTimetableEntry(
+                                          period: selectedPeriod,
+                                        );
+                                        if (sheetContext.mounted) {
+                                          Navigator.of(sheetContext).pop(true);
+                                        }
+                                      } finally {
+                                        if (dialogContext.mounted) {
+                                          setDialogState(() => busy = false);
+                                        }
+                                      }
+                                    },
+                            ),
+                          ),
+                        ],
+                        SizedBox(width: dialogContext.rs(8)),
+                        Expanded(
+                          child: AppleButton(
+                            label: '저장',
+                            loading: busy,
+                            onPressed: busy
+                                ? null
+                                : () async {
+                                    final subject = subjectController.text.trim();
+                                    if (subject.isEmpty) return;
+                                    setDialogState(() => busy = true);
+                                    try {
+                                      await _vm.upsertTimetableEntry(
+                                        period: selectedPeriod,
+                                        subject: subject,
+                                        room: roomController.text.trim(),
+                                        isMovingClass: isMovingClass,
+                                      );
+                                      if (sheetContext.mounted) {
+                                        Navigator.of(sheetContext).pop(true);
+                                      }
+                                    } finally {
+                                      if (dialogContext.mounted) {
+                                        setDialogState(() => busy = false);
+                                      }
+                                    }
+                                  },
+                          ),
+                        ),
+                      ],
                     ),
                   ],
-                ],
+                ),
               ),
-              actions: [
-                TextButton(
-                  onPressed: busy
-                      ? null
-                      : () => Navigator.of(dialogContext).pop(false),
-                  child: const Text('취소'),
-                ),
-                if (existing != null)
-                  TextButton(
-                    onPressed: busy
-                        ? null
-                        : () async {
-                            setDialogState(() => busy = true);
-                            try {
-                              await _vm.deleteTimetableEntry(period: selectedPeriod);
-                              if (dialogContext.mounted) {
-                                Navigator.of(dialogContext).pop(true);
-                              }
-                            } finally {
-                              if (dialogContext.mounted) {
-                                setDialogState(() => busy = false);
-                              }
-                            }
-                          },
-                    child: const Text('삭제'),
-                  ),
-                FilledButton(
-                  onPressed: busy
-                      ? null
-                      : () async {
-                          final subject = subjectController.text.trim();
-                          if (subject.isEmpty) return;
-                          setDialogState(() => busy = true);
-                          try {
-                            await _vm.upsertTimetableEntry(
-                              period: selectedPeriod,
-                              subject: subject,
-                              room: roomController.text.trim(),
-                              isMovingClass: isMovingClass,
-                            );
-                            if (dialogContext.mounted) {
-                              Navigator.of(dialogContext).pop(true);
-                            }
-                          } finally {
-                            if (dialogContext.mounted) {
-                              setDialogState(() => busy = false);
-                            }
-                          }
-                        },
-                  child: const Text('저장'),
-                ),
-              ],
             );
           },
         );
@@ -1144,9 +1294,7 @@ class _TodayClassesScreenState extends State<TodayClassesScreen> {
     roomController.dispose();
 
     if (saved == true && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('시간표가 저장되었습니다.')),
-      );
+      AppFeedback.showSuccess(context, '시간표가 저장되었습니다.');
     }
   }
 

@@ -1,4 +1,6 @@
-import 'package:flutter/material.dart';
+import 'dart:math' as math;
+
+import 'package:flutter/cupertino.dart';
 import 'package:myapp/core/theme/app_theme.dart';
 import 'package:myapp/core/theme/responsive.dart';
 import 'package:myapp/core/utils/subject_theme_service.dart';
@@ -44,7 +46,7 @@ class ClassTimeLeftWidget extends StatelessWidget {
           borderRadius: BorderRadius.circular(AppShapes.radiusMedium),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.1),
+              color: const Color(0x1A000000),
               offset: const Offset(0, 4),
               blurRadius: 12,
             ),
@@ -102,11 +104,11 @@ class ClassTimeLeftWidget extends StatelessWidget {
                 SizedBox(
                   width: context.rs(48),
                   height: context.rs(48),
-                  child: CircularProgressIndicator(
+                  child: _CircularProgressRing(
                     value: secondsLeft / _durationSeconds,
                     strokeWidth: context.rs(4),
                     backgroundColor: AppColors.white.withValues(alpha: 0.3),
-                    valueColor: const AlwaysStoppedAnimation<Color>(AppColors.white),
+                    foregroundColor: AppColors.white,
                   ),
                 ),
               ],
@@ -146,5 +148,81 @@ class ClassTimeLeftWidget extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+class _CircularProgressRing extends StatelessWidget {
+  const _CircularProgressRing({
+    required this.value,
+    required this.strokeWidth,
+    required this.backgroundColor,
+    required this.foregroundColor,
+  });
+
+  final double value;
+  final double strokeWidth;
+  final Color backgroundColor;
+  final Color foregroundColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      painter: _CircularProgressRingPainter(
+        value: value.clamp(0.0, 1.0),
+        strokeWidth: strokeWidth,
+        backgroundColor: backgroundColor,
+        foregroundColor: foregroundColor,
+      ),
+    );
+  }
+}
+
+class _CircularProgressRingPainter extends CustomPainter {
+  const _CircularProgressRingPainter({
+    required this.value,
+    required this.strokeWidth,
+    required this.backgroundColor,
+    required this.foregroundColor,
+  });
+
+  final double value;
+  final double strokeWidth;
+  final Color backgroundColor;
+  final Color foregroundColor;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = (math.min(size.width, size.height) - strokeWidth) / 2;
+    final rect = Rect.fromCircle(center: center, radius: radius);
+
+    final backgroundPaint = Paint()
+      ..color = backgroundColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.round;
+
+    final foregroundPaint = Paint()
+      ..color = foregroundColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.round;
+
+    canvas.drawArc(rect, 0, math.pi * 2, false, backgroundPaint);
+    canvas.drawArc(
+      rect,
+      -math.pi / 2,
+      math.pi * 2 * value,
+      false,
+      foregroundPaint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _CircularProgressRingPainter oldDelegate) {
+    return oldDelegate.value != value ||
+        oldDelegate.strokeWidth != strokeWidth ||
+        oldDelegate.backgroundColor != backgroundColor ||
+        oldDelegate.foregroundColor != foregroundColor;
   }
 }

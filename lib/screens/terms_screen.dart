@@ -1,6 +1,6 @@
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:myapp/components/apple_button.dart';
 import 'package:go_router/go_router.dart';
 import 'package:myapp/core/routing/app_router.dart';
 import 'package:myapp/core/theme/app_theme.dart';
@@ -100,9 +100,9 @@ class _TermsScreenState extends State<TermsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return CupertinoPageScaffold(
       backgroundColor: AppColors.background,
-      body: SafeArea(
+      child: SafeArea(
         child: Column(
           children: [
             Expanded(
@@ -265,7 +265,7 @@ class _TermsScreenState extends State<TermsScreen> {
         alignment: Alignment.center,
         padding: EdgeInsets.symmetric(horizontal: context.rs(16)),
         decoration: BoxDecoration(
-          color: Colors.transparent,
+          color: const Color(0x00000000),
           borderRadius: BorderRadius.circular(10),
           border: Border.all(color: accentColor, width: 1),
         ),
@@ -297,7 +297,7 @@ class _TermsScreenState extends State<TermsScreen> {
     return SizedBox(
       width: size,
       height: size,
-      child: Icon(Icons.check, size: size, color: checkColor),
+      child: Icon(CupertinoIcons.check_mark, size: size, color: checkColor),
     );
   }
 
@@ -310,7 +310,7 @@ class _TermsScreenState extends State<TermsScreen> {
       child: Container(
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: checked ? color : Colors.transparent,
+          color: checked ? color : const Color(0x00000000),
           border: Border.all(color: color, width: 2),
         ),
         alignment: Alignment.center,
@@ -320,7 +320,7 @@ class _TermsScreenState extends State<TermsScreen> {
                 width: size * 0.5,
                 height: size * 0.5,
                 colorFilter: const ColorFilter.mode(
-                  Colors.white,
+                  AppColors.white,
                   BlendMode.srcIn,
                 ),
               )
@@ -555,30 +555,11 @@ class _TermsScreenState extends State<TermsScreen> {
   /// Next-LAON: 맨 아래 고정, 화살표 없음. "다음" 18px #f8faff
   Widget _buildNextButton(BuildContext context) {
     return SizedBox(
-      width: double.infinity,
       height: context.rh(50),
-      child: FilledButton(
+      child: AppleButton(
+        label: '다음',
+        fullWidth: true,
         onPressed: _canProceed ? _onNext : null,
-        style: FilledButton.styleFrom(
-          backgroundColor:
-              _canProceed ? AppColors.primaryBlue : AppColors.hint,
-          disabledBackgroundColor: AppColors.hint,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(15),
-          ),
-          elevation: 0,
-          padding: EdgeInsets.zero,
-        ),
-        child: Text(
-          '다음',
-          style: TextStyle(
-            fontFamily: AppFonts.fontFamily,
-            fontSize: 18,
-            fontWeight: FontWeight.w500,
-            height: 24 / 18,
-            color: AppColors.background,
-          ),
-        ),
       ),
     );
   }

@@ -1,9 +1,13 @@
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
+import 'package:myapp/components/apple_button.dart';
+import 'package:myapp/components/apple_card.dart';
+import 'package:myapp/components/apple_navigation_bar.dart';
 import 'package:myapp/core/auth/auth_state.dart';
 import 'package:myapp/core/routing/app_router.dart';
+import 'package:myapp/core/theme/app_resolved_colors.dart';
 import 'package:myapp/core/theme/app_theme.dart';
 import 'package:myapp/core/theme/responsive.dart';
 
@@ -50,39 +54,36 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: AppColors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(CupertinoIcons.back),
-          color: AppColors.textDark,
+    final colors = context.appColors;
+    return GlassScaffold(
+      backgroundColor: colors.background,
+      appBar: AppleNavigationBar(
+        title: '내 정보',
+        leading: CupertinoButton(
+          padding: EdgeInsets.zero,
           onPressed: () => context.pop(),
-        ),
-        title: Text(
-          '내 정보',
-          style: AppFonts.scaled(context, AppFonts.titleSemiBold)
-              .copyWith(color: AppColors.textDark),
-        ),
-        centerTitle: true,
-        actions: [
-          IconButton(
-            icon: const Icon(CupertinoIcons.pencil),
+          child: Icon(
+            CupertinoIcons.back,
             color: AppColors.textDark,
-            tooltip: '프로필 편집',
-            onPressed: () async {
-              final changed =
-                  await context.push<bool>(AppRoute.profileEdit.path);
-              if (changed == true) _loadProfile();
-            },
           ),
-        ],
+        ),
+        trailing: CupertinoButton(
+          padding: EdgeInsets.zero,
+          onPressed: () async {
+            final changed =
+                await context.push<bool>(AppRoute.profileEdit.path);
+            if (changed == true) _loadProfile();
+          },
+          child: Icon(
+            CupertinoIcons.pencil,
+            color: AppColors.textDark,
+          ),
+        ),
       ),
       body: SafeArea(
         top: false,
         child: _loading
-            ? const Center(child: CircularProgressIndicator())
+            ? const Center(child: CupertinoActivityIndicator(radius: 12))
             : _error != null
                 ? Center(
                     child: Padding(
@@ -99,9 +100,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             textAlign: TextAlign.center,
                           ),
                           SizedBox(height: context.rh(16)),
-                          FilledButton(
+                          AppleButton(
+                            label: '다시 시도',
                             onPressed: _loadProfile,
-                            child: const Text('다시 시도'),
                           ),
                         ],
                       ),
@@ -142,25 +143,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final avatarUrl = p.avatarUrl;
     final name = p.fullName ?? '이름 없음';
     final initials = name.isNotEmpty ? name[0] : '?';
+    final radius = context.rs(48);
 
     return Center(
       child: Column(
         children: [
-          CircleAvatar(
-            radius: context.rs(48),
-            backgroundColor: AppColors.primaryBlue.withValues(alpha: 0.15),
-            backgroundImage: avatarUrl != null && avatarUrl.isNotEmpty
-                ? NetworkImage(avatarUrl)
-                : null,
-            child: avatarUrl == null || avatarUrl.isEmpty
-                ? Text(
-                    initials,
-                    style: AppFonts.scaled(context, AppFonts.heading1Medium)
-                        .copyWith(
-                            color: AppColors.primaryBlue,
-                            fontWeight: FontWeight.w600),
-                  )
-                : null,
+          ClipOval(
+            child: Container(
+              width: radius * 2,
+              height: radius * 2,
+              color: AppColors.primaryBlue.withValues(alpha: 0.15),
+              child: avatarUrl != null && avatarUrl.isNotEmpty
+                  ? Image.network(avatarUrl, fit: BoxFit.cover)
+                  : Center(
+                      child: Text(
+                        initials,
+                        style: AppFonts.scaled(context, AppFonts.heading1Medium)
+                            .copyWith(
+                          color: AppColors.primaryBlue,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+            ),
           ),
           SizedBox(height: context.rh(16)),
           Text(
@@ -179,10 +184,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final grade = p.gradeOrFromStudentId;
     final classNum = p.classNumOrFromStudentId;
     final numberInClass = p.numberInClassOrFromStudentId;
-    final isTeacher = p.role == 'teacher';
+    final isTeacher = p.isTeacher;
 
     final rows = <Widget>[
-      _buildInfoRow('학번', p.studentId.isEmpty ? '-' : p.studentId),
+      _buildInfoRow('학번', p.displayStudentId.isEmpty ? '-' : p.displayStudentId),
       _buildInfoRow('이름', p.fullName ?? '-'),
     ];
 
@@ -215,20 +220,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       rows.add(_buildInfoRow('목표 대학', p.targetUniversity ?? '-'));
     }
 
-    return Container(
-      padding: EdgeInsets.all(context.rs(20)),
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(AppShapes.radiusLarge),
-        border: Border.all(color: AppColors.borderLight),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            offset: const Offset(0, 2),
-            blurRadius: 8,
-          ),
-        ],
-      ),
+    return AppleCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: rows,
@@ -238,59 +230,40 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   /// 개인 시간표는 [TodayClassesScreen]에서 수정한다.
   Widget _buildTimetableEditCard(BuildContext context) {
-    return Material(
-      color: AppColors.white,
-      borderRadius: BorderRadius.circular(AppShapes.radiusLarge),
-      child: InkWell(
-        onTap: () => context.push(AppRoute.todayClasses.path),
-        borderRadius: BorderRadius.circular(AppShapes.radiusLarge),
-        child: Container(
-          padding: EdgeInsets.all(context.rs(20)),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(AppShapes.radiusLarge),
-            border: Border.all(color: AppColors.borderLight),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.04),
-                offset: const Offset(0, 2),
-                blurRadius: 8,
-              ),
-            ],
+    return AppleCard(
+      onTap: () => context.push(AppRoute.todayClasses.path),
+      child: Row(
+        children: [
+          Icon(
+            CupertinoIcons.calendar,
+            size: context.rs(26),
+            color: AppColors.primaryBlue,
           ),
-          child: Row(
-            children: [
-              Icon(
-                Icons.edit_calendar_outlined,
-                size: context.rs(26),
-                color: AppColors.primaryBlue,
-              ),
-              SizedBox(width: context.rs(16)),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '시간표 수정',
-                      style: AppFonts.scaled(context, AppFonts.titleSemiBold)
-                          .copyWith(color: AppColors.textDark),
-                    ),
-                    SizedBox(height: context.rh(4)),
-                    Text(
-                      '월~금 요일별 과목·교실을 바꾸고, 이동 수업 표시도 할 수 있어요.',
-                      style: AppFonts.scaled(context, AppFonts.captionMedium)
-                          .copyWith(color: AppColors.textSecondary),
-                    ),
-                  ],
+          SizedBox(width: context.rs(16)),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '시간표 수정',
+                  style: AppFonts.scaled(context, AppFonts.titleSemiBold)
+                      .copyWith(color: AppColors.textDark),
                 ),
-              ),
-              Icon(
-                CupertinoIcons.chevron_forward,
-                size: context.rs(18),
-                color: AppColors.textSecondary,
-              ),
-            ],
+                SizedBox(height: context.rh(4)),
+                Text(
+                  '월~금 요일별 과목·교실을 바꾸고, 이동 수업 표시도 할 수 있어요.',
+                  style: AppFonts.scaled(context, AppFonts.captionMedium)
+                      .copyWith(color: AppColors.textSecondary),
+                ),
+              ],
+            ),
           ),
-        ),
+          Icon(
+            CupertinoIcons.chevron_forward,
+            size: context.rs(18),
+            color: AppColors.textSecondary,
+          ),
+        ],
       ),
     );
   }

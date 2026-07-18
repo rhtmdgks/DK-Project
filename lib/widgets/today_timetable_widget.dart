@@ -1,4 +1,5 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
+import 'package:myapp/core/theme/app_resolved_colors.dart';
 import 'package:myapp/core/theme/app_theme.dart';
 import 'package:myapp/core/theme/responsive.dart';
 import 'package:myapp/core/utils/subject_theme_service.dart';
@@ -35,7 +36,7 @@ class TodayTimetableWidget extends StatelessWidget {
           border: Border.all(color: AppColors.border, width: 1),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.06),
+              color: const Color(0x0F000000),
               offset: const Offset(0, 2),
               blurRadius: 8,
             ),
@@ -60,13 +61,9 @@ class TodayTimetableWidget extends StatelessWidget {
             if (loading)
               Expanded(
                 child: Center(
-                  child: SizedBox(
-                    width: context.rs(24),
-                    height: context.rs(24),
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
+                  child: CupertinoActivityIndicator(
+                    radius: context.rs(12),
+                    color: context.appColors.primary,
                   ),
                 ),
               )

@@ -1,6 +1,7 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:intl/intl.dart';
 import 'package:myapp/core/theme/app_motion.dart';
+import 'package:myapp/core/theme/app_resolved_colors.dart';
 import 'package:myapp/core/theme/app_theme.dart';
 import 'package:myapp/core/theme/responsive.dart';
 import 'package:myapp/models/notification_item.dart';
@@ -12,14 +13,14 @@ import 'package:provider/provider.dart';
 /// [showNotificationSideSheet]로 띄우며, 배경 탭 시 또는 닫기 버튼으로 닫힌다.
 void showNotificationSideSheet(BuildContext context) {
   final width = context.screenWidth * 0.85;
-  final maxWidth = 360.0;
+  const maxWidth = 360.0;
   final sheetWidth = width > maxWidth ? maxWidth : width;
 
   showGeneralDialog<void>(
     context: context,
     barrierDismissible: true,
     barrierLabel: '알림',
-    barrierColor: Colors.black54,
+    barrierColor: const Color(0x88000000),
     transitionDuration: AppMotion.overlayDuration,
     transitionBuilder: (context, animation, secondaryAnimation, child) {
       final curve = CurvedAnimation(
@@ -36,32 +37,27 @@ void showNotificationSideSheet(BuildContext context) {
       );
     },
     pageBuilder: (context, animation, secondaryAnimation) {
+      final colors = context.appColors;
       return Align(
         alignment: Alignment.centerRight,
-        child: Material(
-          color: Colors.transparent,
-          child: Container(
-            width: sheetWidth,
-            height: double.infinity,
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surface,
-              borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(AppShapes.radiusLarge),
-                bottomLeft: Radius.circular(AppShapes.radiusLarge),
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Theme.of(context)
-                      .colorScheme
-                      .shadow
-                      .withValues(alpha: 0.08),
-                  offset: const Offset(-2, 0),
-                  blurRadius: 12,
-                ),
-              ],
+        child: Container(
+          width: sheetWidth,
+          height: double.infinity,
+          decoration: BoxDecoration(
+            color: colors.surface,
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(AppShapes.radiusLarge),
+              bottomLeft: Radius.circular(AppShapes.radiusLarge),
             ),
-            child: const _NotificationSideSheetContent(),
+            boxShadow: [
+              BoxShadow(
+                color: colors.shadow.withValues(alpha: 0.08),
+                offset: const Offset(-2, 0),
+                blurRadius: 12,
+              ),
+            ],
           ),
+          child: const _NotificationSideSheetContent(),
         ),
       );
     },
@@ -81,7 +77,7 @@ class _NotificationSideSheetContent extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               _buildHeader(context, provider),
-              Divider(height: 1, color: AppColors.borderLight),
+              Container(height: 1, color: AppColors.borderLight),
               Expanded(
                 child: _buildBody(context, provider),
               ),
@@ -93,6 +89,8 @@ class _NotificationSideSheetContent extends StatelessWidget {
   }
 
   Widget _buildHeader(BuildContext context, NotificationProvider provider) {
+    final colors = context.appColors;
+
     return Padding(
       padding: EdgeInsets.symmetric(
         horizontal: context.rs(20),
@@ -113,35 +111,35 @@ class _NotificationSideSheetContent extends StatelessWidget {
                 vertical: context.rh(2),
               ),
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primary,
+                color: colors.primary,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
                 '${provider.unreadCount}',
                 style: AppFonts.scaled(context, AppFonts.captionMedium)
-                    .copyWith(color: Colors.white),
+                    .copyWith(color: AppColors.white),
               ),
             ),
           ],
           const Spacer(),
           if (provider.notifications.isNotEmpty)
-            TextButton(
+            CupertinoButton(
+              padding: EdgeInsets.zero,
               onPressed: () => provider.markAllAsRead(),
               child: Text(
                 '모두 읽음',
                 style: AppFonts.scaled(context, AppFonts.smallRegular)
-                    .copyWith(color: Theme.of(context).colorScheme.primary),
+                    .copyWith(color: colors.primary),
               ),
             ),
-          IconButton(
+          CupertinoButton(
+            padding: EdgeInsets.zero,
+            minimumSize: Size(context.rs(40), context.rs(40)),
             onPressed: () => Navigator.of(context).pop(),
-            icon: Icon(
-              Icons.close_rounded,
+            child: Icon(
+              CupertinoIcons.xmark,
               size: context.rs(24),
               color: AppColors.textPrimary,
-            ),
-            style: IconButton.styleFrom(
-              minimumSize: Size(context.rs(40), context.rs(40)),
             ),
           ),
         ],
@@ -158,7 +156,7 @@ class _NotificationSideSheetContent extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              Icons.notifications_none_rounded,
+              CupertinoIcons.bell,
               size: context.rs(56),
               color: AppColors.hint,
             ),
@@ -227,6 +225,8 @@ class _NotificationTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
+
     return Dismissible(
       key: Key(notification.id),
       direction: DismissDirection.endToStart,
@@ -235,23 +235,24 @@ class _NotificationTile extends StatelessWidget {
         alignment: Alignment.centerRight,
         padding: EdgeInsets.only(right: context.rs(20)),
         decoration: BoxDecoration(
-          color: Colors.red,
+          color: CupertinoColors.destructiveRed,
           borderRadius: BorderRadius.circular(12),
         ),
         child: Icon(
-          Icons.delete_outline,
-          color: Colors.white,
+          CupertinoIcons.trash,
+          color: AppColors.white,
           size: context.rs(24),
         ),
       ),
-      child: Material(
-        color: notification.read
-            ? Theme.of(context).colorScheme.surface
-            : Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.4),
-        borderRadius: BorderRadius.circular(12),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(12),
+      child: GestureDetector(
+        onTap: onTap,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: notification.read
+                ? colors.surface
+                : colors.primaryContainer.withValues(alpha: 0.4),
+            borderRadius: BorderRadius.circular(12),
+          ),
           child: Padding(
             padding: EdgeInsets.all(context.rs(14)),
             child: Column(

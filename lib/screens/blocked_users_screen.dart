@@ -1,9 +1,10 @@
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:myapp/components/apple_list_tile.dart';
 import 'package:myapp/core/theme/app_theme.dart';
 import 'package:myapp/core/theme/responsive.dart';
+import 'package:myapp/core/widgets/app_feedback.dart';
 import 'package:myapp/repositories/user_block_repository.dart';
 
 class BlockedUsersScreen extends StatefulWidget {
@@ -53,12 +54,7 @@ class _BlockedUsersScreenState extends State<BlockedUsersScreen> {
       await _load();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('차단 해제 실패: $e'),
-          backgroundColor: AppColors.error,
-        ),
-      );
+      AppFeedback.showError(context, '차단 해제 실패: $e');
     }
   }
 
@@ -80,12 +76,9 @@ class _BlockedUsersScreenState extends State<BlockedUsersScreen> {
               .copyWith(color: AppColors.textDark),
         ),
       ),
-      child: Material(
-        type: MaterialType.transparency,
-        child: SafeArea(
-          top: false,
-          child: _buildBody(),
-        ),
+      child: SafeArea(
+        top: false,
+        child: _buildBody(),
       ),
     );
   }
@@ -133,27 +126,27 @@ class _BlockedUsersScreenState extends State<BlockedUsersScreen> {
         vertical: context.rh(16),
       ),
       itemCount: _items.length,
-      separatorBuilder: (_, __) => const Divider(height: 1),
+      separatorBuilder: (_, __) => Container(
+        height: 1,
+        color: AppColors.border,
+      ),
       itemBuilder: (context, index) {
         final item = _items[index];
-        return ListTile(
-          title: Text(
-            item.fullName ?? '이름 없음',
-            style: AppFonts.scaled(context, AppFonts.bodyMedium)
-                .copyWith(color: AppColors.textDark),
-          ),
-          subtitle: Text(
-            item.studentId ?? '',
-            style: AppFonts.scaled(context, AppFonts.captionRegular)
-                .copyWith(color: AppColors.textSecondary),
-          ),
-          trailing: TextButton(
+        return AppleListTile(
+          title: item.fullName ?? '이름 없음',
+          subtitle: item.studentId ?? '',
+          trailing: CupertinoButton(
+            padding: EdgeInsets.zero,
+            minimumSize: Size.zero,
             onPressed: () => _unblock(item.profileId),
-            child: const Text('차단 해제'),
+            child: Text(
+              '차단 해제',
+              style: AppFonts.scaled(context, AppFonts.bodyMedium)
+                  .copyWith(color: AppColors.primaryBlue),
+            ),
           ),
         );
       },
     );
   }
 }
-

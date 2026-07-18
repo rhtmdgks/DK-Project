@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:myapp/core/routing/app_router.dart';
 import 'package:myapp/core/theme/app_motion.dart';
@@ -33,11 +32,11 @@ class _SplashScreenState extends State<SplashScreen>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: AppMotion.emphasisDuration,
+      duration: AppMotion.durationLong2,
     );
     _fadeScale = CurvedAnimation(
       parent: _controller,
-      curve: AppMotion.emphasisCurve,
+      curve: AppMotion.curveEmphasized,
     );
     _controller.forward();
 
@@ -57,14 +56,11 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   Widget build(BuildContext context) {
-    // 아이콘 크기를 화면 비율에 맞게 스케일링
     final iconSize = context.rmin(80);
 
     return CupertinoPageScaffold(
       backgroundColor: AppColors.background,
-      child: Material(
-        type: MaterialType.transparency,
-        child: Center(
+      child: Center(
         child: FadeTransition(
           opacity: _fadeScale,
           child: ScaleTransition(
@@ -73,7 +69,6 @@ class _SplashScreenState extends State<SplashScreen>
           ),
         ),
       ),
-    ),
     );
   }
 }

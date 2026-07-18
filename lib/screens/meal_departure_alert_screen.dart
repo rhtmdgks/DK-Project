@@ -1,11 +1,16 @@
 import 'dart:io';
+
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:home_widget/home_widget.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
+import 'package:myapp/components/apple_button.dart';
+import 'package:myapp/components/apple_navigation_bar.dart';
 import 'package:myapp/core/auth/auth_state.dart';
+import 'package:myapp/core/theme/app_resolved_colors.dart';
 import 'package:myapp/core/theme/app_theme.dart';
 import 'package:myapp/core/theme/responsive.dart';
+import 'package:myapp/core/widgets/app_feedback.dart';
 import 'package:myapp/services/meal_departure_alert_sender_service.dart';
 
 /// 급식 출발 알림 전송 화면.
@@ -16,7 +21,8 @@ class MealDepartureAlertScreen extends StatefulWidget {
   const MealDepartureAlertScreen({super.key});
 
   @override
-  State<MealDepartureAlertScreen> createState() => _MealDepartureAlertScreenState();
+  State<MealDepartureAlertScreen> createState() =>
+      _MealDepartureAlertScreenState();
 }
 
 class _MealDepartureAlertScreenState extends State<MealDepartureAlertScreen> {
@@ -36,10 +42,10 @@ class _MealDepartureAlertScreenState extends State<MealDepartureAlertScreen> {
   Future<void> _checkRole() async {
     final profile = await getCurrentProfile();
     if (!mounted) return;
-    final role = profile?.role;
     setState(() {
       _loading = false;
-      _allowed = role == 'council' || role == 'teacher';
+      _allowed =
+          profile != null && (profile.hasCouncilRole || profile.isTeacher);
     });
   }
 
@@ -66,68 +72,32 @@ class _MealDepartureAlertScreenState extends State<MealDepartureAlertScreen> {
         _sending = false;
         _lastResult = '$_grade학년 $_classNumber반 급식 출발 알림이 전송되었습니다.$fcmText';
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(_lastResult!),
-          backgroundColor: AppColors.success,
-          duration: const Duration(seconds: 3),
-        ),
-      );
+      AppFeedback.showSuccess(context, _lastResult!);
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _sending = false;
         _lastResult = '전송 실패: $e';
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(_lastResult!),
-          backgroundColor: AppColors.error,
-          duration: const Duration(seconds: 4),
-        ),
-      );
+      AppFeedback.showError(context, _lastResult!);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
+
     if (_loading) {
-      return Scaffold(
-        backgroundColor: AppColors.background,
-        appBar: AppBar(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          leading: CupertinoButton(
-            padding: EdgeInsets.zero,
-            onPressed: () => Navigator.of(context).pop(),
-            child: SvgPicture.asset(
-              'assets/images/icon_back_arrow.svg',
-              width: context.rs(12),
-              height: context.rs(22),
-              fit: BoxFit.contain,
-            ),
-          ),
-        ),
-        body: const Center(child: CircularProgressIndicator()),
+      return GlassScaffold(
+        backgroundColor: colors.background,
+        appBar: _buildAppBar(context),
+        body: const Center(child: CupertinoActivityIndicator(radius: 12)),
       );
     }
     if (!_allowed) {
-      return Scaffold(
-        backgroundColor: AppColors.background,
-        appBar: AppBar(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          leading: CupertinoButton(
-            padding: EdgeInsets.zero,
-            onPressed: () => Navigator.of(context).pop(),
-            child: SvgPicture.asset(
-              'assets/images/icon_back_arrow.svg',
-              width: context.rs(12),
-              height: context.rs(22),
-              fit: BoxFit.contain,
-            ),
-          ),
-        ),
+      return GlassScaffold(
+        backgroundColor: colors.background,
+        appBar: _buildAppBar(context),
         body: Center(
           child: Padding(
             padding: EdgeInsets.all(context.rs(24)),
@@ -140,26 +110,10 @@ class _MealDepartureAlertScreenState extends State<MealDepartureAlertScreen> {
         ),
       );
     }
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: CupertinoButton(
-          padding: EdgeInsets.zero,
-          onPressed: () => Navigator.of(context).pop(),
-          child: SvgPicture.asset(
-            'assets/images/icon_back_arrow.svg',
-            width: context.rs(12),
-            height: context.rs(22),
-            fit: BoxFit.contain,
-          ),
-        ),
-        title: Text(
-          '급식 출발 알림',
-          style: AppFonts.scaled(context, _Styles.pageTitle),
-        ),
-      ),
+
+    return GlassScaffold(
+      backgroundColor: colors.background,
+      appBar: _buildAppBar(context),
       body: SafeArea(
         child: ListView(
           padding: EdgeInsets.symmetric(horizontal: context.rs(24)),
@@ -183,38 +137,25 @@ class _MealDepartureAlertScreenState extends State<MealDepartureAlertScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _buildSelectRow('학년', _grade, _grades, (v) => setState(() => _grade = v)),
+                  _buildSelectRow(
+                    '학년',
+                    _grade,
+                    _grades,
+                    (v) => setState(() => _grade = v),
+                  ),
                   SizedBox(height: context.rh(16)),
-                  _buildSelectRow('반', _classNumber, _classes, (v) => setState(() => _classNumber = v)),
+                  _buildSelectRow(
+                    '반',
+                    _classNumber,
+                    _classes,
+                    (v) => setState(() => _classNumber = v),
+                  ),
                   SizedBox(height: context.rh(24)),
-                  SizedBox(
-                    height: context.rh(52),
-                    child: FilledButton(
-                      onPressed: _sending ? null : _send,
-                      style: FilledButton.styleFrom(
-                        backgroundColor: Theme.of(context).colorScheme.primary,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(context.rs(16)),
-                        ),
-                      ),
-                      child: _sending
-                          ? SizedBox(
-                              width: context.rs(24),
-                              height: context.rs(24),
-                              child: const CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
-                          : Text(
-                              '급식 출발 알림 보내기',
-                              style: AppFonts.scaled(context, AppFonts.titleSemiBold).copyWith(
-                                color: Colors.white,
-                                fontSize: context.rs(16),
-                              ),
-                            ),
-                    ),
+                  AppleButton(
+                    label: '급식 출발 알림 보내기',
+                    fullWidth: true,
+                    loading: _sending,
+                    onPressed: _sending ? null : _send,
                   ),
                 ],
               ),
@@ -239,7 +180,26 @@ class _MealDepartureAlertScreenState extends State<MealDepartureAlertScreen> {
     );
   }
 
-  /// 학생회·교사 전용: 홈 화면 위젯 추가 카드 (Android만 지원)
+  PreferredSizeWidget _buildAppBar(BuildContext context) {
+    return AppleNavigationBar(
+      title: '급식 출발 알림',
+      middle: Text(
+        '급식 출발 알림',
+        style: AppFonts.scaled(context, _Styles.pageTitle),
+      ),
+      leading: CupertinoButton(
+        padding: EdgeInsets.zero,
+        onPressed: () => Navigator.of(context).pop(),
+        child: SvgPicture.asset(
+          'assets/images/icon_back_arrow.svg',
+          width: context.rs(12),
+          height: context.rs(22),
+          fit: BoxFit.contain,
+        ),
+      ),
+    );
+  }
+
   Widget _buildWidgetCard(BuildContext context) {
     return Container(
       padding: EdgeInsets.all(context.rs(16)),
@@ -266,60 +226,37 @@ class _MealDepartureAlertScreenState extends State<MealDepartureAlertScreen> {
             ),
           ),
           SizedBox(height: context.rh(12)),
-          SizedBox(
-            height: context.rh(44),
-            child: FilledButton(
-              onPressed: () async {
-                final supported = await HomeWidget.isRequestPinWidgetSupported();
-                if (supported != true) {
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('이 기기에서는 위젯 추가를 지원하지 않아요.'),
-                      ),
-                    );
-                  }
-                  return;
-                }
-                try {
-                  await HomeWidget.requestPinWidget(
-                    qualifiedAndroidName:
-                        'com.goodwill.laon.glance.MealDepartureWidgetReceiver',
+          AppleButton(
+            label: '위젯 추가',
+            fullWidth: true,
+            onPressed: () async {
+              final supported = await HomeWidget.isRequestPinWidgetSupported();
+              if (supported != true) {
+                if (context.mounted) {
+                  AppFeedback.showToast(
+                    context,
+                    '이 기기에서는 위젯 추가를 지원하지 않아요.',
                   );
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('위젯을 추가할 수 있는 화면으로 이동했어요.'),
-                        backgroundColor: AppColors.success,
-                      ),
-                    );
-                  }
-                } catch (e) {
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('위젯 추가 실패: $e'),
-                        backgroundColor: AppColors.error,
-                      ),
-                    );
-                  }
                 }
-              },
-              style: FilledButton.styleFrom(
-                backgroundColor: Theme.of(context).colorScheme.primary,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(context.rs(12)),
-                ),
-              ),
-              child: Text(
-                '위젯 추가',
-                style: AppFonts.scaled(context, AppFonts.titleMedium).copyWith(
-                  color: Colors.white,
-                  fontSize: context.rs(14),
-                ),
-              ),
-            ),
+                return;
+              }
+              try {
+                await HomeWidget.requestPinWidget(
+                  qualifiedAndroidName:
+                      'com.goodwill.laon.glance.MealDepartureWidgetReceiver',
+                );
+                if (context.mounted) {
+                  AppFeedback.showSuccess(
+                    context,
+                    '위젯을 추가할 수 있는 화면으로 이동했어요.',
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  AppFeedback.showError(context, '위젯 추가 실패: $e');
+                }
+              }
+            },
           ),
         ],
       ),
@@ -344,31 +281,95 @@ class _MealDepartureAlertScreenState extends State<MealDepartureAlertScreen> {
           ),
         ),
         Expanded(
-          child: Container(
-            padding: EdgeInsets.symmetric(horizontal: context.rs(12)),
-            decoration: BoxDecoration(
-              color: AppColors.white,
-              borderRadius: BorderRadius.circular(context.rs(12)),
-              border: Border.all(color: AppColors.border),
-            ),
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<int>(
-                value: value,
-                isExpanded: true,
-                items: options
-                    .map((v) => DropdownMenuItem(
-                          value: v,
-                          child: Text('$v'),
-                        ))
-                    .toList(),
-                onChanged: (v) {
-                  if (v != null) onChanged(v);
-                },
+          child: GestureDetector(
+            onTap: () => _showPicker(label, value, options, onChanged),
+            child: Container(
+              padding: EdgeInsets.symmetric(
+                horizontal: context.rs(12),
+                vertical: context.rh(12),
+              ),
+              decoration: BoxDecoration(
+                color: AppColors.white,
+                borderRadius: BorderRadius.circular(context.rs(12)),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      '$value',
+                      style: AppFonts.scaled(context, AppFonts.bodyRegular),
+                    ),
+                  ),
+                  const Icon(
+                    CupertinoIcons.chevron_down,
+                    size: 16,
+                    color: AppColors.hint,
+                  ),
+                ],
               ),
             ),
           ),
         ),
       ],
+    );
+  }
+
+  Future<void> _showPicker(
+    String label,
+    int currentValue,
+    List<int> options,
+    ValueChanged<int> onChanged,
+  ) async {
+    var selectedIndex = options.indexOf(currentValue);
+    if (selectedIndex < 0) selectedIndex = 0;
+
+    await showCupertinoModalPopup<void>(
+      context: context,
+      builder: (ctx) => Container(
+        height: context.rh(260),
+        color: AppColors.white,
+        child: Column(
+          children: [
+            SizedBox(
+              height: context.rh(44),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  CupertinoButton(
+                    onPressed: () => Navigator.of(ctx).pop(),
+                    child: const Text('취소'),
+                  ),
+                  Text(
+                    label,
+                    style: AppFonts.scaled(context, AppFonts.titleMedium),
+                  ),
+                  CupertinoButton(
+                    onPressed: () {
+                      onChanged(options[selectedIndex]);
+                      Navigator.of(ctx).pop();
+                    },
+                    child: const Text('완료'),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: CupertinoPicker(
+                scrollController: FixedExtentScrollController(
+                  initialItem: selectedIndex,
+                ),
+                itemExtent: context.rh(36),
+                onSelectedItemChanged: (index) => selectedIndex = index,
+                children: [
+                  for (final option in options)
+                    Center(child: Text('$option')),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

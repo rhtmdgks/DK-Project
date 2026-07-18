@@ -1,8 +1,8 @@
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:myapp/core/supabase_client.dart';
 import 'package:myapp/core/theme/app_motion.dart';
+import 'package:myapp/core/widgets/app_feedback.dart';
 import 'package:myapp/core/widgets/dismiss_keyboard.dart';
 import 'package:myapp/core/theme/app_theme.dart';
 import 'package:myapp/core/theme/responsive.dart';
@@ -150,8 +150,8 @@ class _SuggestionsChatScreenState extends State<SuggestionsChatScreen> {
       if (_scrollController.hasClients) {
         _scrollController.animateTo(
           _scrollController.position.maxScrollExtent,
-          duration: AppMotion.effectDuration,
-          curve: AppMotion.effectCurve,
+          duration: AppMotion.durationMedium1,
+          curve: AppMotion.curveStandard,
         );
       }
     });
@@ -163,13 +163,9 @@ class _SuggestionsChatScreenState extends State<SuggestionsChatScreen> {
 
     final moderation = ContentModerationService.checkText(content);
     if (moderation.hasAbuse) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            '부적절한 표현이 포함되어 있어 메시지를 보낼 수 없습니다. 표현을 수정해 주세요.',
-          ),
-          backgroundColor: AppColors.error,
-        ),
+      AppFeedback.showError(
+        context,
+        '부적절한 표현이 포함되어 있어 메시지를 보낼 수 없습니다. 표현을 수정해 주세요.',
       );
       return;
     }
@@ -194,19 +190,13 @@ class _SuggestionsChatScreenState extends State<SuggestionsChatScreen> {
       if (!mounted) return;
       final msg = e.toString().toLowerCase();
       if (msg.contains('message_blocked')) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              '부적절한 표현이 포함되어 있어 메시지를 보낼 수 없습니다. 표현을 수정해 주세요.',
-            ),
-            backgroundColor: AppColors.error,
-          ),
+        AppFeedback.showError(
+          context,
+          '부적절한 표현이 포함되어 있어 메시지를 보낼 수 없습니다. 표현을 수정해 주세요.',
         );
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('전송 실패: $e')),
-      );
+      AppFeedback.showError(context, '전송 실패: $e');
     }
   }
 
@@ -234,14 +224,11 @@ class _SuggestionsChatScreenState extends State<SuggestionsChatScreen> {
               .copyWith(color: AppColors.textDark),
         ),
       ),
-      child: Material(
-        type: MaterialType.transparency,
-        child: Column(
-          children: [
-            Expanded(child: _buildBody()),
-            _buildInputBar(),
-          ],
-        ),
+      child: Column(
+        children: [
+          Expanded(child: _buildBody()),
+          _buildInputBar(),
+        ],
       ),
       ),
     );
@@ -487,20 +474,10 @@ class _SuggestionsChatScreenState extends State<SuggestionsChatScreen> {
         reason: selected,
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('신고가 접수되었습니다.'),
-          backgroundColor: AppColors.success,
-        ),
-      );
+      AppFeedback.showSuccess(context, '신고가 접수되었습니다.');
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('신고 중 오류가 발생했습니다: $e'),
-          backgroundColor: AppColors.error,
-        ),
-      );
+      AppFeedback.showError(context, '신고 중 오류가 발생했습니다: $e');
     }
   }
 
@@ -510,20 +487,10 @@ class _SuggestionsChatScreenState extends State<SuggestionsChatScreen> {
       await _loadBlockedUsers();
       await _fetchMessages();
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('해당 사용자를 차단했습니다.'),
-          backgroundColor: AppColors.success,
-        ),
-      );
+      AppFeedback.showSuccess(context, '해당 사용자를 차단했습니다.');
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('차단 중 오류가 발생했습니다: $e'),
-          backgroundColor: AppColors.error,
-        ),
-      );
+      AppFeedback.showError(context, '차단 중 오류가 발생했습니다: $e');
     }
   }
 }

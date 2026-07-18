@@ -1,5 +1,4 @@
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:go_router/go_router.dart';
@@ -60,12 +59,9 @@ class _TermsOfServiceScreenState extends State<TermsOfServiceScreen> {
               .copyWith(color: AppColors.textDark),
         ),
       ),
-      child: Material(
-        type: MaterialType.transparency,
-        child: SafeArea(
-          top: false,
-          child: _buildBody(),
-        ),
+      child: SafeArea(
+        top: false,
+        child: _buildBody(),
       ),
     );
   }
@@ -114,7 +110,6 @@ class _TermsOfServiceScreenState extends State<TermsOfServiceScreen> {
           listBullet: AppFonts.scaled(context, AppFonts.bodyRegular),
           tableHead: AppFonts.scaled(context, AppFonts.smallMedium),
           tableBody: AppFonts.scaled(context, AppFonts.smallRegular),
-          tableBorder: TableBorder.all(color: AppColors.border),
           blockquote: AppFonts.scaled(context, AppFonts.bodyRegular)
               .copyWith(color: AppColors.textSecondary),
           horizontalRuleDecoration: BoxDecoration(

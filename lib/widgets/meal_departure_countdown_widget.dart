@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:myapp/core/theme/app_theme.dart';
 import 'package:myapp/core/theme/responsive.dart';
 
@@ -34,7 +34,7 @@ class MealDepartureCountdownWidget extends StatelessWidget {
           borderRadius: BorderRadius.circular(AppShapes.radiusMedium),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.1),
+              color: const Color(0x1A000000),
               offset: const Offset(0, 4),
               blurRadius: 12,
             ),

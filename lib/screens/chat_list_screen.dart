@@ -1,5 +1,4 @@
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:myapp/core/auth/auth_repository.dart';
 import 'package:myapp/core/routing/app_router.dart';
@@ -138,9 +137,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
               .copyWith(color: AppColors.textDark),
         ),
       ),
-      child: Material(
-        type: MaterialType.transparency,
-        child: AsyncBody(
+      child: AsyncBody(
         loading: _loading,
         error: _error,
         isEmpty: _rooms.isEmpty,
@@ -186,7 +183,6 @@ class _ChatListScreenState extends State<ChatListScreen> {
           ],
         ),
       ),
-    ),
     );
   }
 }

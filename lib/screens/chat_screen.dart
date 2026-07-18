@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -10,6 +9,7 @@ import 'package:myapp/core/auth/auth_repository.dart';
 import 'package:myapp/core/supabase_client.dart';
 import 'package:myapp/core/utils/avatar_url_resolver.dart';
 import 'package:myapp/core/theme/app_motion.dart';
+import 'package:myapp/core/widgets/app_feedback.dart';
 import 'package:myapp/core/widgets/dismiss_keyboard.dart';
 import 'package:myapp/core/theme/app_theme.dart';
 import 'package:myapp/core/theme/responsive.dart';
@@ -303,8 +303,8 @@ class _ChatScreenState extends State<ChatScreen> {
       if (_scrollController.hasClients) {
         _scrollController.animateTo(
           _scrollController.position.maxScrollExtent,
-          duration: AppMotion.effectDuration,
-          curve: AppMotion.effectCurve,
+          duration: AppMotion.durationMedium1,
+          curve: AppMotion.curveStandard,
         );
       }
     });
@@ -561,20 +561,10 @@ class _ChatScreenState extends State<ChatScreen> {
         reason: selected,
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('신고가 접수되었습니다.'),
-          backgroundColor: AppColors.success,
-        ),
-      );
+      AppFeedback.showSuccess(context, '신고가 접수되었습니다.');
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('신고 중 오류가 발생했습니다: $e'),
-          backgroundColor: AppColors.error,
-        ),
-      );
+      AppFeedback.showError(context, '신고 중 오류가 발생했습니다: $e');
     }
   }
 
@@ -584,20 +574,10 @@ class _ChatScreenState extends State<ChatScreen> {
       await _loadBlockedUsers();
       await _fetchMessages();
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('해당 사용자를 차단했습니다.'),
-          backgroundColor: AppColors.success,
-        ),
-      );
+      AppFeedback.showSuccess(context, '해당 사용자를 차단했습니다.');
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('차단 중 오류가 발생했습니다: $e'),
-          backgroundColor: AppColors.error,
-        ),
-      );
+      AppFeedback.showError(context, '차단 중 오류가 발생했습니다: $e');
     }
   }
 
@@ -622,16 +602,13 @@ class _ChatScreenState extends State<ChatScreen> {
               .copyWith(color: AppColors.textDark),
         ),
       ),
-      child: Material(
-        type: MaterialType.transparency,
-        child: Column(
-          children: [
-            Expanded(
-              child: DismissKeyboard(child: _buildBody()),
-            ),
-            _buildInputBar(),
-          ],
-        ),
+      child: Column(
+        children: [
+          Expanded(
+            child: DismissKeyboard(child: _buildBody()),
+          ),
+          _buildInputBar(),
+        ],
       ),
     );
   }
@@ -747,7 +724,9 @@ class _ChatScreenState extends State<ChatScreen> {
       padding: EdgeInsets.symmetric(vertical: context.rh(16)),
       child: Row(
         children: [
-          Expanded(child: Divider(color: AppColors.border, height: 1)),
+          Expanded(
+            child: Container(height: 1, color: AppColors.border),
+          ),
           Padding(
             padding: EdgeInsets.symmetric(horizontal: context.rs(12)),
             child: Text(
@@ -756,7 +735,9 @@ class _ChatScreenState extends State<ChatScreen> {
                   .copyWith(color: AppColors.textSecondary),
             ),
           ),
-          Expanded(child: Divider(color: AppColors.border, height: 1)),
+          Expanded(
+            child: Container(height: 1, color: AppColors.border),
+          ),
         ],
       ),
     );

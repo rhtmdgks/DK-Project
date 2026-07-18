@@ -1,12 +1,15 @@
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:myapp/components/apple_list_tile.dart';
+import 'package:myapp/components/apple_modal.dart';
 import 'package:myapp/core/auth/auth_repository.dart';
 import 'package:myapp/core/auth/auth_state.dart';
 import 'package:myapp/core/routing/app_router.dart';
+import 'package:myapp/core/theme/app_theme_mode.dart';
+import 'package:myapp/core/widgets/app_feedback.dart';
 import 'package:myapp/providers/user_preferences_provider.dart';
 import 'package:myapp/repositories/account_repository.dart';
 import 'package:myapp/repositories/notification_settings_repository.dart';
@@ -46,7 +49,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
   };
 
   /// 학생회(council)·교사(teacher)만 급식 출발 알림 발송 메뉴 노출 및 일부 메뉴 제어
-  String? _role;
+  AppProfile? _profile;
+
+  /// 급식 출발 알림 발송 메뉴 노출 여부 (학생회 보직·교사, admin 미포함 — 기존 동작 유지).
+  bool get _canSendMealDeparture =>
+      (_profile?.hasCouncilRole ?? false) || (_profile?.isTeacher ?? false);
 
   bool _deletingAccount = false;
 
@@ -60,7 +67,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _loadProfile() async {
     final profile = await getCurrentProfile();
     if (!mounted) return;
-    setState(() => _role = profile?.role);
+    setState(() => _profile = profile);
   }
 
   Future<void> _loadToggles() async {
@@ -91,12 +98,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
         if (!notificationGranted) {
           if (mounted) {
             setState(() => _toggles[key] = false);
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('알림 권한이 필요합니다. 앱이 꺼져있어도 알림을 받으려면 설정에서 알림 권한을 허용해주세요.'),
-                backgroundColor: AppColors.error,
-                duration: Duration(seconds: 4),
-              ),
+            AppFeedback.showError(
+              context,
+              '알림 권한이 필요합니다. 앱이 꺼져있어도 알림을 받으려면 설정에서 알림 권한을 허용해주세요.',
             );
           }
           return;
@@ -128,12 +132,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
           if (mounted) setState(() => _toggles[key] = false);
           await NotificationSettingsRepository.instance.setWeatherEnabled(false);
           if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(e.toString().replaceAll('Exception: ', '')),
-              backgroundColor: AppColors.error,
-              duration: const Duration(seconds: 3),
-            ),
+          AppFeedback.showError(
+            context,
+            e.toString().replaceAll('Exception: ', ''),
           );
         }
       } else {
@@ -183,9 +184,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           style: AppFonts.scaled(context, _Styles.pageTitle),
         ),
       ),
-      child: Material(
-        type: MaterialType.transparency,
-        child: SafeArea(
+      child: SafeArea(
           child: ListView(
             padding: EdgeInsets.symmetric(horizontal: context.rs(16)),
             children: [
@@ -207,7 +206,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ],
           ),
       ),
-    ),
     );
   }
 
@@ -243,7 +241,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             children: [
               _buildNotificationItem(
                 key: 'meal',
-                icon: Icons.shopping_cart_rounded,
+                icon: CupertinoIcons.cart,
                 iconColor: const Color(0xFFFF9F43),
                 title: '급식 출발 알림',
                 description: '내 반 급식 출발 시간에 알림이 가요!',
@@ -251,7 +249,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               _buildItemDivider(),
               _buildNotificationItem(
                 key: 'schedule',
-                icon: Icons.event_available_rounded,
+                icon: CupertinoIcons.calendar,
                 iconColor: const Color(0xFF4A90D9),
                 title: '일정 알림',
                 description: '캘린더에 추가된 일정이 아침 8시에 알림이 가요!',
@@ -259,7 +257,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               _buildItemDivider(),
               _buildNotificationItem(
                 key: 'class_move',
-                icon: Icons.school_rounded,
+                icon: CupertinoIcons.book,
                 iconColor: const Color(0xFF4CAF50),
                 title: '이동 수업 알림',
                 description: '시간표에 설정한 이동 수업 5분 전에 알림이 가요!',
@@ -267,7 +265,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               _buildItemDivider(),
               _buildNotificationItem(
                 key: 'notice',
-                icon: Icons.notifications_rounded,
+                icon: CupertinoIcons.bell,
                 iconColor: const Color(0xFFFFC107),
                 title: '공지사항 알림',
                 description: '공지사항에 추가된 내용에 알림이 가요!',
@@ -275,7 +273,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               _buildItemDivider(),
               _buildNotificationItem(
                 key: 'weather',
-                icon: Icons.cloud_rounded,
+                icon: CupertinoIcons.cloud,
                 iconColor: const Color(0xFF9C7CDB),
                 title: '날씨 알림',
                 description:
@@ -349,11 +347,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _buildToggle(bool isOn, VoidCallback onTap) {
-    return Switch(
+    return CupertinoSwitch(
       value: isOn,
       onChanged: (_) => onTap(),
-      activeTrackColor: AppColors.primaryBlue.withValues(alpha: 0.5),
-      activeThumbColor: AppColors.primaryBlue,
+      activeTrackColor: AppColors.primaryBlue,
     );
   }
 
@@ -371,9 +368,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   // ── 표시 설정 섹션 (다크모드·글자 크기) ──
 
   static const _themeModeLabels = {
-    ThemeMode.system: '시스템 설정',
-    ThemeMode.light: '라이트',
-    ThemeMode.dark: '다크',
+    AppThemeMode.system: '시스템 설정',
+    AppThemeMode.light: '라이트',
+    AppThemeMode.dark: '다크',
   };
 
   static const _fontScaleLabels = ['작게', '기본', '크게', '아주 크게'];
@@ -401,14 +398,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
           child: Column(
             children: [
               _buildLinkItem(
-                icon: Icons.dark_mode_rounded,
+                icon: CupertinoIcons.moon,
                 iconColor: const Color(0xFF5C6BC0),
                 title: '다크 모드 · ${_themeModeLabels[prefs.themeMode]}',
                 onTap: () => _showThemeModeSheet(prefs),
               ),
               _buildItemDivider(),
               _buildLinkItem(
-                icon: Icons.format_size_rounded,
+                icon: CupertinoIcons.textformat_size,
                 iconColor: const Color(0xFF26A69A),
                 title:
                     '글자 크기 · ${_fontScaleLabelFor(prefs.fontScale)}',
@@ -427,52 +424,65 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _showThemeModeSheet(UserPreferencesProvider prefs) {
-    showModalBottomSheet<void>(
+    AppleModal.showBottomSheetPage<void>(
       context: context,
-      builder: (sheetContext) => SafeArea(
-        child: RadioGroup<ThemeMode>(
-          groupValue: prefs.themeMode,
-          onChanged: (v) {
-            if (v != null) prefs.setThemeMode(v);
-            Navigator.of(sheetContext).pop();
-          },
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              for (final mode in ThemeMode.values)
-                RadioListTile<ThemeMode>(
-                  value: mode,
-                  title: Text(_themeModeLabels[mode]!),
-                ),
-            ],
-          ),
+      heightFactor: 0.35,
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final mode in AppThemeMode.values)
+              AppleListTile(
+                title: _themeModeLabels[mode]!,
+                trailing: prefs.themeMode == mode
+                    ? const Icon(
+                        CupertinoIcons.check_mark,
+                        size: 18,
+                        color: AppColors.primaryBlue,
+                      )
+                    : null,
+                onTap: () {
+                  prefs.setThemeMode(mode);
+                  Navigator.of(context).pop();
+                },
+              ),
+          ],
         ),
       ),
     );
   }
 
   void _showFontScaleSheet(UserPreferencesProvider prefs) {
-    showModalBottomSheet<void>(
+    AppleModal.showBottomSheetPage<void>(
       context: context,
-      builder: (sheetContext) => SafeArea(
-        child: RadioGroup<double>(
-          groupValue: prefs.fontScale,
-          onChanged: (v) {
-            if (v != null) prefs.setFontScale(v);
-            Navigator.of(sheetContext).pop();
-          },
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              for (var i = 0;
-                  i < UserPreferencesRepository.fontScaleSteps.length;
-                  i++)
-                RadioListTile<double>(
-                  value: UserPreferencesRepository.fontScaleSteps[i],
-                  title: Text(_fontScaleLabels[i]),
-                ),
-            ],
-          ),
+      heightFactor: 0.45,
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (var i = 0;
+                i < UserPreferencesRepository.fontScaleSteps.length;
+                i++)
+              AppleListTile(
+                title: _fontScaleLabels[i],
+                trailing: prefs.fontScale ==
+                        UserPreferencesRepository.fontScaleSteps[i]
+                    ? const Icon(
+                        CupertinoIcons.check_mark,
+                        size: 18,
+                        color: AppColors.primaryBlue,
+                      )
+                    : null,
+                onTap: () {
+                  prefs.setFontScale(
+                    UserPreferencesRepository.fontScaleSteps[i],
+                  );
+                  Navigator.of(context).pop();
+                },
+              ),
+          ],
         ),
       ),
     );
@@ -501,14 +511,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
           child: Column(
             children: [
               _buildLinkItem(
-                icon: Icons.person_rounded,
+                icon: CupertinoIcons.person,
                 iconColor: AppColors.primaryBlue,
                 title: '내 정보',
                 onTap: () => context.push(AppRoute.profile.path),
               ),
               _buildItemDivider(),
               _buildLinkItem(
-                icon: Icons.delete_forever_rounded,
+                icon: CupertinoIcons.delete,
                 iconColor: AppColors.error,
                 title: '계정 삭제',
                 onTap: _handleDeleteAccount,
@@ -543,7 +553,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           child: Column(
             children: [
               _buildLinkItem(
-                icon: Icons.block_flipped,
+                icon: CupertinoIcons.nosign,
                 iconColor: AppColors.textSecondary,
                 title: '차단한 사용자',
                 onTap: () => context.push(AppRoute.blockedUsers.path),
@@ -578,14 +588,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
           child: Column(
             children: [
               _buildLinkItem(
-                icon: Icons.description_rounded,
+                icon: CupertinoIcons.doc_text,
                 iconColor: const Color(0xFFFF8A65),
                 title: '개인정보 처리방침',
                 onTap: () => context.push(AppRoute.privacyPolicy.path),
               ),
               _buildItemDivider(),
               _buildLinkItem(
-                icon: Icons.rule_rounded,
+                icon: CupertinoIcons.checkmark_shield,
                 iconColor: AppColors.primaryBlue,
                 title: '서비스 이용약관',
                 onTap: () => context.push(AppRoute.termsOfService.path),
@@ -620,29 +630,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
           child: Column(
             children: [
               _buildLinkItem(
-                icon: Icons.support_agent_rounded,
+                icon: CupertinoIcons.chat_bubble_2,
                 iconColor: AppColors.primaryBlue,
                 title: '문의하기',
                 onTap: () => context.push(AppRoute.support.path),
               ),
               _buildItemDivider(),
               _buildLinkItem(
-                icon: Icons.info_outline_rounded,
+                icon: CupertinoIcons.info,
                 iconColor: AppColors.textSecondary,
                 title: '앱 정보',
                 onTap: () => context.push(AppRoute.appInfo.path),
               ),
               _buildItemDivider(),
               _buildLinkItem(
-                icon: Icons.bug_report_rounded,
+                icon: CupertinoIcons.ant,
                 iconColor: const Color(0xFF66BB6A),
                 title: '버그 신고',
                 onTap: () => context.push(AppRoute.bugReport.path),
               ),
-              if (_role == 'council' || _role == 'teacher') ...[
+              if (_canSendMealDeparture) ...[
                 _buildItemDivider(),
                 _buildLinkItem(
-                  icon: Icons.lunch_dining_rounded,
+                  icon: CupertinoIcons.square_favorites,
                   iconColor: const Color(0xFFFF9F43),
                   title: '급식 출발 알림',
                   onTap: () => context.push(AppRoute.mealDepartureAlert.path),
@@ -782,12 +792,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('계정이 삭제되었습니다. 이용해 주셔서 감사합니다.'),
-          backgroundColor: AppColors.success,
-        ),
-      );
+      AppFeedback.showSuccess(context, '계정이 삭제되었습니다. 이용해 주셔서 감사합니다.');
 
       context.go(AppRoute.login.path);
     } catch (e) {
