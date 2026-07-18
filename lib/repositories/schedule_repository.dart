@@ -1,3 +1,4 @@
+import 'package:myapp/core/school/school_context.dart';
 import 'package:myapp/core/supabase_client.dart';
 
 /// 일정(학교 일정·개인 일정·NEIS 학사일정) 데이터 접근 레이어.
@@ -57,10 +58,17 @@ class ScheduleRepository {
     final toYmd =
         '${lastDay.year}${lastDay.month.toString().padLeft(2, '0')}${lastDay.day.toString().padLeft(2, '0')}';
 
+    await SchoolContext.instance.ensureLoaded();
+    final schoolId = SchoolContext.instance.currentSchoolId;
+
     final neisRes = await _client.functions
         .invoke(
           'neis_academic_calendar',
-          queryParameters: {'from': fromYmd, 'to': toYmd},
+          queryParameters: {
+            'from': fromYmd,
+            'to': toYmd,
+            if (schoolId != null) 'school_id': schoolId,
+          },
         )
         .timeout(
           const Duration(seconds: 15),

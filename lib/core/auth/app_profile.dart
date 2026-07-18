@@ -1,3 +1,5 @@
+import 'package:myapp/core/auth/app_role.dart';
+
 /// `public.profiles` 테이블의 한 행을 나타내는 불변 모델.
 /// 학번 5자리 규칙: G(1) + 반(2) + 번(2) → 10102 = 1학년 1반 2번, 11002 = 1학년 10반 2번.
 class AppProfile {
@@ -16,6 +18,10 @@ class AppProfile {
     this.teacherRoles,
     this.classLeaderRole,
     this.targetUniversity,
+    this.schoolId,
+    this.username,
+    this.orgRoles = const [],
+    this.recoveryEmail,
   });
 
   final String id;
@@ -39,6 +45,14 @@ class AppProfile {
   final String? classLeaderRole;
   /// 목표 대학 (프로필 편집에서 본인이 설정).
   final String? targetUniversity;
+  /// 소속 학교 ID (멀티스쿨). 컬럼 부재/미배정 시 null.
+  final String? schoolId;
+  /// 로그인용 username (멀티스쿨 신규 컬럼). 컬럼 부재 시 null.
+  final String? username;
+  /// 조직 내 보직 리스트 (예: 'council'). 컬럼 부재 시 빈 리스트.
+  final List<String> orgRoles;
+  /// 복구용 이메일 (멀티스쿨 신규 컬럼). 컬럼 부재 시 null.
+  final String? recoveryEmail;
 
   factory AppProfile.fromJson(Map<String, dynamic> json) {
     return AppProfile(
@@ -61,6 +75,10 @@ class AppProfile {
       targetUniversity: (json['target_university'] as String?)?.trim().isEmpty == true
           ? null
           : (json['target_university'] as String?),
+      schoolId: json['school_id'] as String?,
+      username: (json['username'] as String?)?.trim(),
+      orgRoles: _stringListFromJson(json['org_roles']) ?? const [],
+      recoveryEmail: json['recovery_email'] as String?,
     );
   }
 
@@ -108,10 +126,71 @@ class AppProfile {
     return (g, c, n);
   }
 
-  bool get isPrivileged => role == 'council' || role == 'admin';
+  /// role 문자열을 [AppRole]로 변환한 값. 레거시/신규 role 공존 매핑은 [appRoleFromString] 참고.
+  AppRole get appRole => appRoleFromString(role);
 
-  bool get isTeacher => role == 'teacher';
+  /// 학생회 보직 여부: 신규 `org_roles`에 [kOrgRoleCouncil] 포함 또는 레거시 `role == 'council'`.
+  bool get hasCouncilRole => orgRoles.contains(kOrgRoleCouncil) || role == 'council';
+
+  /// 학교 관리자 이상 (school_admin·레거시 admin·super_admin).
+  bool get isSchoolAdmin => appRole == AppRole.schoolAdmin || appRole == AppRole.superAdmin;
+
+  /// 전체 시스템 관리자 여부.
+  bool get isSuperAdmin => appRole == AppRole.superAdmin;
+
+  /// 학부모 여부.
+  bool get isParent => appRole == AppRole.parent;
+
+  /// 화면 표시용 학번: 학번이 있으면 학번, 없으면 username (멀티스쿨 신규 계정 대응).
+  String get displayStudentId => studentId.isNotEmpty ? studentId : (username ?? '');
+
+  bool get isPrivileged => hasCouncilRole || isSchoolAdmin;
+
+  bool get isTeacher => appRole == AppRole.teacher;
   bool get isClassPresident => classLeaderRole == 'president';
   bool get isClassVicePresident => classLeaderRole == 'vice_president';
-  bool get canManageClassResources => isClassPresident || isClassVicePresident || role == 'admin' || role == 'teacher';
+  bool get canManageClassResources => isClassPresident || isClassVicePresident || isSchoolAdmin || isTeacher;
+
+  /// 일부 필드만 변경한 복사본을 반환한다. 전달하지 않은 필드는 기존 값을 유지한다.
+  AppProfile copyWith({
+    String? id,
+    String? userId,
+    String? studentId,
+    String? role,
+    bool? mustChangePassword,
+    String? fullName,
+    String? avatarUrl,
+    int? grade,
+    int? classNum,
+    int? numberInClass,
+    List<String>? teacherSubjects,
+    List<String>? teacherRoles,
+    String? classLeaderRole,
+    String? targetUniversity,
+    String? schoolId,
+    String? username,
+    List<String>? orgRoles,
+    String? recoveryEmail,
+  }) {
+    return AppProfile(
+      id: id ?? this.id,
+      userId: userId ?? this.userId,
+      studentId: studentId ?? this.studentId,
+      role: role ?? this.role,
+      mustChangePassword: mustChangePassword ?? this.mustChangePassword,
+      fullName: fullName ?? this.fullName,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
+      grade: grade ?? this.grade,
+      classNum: classNum ?? this.classNum,
+      numberInClass: numberInClass ?? this.numberInClass,
+      teacherSubjects: teacherSubjects ?? this.teacherSubjects,
+      teacherRoles: teacherRoles ?? this.teacherRoles,
+      classLeaderRole: classLeaderRole ?? this.classLeaderRole,
+      targetUniversity: targetUniversity ?? this.targetUniversity,
+      schoolId: schoolId ?? this.schoolId,
+      username: username ?? this.username,
+      orgRoles: orgRoles ?? this.orgRoles,
+      recoveryEmail: recoveryEmail ?? this.recoveryEmail,
+    );
+  }
 }

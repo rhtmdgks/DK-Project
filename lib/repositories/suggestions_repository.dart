@@ -45,6 +45,8 @@ class SuggestionsRepository {
   ///
   /// 참고: RLS로 타인 프로필이 보이지 않으므로 [role]이 admin/council일 때는
   /// [fetchStaffChatContact]를 사용하는 것이 맞다.
+  ///
+  /// legacy: role 문자열 직접 질의. 멀티스쿨 확장 시 school_admin 포함 및 school 스코프 필요.
   Future<Map<String, dynamic>?> fetchProfileByRole(String role) async {
     final res = await _client
         .from('profiles')

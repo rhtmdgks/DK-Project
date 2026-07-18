@@ -15,3 +15,7 @@ void setSupabaseAnonKey(String k) => supabaseAnonKey = k;
 String emailFromStudentId(String studentId) {
   return '${studentId.trim()}@school.local';
 }
+
+/// 레거시 가상 이메일 후보 (기존 학번 계정 호환용). 포맷 변경 금지.
+List<String> legacyEmailCandidates(String username) =>
+    ['$username@school.local', '$username@laon.local'];

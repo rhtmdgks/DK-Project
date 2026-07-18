@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:myapp/core/theme/app_theme_mode.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// 사용자 표시 설정(테마·글자 크기)의 단일 저장소.
@@ -20,25 +20,13 @@ class UserPreferencesRepository {
 
   Future<SharedPreferences> _prefs() => SharedPreferences.getInstance();
 
-  Future<ThemeMode> getThemeMode() async {
+  Future<AppThemeMode> getThemeMode() async {
     final raw = (await _prefs()).getString(keyThemeMode);
-    switch (raw) {
-      case 'light':
-        return ThemeMode.light;
-      case 'dark':
-        return ThemeMode.dark;
-      default:
-        return ThemeMode.system;
-    }
+    return AppThemeMode.fromStorage(raw);
   }
 
-  Future<void> setThemeMode(ThemeMode mode) async {
-    final raw = switch (mode) {
-      ThemeMode.light => 'light',
-      ThemeMode.dark => 'dark',
-      ThemeMode.system => 'system',
-    };
-    await (await _prefs()).setString(keyThemeMode, raw);
+  Future<void> setThemeMode(AppThemeMode mode) async {
+    await (await _prefs()).setString(keyThemeMode, mode.storageValue);
   }
 
   Future<double> getFontScale() async {

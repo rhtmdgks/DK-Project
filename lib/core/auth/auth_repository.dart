@@ -1,4 +1,5 @@
 import 'package:myapp/core/auth/app_profile.dart';
+import 'package:myapp/core/school/school_context.dart';
 import 'package:myapp/core/supabase_client.dart';
 import 'package:myapp/core/utils/avatar_url_resolver.dart';
 import 'package:myapp/core/utils/avatar_utils.dart';
@@ -9,22 +10,7 @@ import 'package:myapp/core/utils/avatar_utils.dart';
 /// 리다이렉트·로그인·로그아웃·프로필 조회는 모두 이 레이어를 통해서만 수행한다.
 
 AppProfile _withResolvedAvatar(AppProfile p) {
-  return AppProfile(
-    id: p.id,
-    userId: p.userId,
-    studentId: p.studentId,
-    role: p.role,
-    mustChangePassword: p.mustChangePassword,
-    fullName: p.fullName,
-    avatarUrl: resolveAvatarUrl(p.avatarUrl),
-    grade: p.grade,
-    classNum: p.classNum,
-    numberInClass: p.numberInClass,
-    teacherSubjects: p.teacherSubjects,
-    teacherRoles: p.teacherRoles,
-    classLeaderRole: p.classLeaderRole,
-    targetUniversity: p.targetUniversity,
-  );
+  return p.copyWith(avatarUrl: resolveAvatarUrl(p.avatarUrl));
 }
 
 class AuthRepository {
@@ -73,22 +59,8 @@ class AuthRepository {
         // RLS 등으로 DB 저장 실패 시(예: 백오피스에서 생성한 계정이 세션 없이 로그인) 무시
       }
       // DB 반영 여부와 관계없이 생성한 아바타 URL로 프로필 반환 → 메인 등에서 프로필 사진 표시
-      return AppProfile(
-        id: profile.id,
-        userId: profile.userId,
-        studentId: profile.studentId,
-        role: profile.role,
-        mustChangePassword: profile.mustChangePassword,
-        fullName: profile.fullName,
-        avatarUrl: avatarUrl,
-        grade: profile.grade,
-        classNum: profile.classNum,
-        numberInClass: profile.numberInClass,
-        teacherSubjects: profile.teacherSubjects,
-        teacherRoles: profile.teacherRoles,
-        classLeaderRole: profile.classLeaderRole,
-        targetUniversity: profile.targetUniversity,
-      );
+      // copyWith 사용: 신규 필드(school_id, username, org_roles 등) 유실 방지
+      return profile.copyWith(avatarUrl: avatarUrl);
     }
 
     return _withResolvedAvatar(profile);
@@ -106,6 +78,7 @@ class AuthRepository {
 
   /// 로그아웃: Supabase 세션을 만료시킨다.
   Future<void> logout() async {
+    SchoolContext.instance.clear();
     try {
       await supabase.auth.signOut();
     } catch (_) {
@@ -115,6 +88,7 @@ class AuthRepository {
 
   /// 리다이렉트용: 프로필 조회 실패 시 세션을 초기화한다.
   Future<void> clearLoginState() async {
+    SchoolContext.instance.clear();
     try {
       await supabase.auth.signOut();
     } catch (_) {}
