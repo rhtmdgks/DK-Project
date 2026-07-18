@@ -180,13 +180,30 @@ class _SuggestionsChatScreenState extends State<SuggestionsChatScreen> {
     _messageController.clear();
 
     try {
-      await supabase.from('chat_messages').insert({
-        'room_id': kSuggestionsChatRoomId,
-        'sender_id': uid,
-        'content': content,
-      });
+      await supabase.rpc(
+        'insert_chat_message',
+        params: {
+          'p_room_id': kSuggestionsChatRoomId,
+          'p_sender_id': uid,
+          'p_content': content,
+          'p_attachment_url': null,
+          'p_attachment_type': null,
+        },
+      );
     } catch (e) {
       if (!mounted) return;
+      final msg = e.toString().toLowerCase();
+      if (msg.contains('message_blocked')) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              '부적절한 표현이 포함되어 있어 메시지를 보낼 수 없습니다. 표현을 수정해 주세요.',
+            ),
+            backgroundColor: AppColors.error,
+          ),
+        );
+        return;
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('전송 실패: $e')),
       );

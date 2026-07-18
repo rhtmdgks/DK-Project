@@ -279,7 +279,28 @@ abstract final class AppFonts {
   /// ```
   static TextStyle scaled(BuildContext context, TextStyle style) {
     final scaledSize = context.rs(style.fontSize ?? 14);
-    return style.copyWith(fontSize: scaledSize);
+    return themed(context, style.copyWith(fontSize: scaledSize));
+  }
+
+  /// 라이트 전용 [AppColors] 텍스트 색을 다크 모드에서 읽을 수 있는 색으로 치환한다.
+  /// 브랜드/온-컬러(white, primaryBlue 등)는 그대로 둔다.
+  static TextStyle themed(BuildContext context, TextStyle style) {
+    if (Theme.of(context).brightness == Brightness.light) return style;
+    final c = style.color;
+    if (c == null) {
+      return style.copyWith(color: AppDarkColors.textPrimary);
+    }
+    if (c == AppColors.textPrimary ||
+        c == AppColors.textDark ||
+        c == AppColors.textDarkFigma) {
+      return style.copyWith(color: AppDarkColors.textPrimary);
+    }
+    if (c == AppColors.textSecondary ||
+        c == AppColors.navInactive ||
+        c == AppColors.hint) {
+      return style.copyWith(color: AppDarkColors.textSecondary);
+    }
+    return style;
   }
 }
 
@@ -418,8 +439,17 @@ ThemeData buildAppDarkTheme() {
   const noUnderline = TextStyle(decoration: TextDecoration.none);
   final colorScheme = ColorScheme.fromSeed(
     seedColor: AppColors.primaryBlue,
-    surface: AppDarkColors.background,
     brightness: Brightness.dark,
+    surface: AppDarkColors.background,
+    onSurface: AppDarkColors.textPrimary,
+    onSurfaceVariant: AppDarkColors.textSecondary,
+  ).copyWith(
+    surfaceContainerLowest: AppDarkColors.background,
+    surfaceContainerLow: AppDarkColors.surface,
+    surfaceContainer: AppDarkColors.surfaceHigh,
+    surfaceContainerHigh: AppDarkColors.surfaceHigh,
+    surfaceContainerHighest: AppDarkColors.surfaceHigh,
+    outline: AppDarkColors.border,
   );
 
   return ThemeData(
@@ -490,6 +520,7 @@ ThemeData buildAppDarkTheme() {
     bottomNavigationBarTheme: BottomNavigationBarThemeData(
       elevation: 0,
       type: BottomNavigationBarType.fixed,
+      backgroundColor: AppDarkColors.surface,
     ),
     listTileTheme: ListTileThemeData(
       shape: RoundedRectangleBorder(
@@ -512,13 +543,13 @@ ThemeData buildAppDarkTheme() {
       displaySmall: noUnderline,
       headlineLarge: noUnderline,
       headlineMedium: noUnderline,
-      headlineSmall: noUnderline,
-      titleLarge: noUnderline,
-      titleMedium: noUnderline,
-      titleSmall: noUnderline,
-      bodyLarge: noUnderline,
-      bodyMedium: noUnderline,
-      bodySmall: noUnderline,
+      headlineSmall: noUnderline.copyWith(color: AppDarkColors.textPrimary),
+      titleLarge: noUnderline.copyWith(color: AppDarkColors.textPrimary),
+      titleMedium: noUnderline.copyWith(color: AppDarkColors.textPrimary),
+      titleSmall: noUnderline.copyWith(color: AppDarkColors.textPrimary),
+      bodyLarge: noUnderline.copyWith(color: AppDarkColors.textPrimary),
+      bodyMedium: noUnderline.copyWith(color: AppDarkColors.textSecondary),
+      bodySmall: noUnderline.copyWith(color: AppDarkColors.textSecondary),
       labelLarge: noUnderline,
       labelMedium: noUnderline,
       labelSmall: noUnderline,
@@ -563,4 +594,5 @@ class _M3PageTransitionsBuilder extends PageTransitionsBuilder {
 }
 
 /// Cupertino 전역 테마. [app_design.buildAppCupertinoTheme]에 위임.
-CupertinoThemeData buildCupertinoTheme() => app_design.buildAppCupertinoTheme();
+CupertinoThemeData buildCupertinoTheme({Brightness brightness = Brightness.light}) =>
+    app_design.buildAppCupertinoTheme(brightness: brightness);

@@ -543,13 +543,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
           child: Column(
             children: [
               _buildLinkItem(
-                icon: Icons.photo_library_outlined,
-                iconColor: const Color(0xFF7986CB),
-                title: '학급 사진 공유',
-                onTap: () => context.push(AppRoute.classPhotoShares.path),
-              ),
-              _buildItemDivider(),
-              _buildLinkItem(
                 icon: Icons.block_flipped,
                 iconColor: AppColors.textSecondary,
                 title: '차단한 사용자',

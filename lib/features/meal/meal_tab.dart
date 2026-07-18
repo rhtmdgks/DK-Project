@@ -155,7 +155,11 @@ class _MealTabState extends State<MealTab> {
         decoration: BoxDecoration(
           color: Theme.of(context).colorScheme.surface,
           borderRadius: AppShapes.borderRadiusMedium,
-          border: Border.all(color: AppColors.borderLight),
+          border: Border.all(
+            color: Theme.of(context).brightness == Brightness.dark
+                ? AppDarkColors.border
+                : AppColors.borderLight,
+          ),
           boxShadow: [
             BoxShadow(
               color: Theme.of(context).colorScheme.shadow.withValues(alpha: 0.06),
@@ -180,7 +184,7 @@ class _MealTabState extends State<MealTab> {
                   },
                   child: Icon(
                     CupertinoIcons.chevron_left,
-                    color: AppColors.textPrimary,
+                    color: Theme.of(context).colorScheme.onSurface,
                     size: context.rs(28),
                   ),
                 ),
@@ -209,7 +213,7 @@ class _MealTabState extends State<MealTab> {
                   },
                   child: Icon(
                     CupertinoIcons.chevron_right,
-                    color: AppColors.textPrimary,
+                    color: Theme.of(context).colorScheme.onSurface,
                     size: context.rs(28),
                   ),
                 ),
@@ -289,8 +293,12 @@ class _MealTabState extends State<MealTab> {
                                     color: isSelected
                                         ? AppColors.white
                                         : (isSunday
-                                            ? AppColors.textSecondary
-                                            : AppColors.textPrimary),
+                                            ? Theme.of(context)
+                                                .colorScheme
+                                                .onSurfaceVariant
+                                            : Theme.of(context)
+                                                .colorScheme
+                                                .onSurface),
                                   ),
                                 ),
                               ),
@@ -381,8 +389,9 @@ class _MealTabState extends State<MealTab> {
         children: [
           RichText(
             text: TextSpan(
-              style: AppFonts.scaled(context, AppFonts.bodyMedium)
-                  .copyWith(color: AppColors.textDark),
+              style: AppFonts.scaled(context, AppFonts.bodyMedium).copyWith(
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
               children: [
                 TextSpan(
                   text: '오늘  ',
@@ -418,11 +427,13 @@ class _MealTabState extends State<MealTab> {
     final cardPad = context.rs(16);
     final mealTypeWidth = context.rs(80);
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Container(
       margin: EdgeInsets.only(bottom: context.rh(16)),
       padding: EdgeInsets.all(cardPad),
       decoration: BoxDecoration(
-        color: AppColors.timetableBg,
+        color: isDark ? AppDarkColors.surfaceHigh : AppColors.timetableBg,
         borderRadius: AppShapes.borderRadiusSmall,
       ),
       child: Row(
@@ -446,13 +457,14 @@ class _MealTabState extends State<MealTab> {
                       vertical: context.rh(2),
                     ),
                     decoration: BoxDecoration(
-                      color: AppColors.white.withValues(alpha: 0.7),
+                      color: Theme.of(context).colorScheme.surface,
                       borderRadius: AppShapes.borderRadiusSmall,
                     ),
                     child: Text(
                       cal,
-                      style: AppFonts.scaled(context, AppFonts.tiny)
-                          .copyWith(color: AppColors.textDark.withValues(alpha: 0.7)),
+                      style: AppFonts.scaled(context, AppFonts.tiny).copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
                     ),
                   ),
               ],
@@ -476,7 +488,9 @@ class _MealTabState extends State<MealTab> {
                           child: Text(
                             item,
                             style: AppFonts.scaled(context, AppFonts.smallMedium)
-                                .copyWith(color: AppColors.textDark),
+                                .copyWith(
+                              color: Theme.of(context).colorScheme.onSurface,
+                            ),
                           ),
                         ))
                     .toList(),

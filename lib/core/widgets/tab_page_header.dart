@@ -2,13 +2,8 @@ import 'package:flutter/material.dart';
 
 /// Material 3 Small App Bar 스타일의 탭 제목 헤더.
 ///
-/// Material 3 Small App Bar 스펙에 따라 구현:
-/// - 높이: 64dp
-/// - 좌측 패딩: 16dp
-/// - 우측 패딩: 16dp (액션이 있으면 8dp)
-/// - 제목: headlineSmall (24sp, w400)
-/// - 서브타이틀: bodyMedium (16sp, w400)
-/// - Material 3 elevation과 색상 시스템 사용
+/// 기본 높이 64dp를 *최소* 기준으로 두되, 글자 크기(TextScaler)가 커지면
+/// 세로로 늘어나 overflow 없이 표시한다.
 class TabPageHeader extends StatelessWidget {
   const TabPageHeader({
     super.key,
@@ -28,19 +23,21 @@ class TabPageHeader extends StatelessWidget {
   /// null이면 기본 좌우 패딩(16), 지정 시 해당 값 사용(예: [EdgeInsets.zero]로 끝에 붙이기).
   final EdgeInsets? contentPadding;
 
+  static const double _minVerticalPadding = 12;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    
-    // Material 3 Small App Bar 높이: 64dp
-    const double appBarHeight = 64.0;
-    final resolvedPadding = contentPadding ?? EdgeInsets.only(
-      left: leading != null ? 4 : 16,
-      right: trailing != null ? 8 : 16,
-    );
 
-    return Container(
-      height: appBarHeight,
+    final resolvedPadding = contentPadding ??
+        EdgeInsets.only(
+          left: leading != null ? 4 : 16,
+          right: trailing != null ? 8 : 16,
+          top: _minVerticalPadding,
+          bottom: _minVerticalPadding,
+        );
+
+    return Padding(
       padding: resolvedPadding,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
@@ -51,7 +48,6 @@ class TabPageHeader extends StatelessWidget {
           ],
           Expanded(
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -65,7 +61,7 @@ class TabPageHeader extends StatelessWidget {
                     color: theme.colorScheme.onSurface,
                   ),
                 ),
-                SizedBox(height: 4),
+                const SizedBox(height: 4),
                 Text(
                   subtitle,
                   style: theme.textTheme.bodyMedium?.copyWith(
@@ -79,7 +75,7 @@ class TabPageHeader extends StatelessWidget {
             ),
           ),
           if (trailing != null) ...[
-            SizedBox(width: 8),
+            const SizedBox(width: 8),
             trailing!,
           ],
         ],

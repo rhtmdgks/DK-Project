@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:myapp/core/routing/app_router.dart';
 import 'package:myapp/core/auth/auth_state.dart';
 import 'package:myapp/core/auth/auth_repository.dart';
 import 'package:myapp/core/supabase_client.dart';
@@ -214,7 +216,7 @@ class _ScheduleTabState extends State<ScheduleTab> {
   Widget build(BuildContext context) {
     return DismissKeyboard(
       child: Scaffold(
-        backgroundColor: AppColors.background,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         body: Column(
         children: [
           SafeArea(
@@ -261,6 +263,8 @@ class _ScheduleTabState extends State<ScheduleTab> {
                       SizedBox(height: context.rh(20)),
                       _buildNewEventButton(),
                       SizedBox(height: context.rh(24)),
+                      _buildClassPhotoSection(),
+                      SizedBox(height: context.rh(24)),
                     ],
                   ),
                 ),
@@ -270,6 +274,68 @@ class _ScheduleTabState extends State<ScheduleTab> {
         ],
       ),
       ),
+    );
+  }
+
+  /// 반별 사진 공유 진입 섹션.
+  Widget _buildClassPhotoSection() {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: EdgeInsets.only(left: context.rs(4), bottom: context.rh(8)),
+          child: Text(
+            '반별 사진',
+            style: AppFonts.scaled(context, AppFonts.sectionTitle),
+          ),
+        ),
+        Material(
+          color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
+          borderRadius: BorderRadius.circular(12),
+          child: InkWell(
+            onTap: () => context.push(AppRoute.classPhotoShares.path),
+            borderRadius: BorderRadius.circular(12),
+            child: Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: context.rs(16),
+                vertical: context.rh(14),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.photo_library_outlined,
+                    size: context.rs(22),
+                    color: theme.colorScheme.primary,
+                  ),
+                  SizedBox(width: context.rs(10)),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '반별 사진 공유',
+                          style: AppFonts.scaled(context, AppFonts.titleMedium),
+                        ),
+                        SizedBox(height: context.rh(2)),
+                        Text(
+                          '같은 반 친구들과 사진을 올리고 볼 수 있어요.',
+                          style: AppFonts.scaled(context, AppFonts.captionRegular),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    size: context.rs(22),
+                    color: AppColors.hint,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 

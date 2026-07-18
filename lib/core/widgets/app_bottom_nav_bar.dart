@@ -32,6 +32,7 @@ class AppBottomNavBar extends StatelessWidget {
     final hPad = context.rs(28);
     final vPad = context.rh(12);
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
     return Container(
       decoration: BoxDecoration(
@@ -40,8 +41,10 @@ class AppBottomNavBar extends StatelessWidget {
           topLeft: Radius.circular(AppShapes.radiusExtraLarge),
           topRight: Radius.circular(AppShapes.radiusExtraLarge),
         ),
-        border: const Border(
-          top: BorderSide(color: AppColors.borderLight),
+        border: Border(
+          top: BorderSide(
+            color: isDark ? AppDarkColors.border : AppColors.borderLight,
+          ),
         ),
         boxShadow: [
           BoxShadow(

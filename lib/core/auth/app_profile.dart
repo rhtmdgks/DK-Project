@@ -79,11 +79,20 @@ class AppProfile {
     return int.tryParse(v.toString());
   }
 
-  /// 학번 5자리 규칙으로 학년·반·번호 추론 (DB 컬럼 없을 때 대비).
+  static int? _validGrade(int? v) =>
+      v != null && v >= 1 && v <= 3 ? v : null;
+
+  static int? _validClassNum(int? v) =>
+      v != null && v >= 1 && v <= 10 ? v : null;
+
+  /// 학년(1-3). DB에 없으면 학번 첫 자리로 추론 가능.
   int? get gradeOrFromStudentId =>
-      grade ?? _parseGradeClassNumber(studentId).$1;
+      _validGrade(grade) ??
+      _validGrade(_parseGradeClassNumber(studentId).$1);
+  /// 반(1-10). DB에 없으면 학번 2~3자리로 추론 가능.
   int? get classNumOrFromStudentId =>
-      classNum ?? _parseGradeClassNumber(studentId).$2;
+      _validClassNum(classNum) ??
+      _validClassNum(_parseGradeClassNumber(studentId).$2);
   int? get numberInClassOrFromStudentId =>
       numberInClass ?? _parseGradeClassNumber(studentId).$3;
   bool get hasGradeClass =>

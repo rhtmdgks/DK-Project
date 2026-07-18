@@ -121,8 +121,15 @@ class _AppState extends State<App> with WidgetsBindingObserver {
       ],
       child: Consumer<UserPreferencesProvider>(
         builder: (context, prefs, _) {
+          final platformBrightness =
+              WidgetsBinding.instance.platformDispatcher.platformBrightness;
+          final cupertinoBrightness = switch (prefs.themeMode) {
+            ThemeMode.dark => Brightness.dark,
+            ThemeMode.light => Brightness.light,
+            ThemeMode.system => platformBrightness,
+          };
           return CupertinoTheme(
-            data: buildCupertinoTheme(),
+            data: buildCupertinoTheme(brightness: cupertinoBrightness),
             child: Material(
               type: MaterialType.transparency,
               child: MaterialApp.router(

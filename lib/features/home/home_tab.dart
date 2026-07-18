@@ -43,6 +43,7 @@ class _HomeTabState extends State<HomeTab> {
   String? _fullName;
   String? _avatarUrl;
   String? _role;
+  String? _targetUniversity;
   bool _loading = true;
   String? _dynamicGreeting;
   bool _homeFeedLoading = true;
@@ -141,6 +142,7 @@ class _HomeTabState extends State<HomeTab> {
         _fullName = profile?.fullName;
         _avatarUrl = profile?.avatarUrl;
         _role = profile?.role;
+        _targetUniversity = profile?.targetUniversity;
         _loading = false;
       });
     } catch (_) {
@@ -570,20 +572,20 @@ class _HomeTabState extends State<HomeTab> {
     required bool isCompleted,
     required bool isUpcoming,
   }) {
+    final cs = Theme.of(context).colorScheme;
+    final scaffoldBg = Theme.of(context).scaffoldBackgroundColor;
     final pointColor = isCurrent
         ? AppColors.primaryBlue
         : isCompleted
-            ? AppColors.surfaceContainerHigh
-            : AppColors.surfaceContainer;
+            ? cs.surfaceContainerHigh
+            : cs.surfaceContainer;
     final cardColor = isCurrent
         ? AppColors.primaryBlue.withValues(alpha: 0.1)
-        : AppColors.surfaceContainerLow;
+        : cs.surfaceContainerLow;
     final borderColor = isCurrent
         ? AppColors.primaryBlue.withValues(alpha: 0.35)
-        : AppColors.borderLight;
-    final textColor = isCompleted
-        ? AppColors.textSecondary
-        : AppColors.textPrimary;
+        : cs.outline.withValues(alpha: 0.45);
+    final textColor = isCompleted ? cs.onSurfaceVariant : cs.onSurface;
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -598,7 +600,7 @@ class _HomeTabState extends State<HomeTab> {
                 color: pointColor,
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: isCurrent ? AppColors.white : AppColors.background,
+                  color: isCurrent ? AppColors.white : scaffoldBg,
                   width: 2,
                 ),
                 boxShadow: isCurrent
@@ -719,7 +721,7 @@ class _HomeTabState extends State<HomeTab> {
                       vertical: context.rh(4),
                     ),
                     decoration: BoxDecoration(
-                      color: AppColors.white,
+                      color: cs.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(999),
                     ),
                     child: Text(
@@ -1012,20 +1014,26 @@ class _HomeTabState extends State<HomeTab> {
   }
 
   Widget _buildGlassCard({required Widget child}) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     return Container(
       width: double.infinity,
       padding: EdgeInsets.all(context.rs(16)),
       decoration: BoxDecoration(
-        color: AppColors.white.withValues(alpha: 0.8),
+        color: theme.cardTheme.color ?? theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.borderLight),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 12,
-            offset: const Offset(0, 6),
-          ),
-        ],
+        border: Border.all(
+          color: isDark ? AppDarkColors.border : AppColors.borderLight,
+        ),
+        boxShadow: isDark
+            ? null
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.03),
+                  blurRadius: 12,
+                  offset: const Offset(0, 6),
+                ),
+              ],
       ),
       child: child,
     );
@@ -1119,6 +1127,8 @@ class _HomeTabState extends State<HomeTab> {
 
   Widget _buildGreeting() {
     final avatarSize = context.rmin(64);
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: context.rs(22)),
@@ -1130,9 +1140,9 @@ class _HomeTabState extends State<HomeTab> {
             height: avatarSize,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: AppColors.white,
+              color: theme.colorScheme.surface,
               border: Border.all(
-                color: AppColors.border,
+                color: isDark ? AppDarkColors.border : AppColors.border,
                 width: 1.5,
               ),
               boxShadow: const [
@@ -1184,6 +1194,15 @@ class _HomeTabState extends State<HomeTab> {
                   _greetingMessage(),
                   style: AppFonts.scaled(context, AppFonts.titleMedium),
                 ),
+                if (_targetUniversity != null &&
+                    _targetUniversity!.trim().isNotEmpty) ...[
+                  SizedBox(height: context.rh(6)),
+                  Text(
+                    '목표 대학: ${_targetUniversity!.trim()}',
+                    style: AppFonts.scaled(context, AppFonts.captionMedium)
+                        .copyWith(color: AppColors.primaryBlue),
+                  ),
+                ],
               ],
             ),
           ),
