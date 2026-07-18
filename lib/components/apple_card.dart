@@ -1,9 +1,9 @@
-import 'package:flutter/material.dart';
-import 'package:myapp/design/app_colors.dart';
-import 'package:myapp/design/app_radius.dart';
+import 'package:flutter/cupertino.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:myapp/design/app_spacing.dart';
+import 'package:myapp/design/glass.dart';
 
-/// 인셋 그룹 배경 위에 올리는 부드러운 표면 카드.
+/// Glass 표면 카드.
 class AppleCard extends StatelessWidget {
   const AppleCard({
     super.key,
@@ -20,26 +20,20 @@ class AppleCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final surface = AppDesignColors.surface(context);
-    final Widget tile = Container(
-      margin: margin,
-      decoration: BoxDecoration(
-        color: surface,
-        borderRadius: BorderRadius.circular(AppRadius.utilityCard),
-      ),
-      child: Material(
-        type: MaterialType.transparency,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(AppRadius.utilityCard),
-          child: Padding(
-            padding: padding ??
-                const EdgeInsets.all(AppSpacing.md),
-            child: child,
-          ),
-        ),
-      ),
+    final card = GlassCard(
+      quality: kAppGlassQuality,
+      useOwnLayer: true,
+      padding: padding ?? const EdgeInsets.all(AppSpacing.md),
+      child: child,
     );
-    return tile;
+    final wrapped = onTap == null
+        ? card
+        : GestureDetector(
+            onTap: onTap,
+            behavior: HitTestBehavior.opaque,
+            child: card,
+          );
+    if (margin == null) return wrapped;
+    return Padding(padding: margin!, child: wrapped);
   }
 }

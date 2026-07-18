@@ -1,6 +1,9 @@
 import 'package:flutter/cupertino.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
+import 'package:myapp/core/theme/app_theme.dart';
 import 'package:myapp/design/app_colors.dart';
 import 'package:myapp/design/app_spacing.dart';
+import 'package:myapp/design/glass.dart';
 
 enum AppleButtonVariant {
   primary,
@@ -9,7 +12,7 @@ enum AppleButtonVariant {
   plain,
 }
 
-/// iOS 스타일 액션 버튼. [MaterialApp] + [CupertinoTheme] 하이브리드 앱용.
+/// Glass / Cupertino 액션 버튼 어댑터.
 class AppleButton extends StatelessWidget {
   const AppleButton({
     super.key,
@@ -41,75 +44,64 @@ class AppleButton extends StatelessWidget {
   }
 
   Widget _buildChild(BuildContext context) {
-    final effective = _enabled ? onPressed : null;
-    final content = _content(context);
-
-    switch (variant) {
-      case AppleButtonVariant.primary:
-        return CupertinoButton.filled(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.lg,
-            vertical: AppSpacing.sm,
-          ),
-          onPressed: effective,
-          child: content,
-        );
-      case AppleButtonVariant.secondary:
-        return CupertinoButton(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.lg,
-            vertical: AppSpacing.sm,
-          ),
-          onPressed: effective,
-          child: DefaultTextStyle.merge(
-            style: TextStyle(color: AppDesignColors.primary(context)),
-            child: _borderedPill(context, content),
-          ),
-        );
-      case AppleButtonVariant.destructive:
-        return CupertinoButton(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.lg,
-            vertical: AppSpacing.sm,
-          ),
-          onPressed: effective,
-          child: DefaultTextStyle.merge(
-            style: TextStyle(color: AppDesignColors.destructive(context)),
-            child: content,
-          ),
-        );
-      case AppleButtonVariant.plain:
-        return CupertinoButton(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.md,
-            vertical: AppSpacing.xs,
-          ),
-          onPressed: effective,
-          child: content,
-        );
+    if (loading) {
+      return const SizedBox(
+        height: 48,
+        child: Center(child: CupertinoActivityIndicator()),
+      );
     }
-  }
 
-  Widget _borderedPill(BuildContext context, Widget inner) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        border: Border.all(color: AppDesignColors.primary(context)),
-        borderRadius: BorderRadius.circular(1e6),
-      ),
-      child: Padding(
+    final content = _content(context);
+    final effective = _enabled ? onPressed : null;
+
+    if (variant == AppleButtonVariant.plain) {
+      return CupertinoButton(
         padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.lg,
+          horizontal: AppSpacing.md,
           vertical: AppSpacing.xs,
         ),
-        child: inner,
+        onPressed: effective,
+        child: content,
+      );
+    }
+
+    if (variant == AppleButtonVariant.primary) {
+      return GlassButton.custom(
+        onTap: onPressed ?? () {},
+        enabled: _enabled,
+        quality: kAppGlassQuality,
+        useOwnLayer: true,
+        width: fullWidth ? double.infinity : null,
+        height: 48,
+        child: DefaultTextStyle.merge(
+          style: TextStyle(
+            color: AppColors.white,
+            fontWeight: FontWeight.w600,
+          ),
+          child: content,
+        ),
+      );
+    }
+
+    final color = variant == AppleButtonVariant.destructive
+        ? AppDesignColors.destructive(context)
+        : AppDesignColors.primary(context);
+
+    return GlassButton.custom(
+      onTap: onPressed ?? () {},
+      enabled: _enabled,
+      quality: kAppGlassQuality,
+      useOwnLayer: true,
+      width: fullWidth ? double.infinity : null,
+      height: 48,
+      child: DefaultTextStyle.merge(
+        style: TextStyle(color: color, fontWeight: FontWeight.w600),
+        child: content,
       ),
     );
   }
 
   Widget _content(BuildContext context) {
-    if (loading) {
-      return const CupertinoActivityIndicator();
-    }
     if (icon != null) {
       return Row(
         mainAxisSize: MainAxisSize.min,

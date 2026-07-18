@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 
 /// 과목별 색상, 아이콘, 장식 벡터를 일관되게 관리하는 서비스.
 ///
@@ -37,49 +37,49 @@ class SubjectThemeService {
 
   /// 과목명 기반 아이콘 매핑
   static final Map<String, IconData> _iconMap = {
-    '수학': Icons.calculate_outlined,
-    '수학Ⅰ': Icons.calculate_outlined,
-    '수학Ⅱ': Icons.calculate_outlined,
-    '미적분': Icons.functions,
-    '확률과통계': Icons.bar_chart_outlined,
-    '기하': Icons.shape_line_outlined,
-    '생명과학': Icons.science_outlined,
-    '생명과학Ⅰ': Icons.science_outlined,
-    '생명과학Ⅱ': Icons.science_outlined,
-    '화학': Icons.science_outlined,
-    '화학Ⅰ': Icons.science_outlined,
-    '화학Ⅱ': Icons.science_outlined,
-    '물리': Icons.bolt_outlined,
-    '물리학': Icons.bolt_outlined,
-    '물리Ⅰ': Icons.bolt_outlined,
-    '물리Ⅱ': Icons.bolt_outlined,
-    '지구과학': Icons.public_outlined,
-    '지구과학Ⅰ': Icons.public_outlined,
-    '지구과학Ⅱ': Icons.public_outlined,
-    '국어': Icons.menu_book_outlined,
-    '국어Ⅰ': Icons.menu_book_outlined,
-    '국어Ⅱ': Icons.menu_book_outlined,
-    '문학': Icons.book_outlined,
-    '언어와매체': Icons.article_outlined,
-    '영어': Icons.translate,
-    '영어Ⅰ': Icons.translate,
-    '영어Ⅱ': Icons.translate,
-    '영어회화': Icons.record_voice_over_outlined,
-    '한국사': Icons.history_edu_outlined,
-    '세계사': Icons.public_outlined,
-    '동아시아사': Icons.map_outlined,
-    '경제': Icons.account_balance_outlined,
-    '정치와법': Icons.gavel_outlined,
-    '사회문화': Icons.people_outline,
-    '지리': Icons.map_outlined,
-    '세계지리': Icons.public_outlined,
-    '한국지리': Icons.map_outlined,
-    '체육': Icons.sports_soccer_outlined,
-    '음악': Icons.music_note_outlined,
-    '미술': Icons.palette_outlined,
-    '기술가정': Icons.build_outlined,
-    '정보': Icons.computer_outlined,
-    '프로그래밍': Icons.code_outlined,
+    '수학': CupertinoIcons.number,
+    '수학Ⅰ': CupertinoIcons.number,
+    '수학Ⅱ': CupertinoIcons.number,
+    '미적분': CupertinoIcons.number_square,
+    '확률과통계': CupertinoIcons.chart_bar,
+    '기하': CupertinoIcons.cube_box,
+    '생명과학': CupertinoIcons.lab_flask,
+    '생명과학Ⅰ': CupertinoIcons.lab_flask,
+    '생명과학Ⅱ': CupertinoIcons.lab_flask,
+    '화학': CupertinoIcons.lab_flask,
+    '화학Ⅰ': CupertinoIcons.lab_flask,
+    '화학Ⅱ': CupertinoIcons.lab_flask,
+    '물리': CupertinoIcons.bolt,
+    '물리학': CupertinoIcons.bolt,
+    '물리Ⅰ': CupertinoIcons.bolt,
+    '물리Ⅱ': CupertinoIcons.bolt,
+    '지구과학': CupertinoIcons.globe,
+    '지구과학Ⅰ': CupertinoIcons.globe,
+    '지구과학Ⅱ': CupertinoIcons.globe,
+    '국어': CupertinoIcons.book,
+    '국어Ⅰ': CupertinoIcons.book,
+    '국어Ⅱ': CupertinoIcons.book,
+    '문학': CupertinoIcons.book_fill,
+    '언어와매체': CupertinoIcons.doc_text,
+    '영어': CupertinoIcons.textformat,
+    '영어Ⅰ': CupertinoIcons.textformat,
+    '영어Ⅱ': CupertinoIcons.textformat,
+    '영어회화': CupertinoIcons.mic,
+    '한국사': CupertinoIcons.time,
+    '세계사': CupertinoIcons.globe,
+    '동아시아사': CupertinoIcons.map,
+    '경제': CupertinoIcons.money_dollar,
+    '정치와법': CupertinoIcons.hammer,
+    '사회문화': CupertinoIcons.person_2,
+    '지리': CupertinoIcons.map,
+    '세계지리': CupertinoIcons.globe,
+    '한국지리': CupertinoIcons.map,
+    '체육': CupertinoIcons.sportscourt,
+    '음악': CupertinoIcons.music_note,
+    '미술': CupertinoIcons.paintbrush,
+    '기술가정': CupertinoIcons.wrench,
+    '정보': CupertinoIcons.desktopcomputer,
+    '프로그래밍': CupertinoIcons.chevron_left_slash_chevron_right,
   };
 
   /// 장식 벡터 경로 리스트 (Figma에서 가져온 SVG)
@@ -125,27 +125,27 @@ class SubjectThemeService {
     // 키워드 기반 추론
     final lowerName = subjectName.toLowerCase();
     if (lowerName.contains('수학') || lowerName.contains('math')) {
-      return Icons.calculate_outlined;
+      return CupertinoIcons.number;
     } else if (lowerName.contains('과학') || lowerName.contains('science')) {
-      return Icons.science_outlined;
+      return CupertinoIcons.lab_flask;
     } else if (lowerName.contains('국어') || lowerName.contains('korean')) {
-      return Icons.menu_book_outlined;
+      return CupertinoIcons.book;
     } else if (lowerName.contains('영어') || lowerName.contains('english')) {
-      return Icons.translate;
+      return CupertinoIcons.textformat;
     } else if (lowerName.contains('역사') || lowerName.contains('history')) {
-      return Icons.history_edu_outlined;
+      return CupertinoIcons.time;
     } else if (lowerName.contains('지리') || lowerName.contains('geography')) {
-      return Icons.map_outlined;
+      return CupertinoIcons.map;
     } else if (lowerName.contains('체육') || lowerName.contains('pe') || lowerName.contains('physical')) {
-      return Icons.sports_soccer_outlined;
+      return CupertinoIcons.sportscourt;
     } else if (lowerName.contains('음악') || lowerName.contains('music')) {
-      return Icons.music_note_outlined;
+      return CupertinoIcons.music_note;
     } else if (lowerName.contains('미술') || lowerName.contains('art')) {
-      return Icons.palette_outlined;
+      return CupertinoIcons.paintbrush;
     }
 
     // 기본 아이콘
-    return Icons.school_outlined;
+    return CupertinoIcons.book;
   }
 
   /// 과목명으로부터 장식 벡터 경로 반환 (없을 수 있음)
@@ -158,7 +158,7 @@ class SubjectThemeService {
 
   /// 과목명으로부터 장식 벡터 색상 반환
   static Color getDecorationColorForSubject(String subjectName) {
-    if (_decorationColors.isEmpty) return Colors.white;
+    if (_decorationColors.isEmpty) return CupertinoColors.white;
     final hash = _hashSubjectName(subjectName);
     final index = hash.abs() % _decorationColors.length;
     return _decorationColors[index];

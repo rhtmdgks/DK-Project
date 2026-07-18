@@ -1,9 +1,8 @@
 import 'package:flutter/cupertino.dart';
-import 'package:myapp/design/app_colors.dart';
-import 'package:myapp/design/app_radius.dart';
-import 'package:myapp/design/app_spacing.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
+import 'package:myapp/design/glass.dart';
 
-/// iOS 스타일 단일 줄 입력.
+/// Glass 단일 줄 입력 어댑터.
 class AppleTextField extends StatelessWidget {
   const AppleTextField({
     super.key,
@@ -34,11 +33,21 @@ class AppleTextField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bg = AppDesignColors.surface(context);
-    return CupertinoTextField(
+    if (obscureText) {
+      return GlassPasswordField(
+        controller: controller,
+        placeholder: placeholder ?? '',
+        enabled: enabled,
+        autofocus: autofocus,
+        onChanged: onChanged,
+        onSubmitted: onSubmitted,
+        textInputAction: textInputAction,
+        quality: kAppGlassQuality,
+      );
+    }
+    return GlassTextField(
       controller: controller,
-      placeholder: placeholder,
-      obscureText: obscureText,
+      placeholder: placeholder ?? '',
       keyboardType: keyboardType,
       enabled: enabled,
       autofocus: autofocus,
@@ -46,28 +55,8 @@ class AppleTextField extends StatelessWidget {
       onChanged: onChanged,
       onSubmitted: onSubmitted,
       textInputAction: textInputAction,
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.md,
-        vertical: AppSpacing.sm,
-      ),
-      prefix: prefix != null
-          ? Padding(
-              padding: const EdgeInsets.only(left: AppSpacing.sm),
-              child: prefix,
-            )
-          : null,
-      clearButtonMode: OverlayVisibilityMode.editing,
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(AppRadius.sm),
-        border: Border.all(
-          color: CupertinoColors.separator.resolveFrom(context),
-        ),
-      ),
-      style: TextStyle(color: AppDesignColors.label(context)),
-      placeholderStyle: TextStyle(
-        color: AppDesignColors.secondaryLabel(context),
-      ),
+      quality: kAppGlassQuality,
+      prefixIcon: prefix,
     );
   }
 }

@@ -1,7 +1,8 @@
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
+import 'package:myapp/design/glass.dart';
 
-/// Cupertino 다이얼로그·액션 시트 헬퍼.
+/// Cupertino / Glass 다이얼로그·시트 헬퍼.
 abstract final class AppleModal {
   AppleModal._();
 
@@ -14,27 +15,26 @@ abstract final class AppleModal {
     VoidCallback? onConfirm,
     bool isDestructiveConfirm = false,
   }) {
-    return showCupertinoDialog<T>(
+    return GlassDialog.show<T>(
       context: context,
-      builder: (ctx) => CupertinoAlertDialog(
-        title: title != null ? Text(title) : null,
-        content: message != null ? Text(message) : null,
-        actions: [
-          CupertinoDialogAction(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: Text(cancelLabel),
-          ),
-          CupertinoDialogAction(
-            isDestructiveAction: isDestructiveConfirm,
-            isDefaultAction: !isDestructiveConfirm,
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              onConfirm?.call();
-            },
-            child: Text(confirmLabel),
-          ),
-        ],
-      ),
+      quality: kAppGlassQuality,
+      title: title,
+      message: message,
+      actions: [
+        GlassDialogAction(
+          label: cancelLabel,
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        GlassDialogAction(
+          label: confirmLabel,
+          isDestructive: isDestructiveConfirm,
+          isPrimary: !isDestructiveConfirm,
+          onPressed: () {
+            Navigator.of(context).pop();
+            onConfirm?.call();
+          },
+        ),
+      ],
     );
   }
 
@@ -59,30 +59,19 @@ abstract final class AppleModal {
     );
   }
 
-  /// 하단에서 올라오는 페이지 시트 (모달 라우트).
+  /// 하단에서 올라오는 Glass 시트.
   static Future<T?> showBottomSheetPage<T>({
     required BuildContext context,
     required Widget child,
     double? heightFactor,
   }) {
-    return showCupertinoModalPopup<T>(
+    return GlassSheet.show<T>(
       context: context,
-      builder: (ctx) => DraggableScrollableSheet(
-        expand: false,
-        initialChildSize: heightFactor ?? 0.45,
-        minChildSize: 0.25,
-        maxChildSize: 0.92,
-        builder: (context, scrollController) => Material(
-          type: MaterialType.transparency,
-          child: ClipRRect(
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
-            child: ColoredBox(
-              color: CupertinoColors.systemBackground.resolveFrom(context),
-              child: child,
-            ),
-          ),
-        ),
-      ),
+      quality: kAppGlassQuality,
+      builder: (ctx) {
+        final h = MediaQuery.sizeOf(ctx).height * (heightFactor ?? 0.45);
+        return SizedBox(height: h, child: child);
+      },
     );
   }
 }
