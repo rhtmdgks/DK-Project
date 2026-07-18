@@ -1,5 +1,5 @@
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:myapp/components/components.dart';
 import 'package:myapp/core/utils/avatar_url_resolver.dart';
 import 'package:myapp/core/utils/avatar_utils.dart';
@@ -7,6 +7,7 @@ import 'package:myapp/core/supabase_client.dart';
 import 'package:myapp/core/theme/app_theme.dart';
 import 'package:myapp/core/theme/apple_design_tokens.dart' show AppleShape;
 import 'package:myapp/core/theme/responsive.dart';
+import 'package:myapp/core/widgets/app_feedback.dart';
 import 'package:myapp/core/widgets/async_body.dart';
 import 'package:myapp/core/widgets/m3_list.dart';
 import 'package:myapp/design/design.dart';
@@ -81,18 +82,31 @@ Widget _buildAuthorAvatar(BuildContext context, String? avatarUrl) {
         width: radius * 2,
         height: radius * 2,
         fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => CircleAvatar(
-          radius: radius,
-          backgroundColor: AppColors.surfaceContainerHigh,
-          child: Icon(Icons.person, size: context.rs(22), color: AppColors.textSecondary),
+        errorBuilder: (_, __, ___) => _avatarCircle(
+          context,
+          radius,
+          child: Icon(CupertinoIcons.person_fill, size: context.rs(22), color: AppColors.textSecondary),
         ),
       ),
     );
   }
-  return CircleAvatar(
-    radius: radius,
-    backgroundColor: AppColors.surfaceContainerHigh,
-    child: Icon(Icons.person, size: context.rs(22), color: AppColors.textSecondary),
+  return _avatarCircle(
+    context,
+    radius,
+    child: Icon(CupertinoIcons.person_fill, size: context.rs(22), color: AppColors.textSecondary),
+  );
+}
+
+Widget _avatarCircle(BuildContext context, double radius, {required Widget child}) {
+  return Container(
+    width: radius * 2,
+    height: radius * 2,
+    decoration: const BoxDecoration(
+      color: AppColors.surfaceContainerHigh,
+      shape: BoxShape.circle,
+    ),
+    clipBehavior: Clip.antiAlias,
+    child: Center(child: child),
   );
 }
 
@@ -116,9 +130,9 @@ Widget _buildCommentAuthorAvatar(BuildContext context, String author, String? au
 }
 
 Widget _commentAvatarPlaceholder(BuildContext context, double radius, String author) {
-  return CircleAvatar(
-    radius: radius,
-    backgroundColor: AppColors.surfaceContainerHigh,
+  return _avatarCircle(
+    context,
+    radius,
     child: Text(
       author.isNotEmpty ? author[0] : '?',
       style: AppFonts.scaled(context, AppFonts.smallMedium).copyWith(
@@ -138,19 +152,14 @@ class NoticePollTab extends StatefulWidget {
   State<NoticePollTab> createState() => _NoticePollTabState();
 }
 
-class _NoticePollTabState extends State<NoticePollTab>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+class _NoticePollTabState extends State<NoticePollTab> {
+  int _segmentIndex = 0;
   late NoticePollViewModel _viewModel;
   RealtimeChannel? _pollsChannel;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
-    _tabController.addListener(() {
-      if (mounted) setState(() {});
-    });
     _viewModel = NoticePollViewModel()..addListener(_onViewModelChanged);
     _viewModel.fetchAnnouncements();
     _viewModel.fetchPolls();
@@ -180,7 +189,6 @@ class _NoticePollTabState extends State<NoticePollTab>
   void dispose() {
     _pollsChannel?.unsubscribe();
     _viewModel.removeListener(_onViewModelChanged);
-    _tabController.dispose();
     super.dispose();
   }
 
@@ -210,7 +218,7 @@ class _NoticePollTabState extends State<NoticePollTab>
                   ),
                   const SizedBox(height: AppSpacing.md),
                   CupertinoSlidingSegmentedControl<int>(
-                    groupValue: _tabController.index,
+                    groupValue: _segmentIndex,
                     children: const <int, Widget>{
                       0: Padding(
                         padding: EdgeInsets.symmetric(vertical: AppSpacing.xs),
@@ -223,7 +231,7 @@ class _NoticePollTabState extends State<NoticePollTab>
                     },
                     onValueChanged: (int? value) {
                       if (value == null) return;
-                      _tabController.animateTo(value);
+                      setState(() => _segmentIndex = value);
                     },
                   ),
                 ],
@@ -231,8 +239,8 @@ class _NoticePollTabState extends State<NoticePollTab>
             ),
           ),
           Expanded(
-            child: TabBarView(
-              controller: _tabController,
+            child: IndexedStack(
+              index: _segmentIndex,
               children: [
                 _buildAnnouncementsBody(),
                 _buildPollsBody(),
@@ -380,25 +388,19 @@ class _NoticePollTabState extends State<NoticePollTab>
       final result = await _viewModel.togglePollLike(pollId);
       if (!context.mounted) return;
       if (result == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('로그인이 필요해요')),
-        );
+        AppFeedback.showToast(context, '로그인이 필요해요');
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('좋아요에 실패했어요. 다시 시도해 주세요.')),
-        );
+        AppFeedback.showError(context, '좋아요에 실패했어요. 다시 시도해 주세요.');
       }
     }
   }
 
   void _showPollDetail(BuildContext context, Map<String, dynamic> poll) {
-    showModalBottomSheet<void>(
+    GlassSheet.show<void>(
       context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: Colors.transparent,
+      quality: kAppGlassQuality,
       builder: (ctx) {
         return DraggableScrollableSheet(
           expand: false,
@@ -511,20 +513,17 @@ class PollPostCard extends StatelessWidget {
       }
     }
 
-    return Material(
-      color: AppColors.white,
-      borderRadius: BorderRadius.circular(AppleShape.radiusUtilityCard),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Container(
-          padding: EdgeInsets.all(context.rs(16)),
-          decoration: BoxDecoration(
-            color: AppColors.white,
-            borderRadius: BorderRadius.circular(AppleShape.radiusUtilityCard),
-            border: Border.all(color: AppColors.border),
-          ),
-          child: Column(
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        padding: EdgeInsets.all(context.rs(16)),
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.circular(AppleShape.radiusUtilityCard),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // 헤더: 프로필 사진 + 이름·시간 + 더보기(⋮)
@@ -696,7 +695,6 @@ class PollPostCard extends StatelessWidget {
             ],
           ),
         ),
-      ),
     );
   }
 }
@@ -790,28 +788,33 @@ class _PollOptionBar extends StatelessWidget {
           final hasUrl = url != null && url.isNotEmpty;
           return Positioned(
             left: (r * 2 - overlap) * i.toDouble(),
-            child: CircleAvatar(
-              radius: r,
-              backgroundColor: hasUrl ? AppColors.border : colors[i % colors.length],
+            child: Container(
+              width: r * 2,
+              height: r * 2,
+              decoration: BoxDecoration(
+                color: hasUrl ? AppColors.border : colors[i % colors.length],
+                shape: BoxShape.circle,
+              ),
+              clipBehavior: Clip.antiAlias,
               child: hasUrl
-                  ? ClipOval(
-                      child: Image.network(
-                        url,
-                        width: r * 2,
-                        height: r * 2,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Icon(
-                          Icons.person,
-                          size: context.rs(16),
-                          color: AppColors.textSecondary,
-                        ),
+                  ? Image.network(
+                      url,
+                      width: r * 2,
+                      height: r * 2,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Icon(
+                        CupertinoIcons.person_fill,
+                        size: context.rs(16),
+                        color: AppColors.textSecondary,
                       ),
                     )
-                  : Text(
-                      String.fromCharCode(0x41 + (optionIndex + i) % 5),
-                      style: AppFonts.scaled(context, AppFonts.tiny).copyWith(
-                        color: AppColors.white,
-                        fontWeight: FontWeight.w600,
+                  : Center(
+                      child: Text(
+                        String.fromCharCode(0x41 + (optionIndex + i) % 5),
+                        style: AppFonts.scaled(context, AppFonts.tiny).copyWith(
+                          color: AppColors.white,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
             ),
@@ -896,9 +899,7 @@ class _PollCommentsSectionState extends State<_PollCommentsSection> {
         final msg = e is Exception
             ? e.toString().replaceFirst('Exception: ', '')
             : '댓글 등록에 실패했어요. 다시 시도해 주세요.';
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(msg)),
-        );
+        AppFeedback.showError(context, msg);
       }
     }
     if (mounted) setState(() => _sending = false);

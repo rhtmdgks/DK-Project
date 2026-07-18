@@ -1,14 +1,16 @@
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:go_router/go_router.dart';
 import 'package:myapp/components/components.dart';
 import 'package:myapp/core/auth/auth_repository.dart';
 import 'package:myapp/core/auth/auth_state.dart';
 import 'package:myapp/core/routing/app_router.dart';
 import 'package:myapp/core/supabase_client.dart';
+import 'package:myapp/core/theme/app_resolved_colors.dart';
 import 'package:myapp/core/theme/app_theme.dart';
 import 'package:myapp/core/theme/apple_design_tokens.dart' show AppleShape;
 import 'package:myapp/core/theme/responsive.dart';
+import 'package:myapp/core/widgets/app_feedback.dart';
 import 'package:myapp/core/widgets/async_body.dart';
 import 'package:myapp/core/widgets/dismiss_keyboard.dart';
 import 'package:myapp/core/widgets/m3_list.dart';
@@ -18,25 +20,6 @@ import 'package:myapp/repositories/suggestions_repository.dart';
 import 'package:myapp/repositories/user_block_repository.dart';
 import 'package:myapp/services/content_moderation_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-
-/// FAB를 하단에서 살짝 위로 둔 커스텀 위치.
-class _LowerFabLocation extends FloatingActionButtonLocation {
-  const _LowerFabLocation();
-
-  @override
-  Offset getOffset(ScaffoldPrelayoutGeometry scaffoldGeometry) {
-    const double end = 16.0;
-    const double bottom = 28.0; // 위로 올리기 (값이 클수록 더 위)
-    return Offset(
-      scaffoldGeometry.scaffoldSize.width -
-          scaffoldGeometry.floatingActionButtonSize.width -
-          end,
-      scaffoldGeometry.contentBottom -
-          scaffoldGeometry.floatingActionButtonSize.height -
-          bottom,
-    );
-  }
-}
 
 /// [createdAt] ISO 문자열을 "2월 18일" 형식으로 포맷.
 String _formatDate(String? createdAt) {
@@ -74,9 +57,8 @@ class SuggestionsTab extends StatefulWidget {
   State<SuggestionsTab> createState() => _SuggestionsTabState();
 }
 
-class _SuggestionsTabState extends State<SuggestionsTab>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+class _SuggestionsTabState extends State<SuggestionsTab> {
+  int _segmentIndex = 0;
 
   bool _loading = false;
   String? _error;
@@ -89,18 +71,8 @@ class _SuggestionsTabState extends State<SuggestionsTab>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
-    _tabController.addListener(() {
-      if (mounted) setState(() {});
-    });
     _loadProfile();
     _fetch();
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
   }
 
   Future<void> _loadProfile() async {
@@ -115,18 +87,14 @@ class _SuggestionsTabState extends State<SuggestionsTab>
 
       if (adminUserId == null || adminUserId.isEmpty) {
         if (!mounted) return;
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('관리자를 찾을 수 없습니다')));
+        AppFeedback.showError(context, '관리자를 찾을 수 없습니다');
         return;
       }
 
       final currentUserId = await AuthRepository.instance.getUserId();
       if (currentUserId == null) {
         if (!mounted) return;
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('로그인이 필요합니다')));
+        AppFeedback.showError(context, '로그인이 필요합니다');
         return;
       }
 
@@ -137,9 +105,7 @@ class _SuggestionsTabState extends State<SuggestionsTab>
 
       if (result == null) {
         if (!mounted) return;
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('채팅방을 생성할 수 없습니다')));
+        AppFeedback.showError(context, '채팅방을 생성할 수 없습니다');
         return;
       }
 
@@ -147,9 +113,7 @@ class _SuggestionsTabState extends State<SuggestionsTab>
       final roomId = resultMap['room_id'] as String?;
       if (roomId == null) {
         if (!mounted) return;
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('채팅방 ID를 가져올 수 없습니다')));
+        AppFeedback.showError(context, '채팅방 ID를 가져올 수 없습니다');
         return;
       }
 
@@ -159,22 +123,16 @@ class _SuggestionsTabState extends State<SuggestionsTab>
       if (!mounted) return;
       if (e.code == 'P0001' && e.message.contains('cannot_chat_with_self')) {
         // 관리자 계정이 자기 자신에게 채팅을 시도하는 경우 – 친절한 안내로 대체
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('관리자 계정에서는 이 버튼 대신 건의함 채팅 또는 기존 채팅방을 이용해 주세요.'),
-            backgroundColor: AppColors.error,
-          ),
+        AppFeedback.showError(
+          context,
+          '관리자 계정에서는 이 버튼 대신 건의함 채팅 또는 기존 채팅방을 이용해 주세요.',
         );
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('채팅방을 여는 중 오류가 발생했습니다: ${e.message}')),
-        );
+        AppFeedback.showError(context, '채팅방을 여는 중 오류가 발생했습니다: ${e.message}');
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('채팅방을 여는 중 오류가 발생했습니다: $e')));
+      AppFeedback.showError(context, '채팅방을 여는 중 오류가 발생했습니다: $e');
     }
   }
 
@@ -218,70 +176,74 @@ class _SuggestionsTabState extends State<SuggestionsTab>
   @override
   Widget build(BuildContext context) {
     return DismissKeyboard(
-      child: Scaffold(
-        backgroundColor: AppDesignColors.groupedBackground(context),
-        body: Column(
+      child: ColoredBox(
+        color: AppDesignColors.groupedBackground(context),
+        child: Stack(
           children: [
-            SafeArea(
-              bottom: false,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.md,
-                  AppSpacing.xs,
-                  AppSpacing.md,
-                  AppSpacing.sm,
+            Column(
+              children: [
+                SafeArea(
+                  bottom: false,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      AppSpacing.md,
+                      AppSpacing.xs,
+                      AppSpacing.md,
+                      AppSpacing.sm,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('건의함', style: AppTypography.largeTitle(context)),
+                        const SizedBox(height: AppSpacing.xs),
+                        Text(
+                          '학교 운영에 대한 의견을 남기거나 학생회와 바로 채팅하세요.',
+                          style: AppTypography.subheadline(context),
+                        ),
+                        const SizedBox(height: AppSpacing.md),
+                        CupertinoSlidingSegmentedControl<int>(
+                          groupValue: _segmentIndex,
+                          children: const <int, Widget>{
+                            0: Padding(
+                              padding: EdgeInsets.symmetric(vertical: AppSpacing.xs),
+                              child: Text('건의 목록'),
+                            ),
+                            1: Padding(
+                              padding: EdgeInsets.symmetric(vertical: AppSpacing.xs),
+                              child: Text('채팅하기'),
+                            ),
+                          },
+                          onValueChanged: (int? value) {
+                            if (value == null) return;
+                            setState(() => _segmentIndex = value);
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('건의함', style: AppTypography.largeTitle(context)),
-                    const SizedBox(height: AppSpacing.xs),
-                    Text(
-                      '학교 운영에 대한 의견을 남기거나 학생회와 바로 채팅하세요.',
-                      style: AppTypography.subheadline(context),
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-                    CupertinoSlidingSegmentedControl<int>(
-                      groupValue: _tabController.index,
-                      children: const <int, Widget>{
-                        0: Padding(
-                          padding: EdgeInsets.symmetric(vertical: AppSpacing.xs),
-                          child: Text('건의 목록'),
-                        ),
-                        1: Padding(
-                          padding: EdgeInsets.symmetric(vertical: AppSpacing.xs),
-                          child: Text('채팅하기'),
-                        ),
-                      },
-                      onValueChanged: (int? value) {
-                        if (value == null) return;
-                        _tabController.animateTo(value);
-                      },
-                    ),
-                  ],
+                Expanded(
+                  child: IndexedStack(
+                    index: _segmentIndex,
+                    children: [_buildListBody(), _buildChatSection()],
+                  ),
+                ),
+              ],
+            ),
+            if (_segmentIndex == 0)
+              Positioned(
+                right: 16,
+                bottom: 28,
+                child: CupertinoButton(
+                  padding: const EdgeInsets.all(AppSpacing.sm),
+                  color: AppDesignColors.primary(context),
+                  borderRadius: BorderRadius.circular(999),
+                  onPressed: _showAddSuggestionBottomSheet,
+                  child: const Icon(CupertinoIcons.add),
                 ),
               ),
-            ),
-            Expanded(
-              child: TabBarView(
-                controller: _tabController,
-                children: [_buildListBody(), _buildChatSection()],
-              ),
-            ),
           ],
         ),
-        floatingActionButton: _tabController.index == 0
-            ? CupertinoButton(
-                padding: const EdgeInsets.all(AppSpacing.sm),
-                color: AppDesignColors.primary(context),
-                borderRadius: BorderRadius.circular(999),
-                onPressed: _showAddSuggestionBottomSheet,
-                child: const Icon(CupertinoIcons.add),
-              )
-            : null,
-        floatingActionButtonLocation: _tabController.index == 0
-            ? const _LowerFabLocation()
-            : null,
       ),
     );
   }
@@ -503,61 +465,8 @@ class _SuggestionsTabState extends State<SuggestionsTab>
     String contentType,
     String contentId,
   ) async {
-    final controller = TextEditingController();
-    String? selectedReason;
-
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) {
-        return AlertDialog(
-          title: const Text('신고하기'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              DropdownButtonFormField<String>(
-                initialValue: selectedReason,
-                decoration: const InputDecoration(labelText: '사유 선택'),
-                items: const [
-                  DropdownMenuItem(value: '욕설/비하', child: Text('욕설/비하')),
-                  DropdownMenuItem(value: '괴롭힘/따돌림', child: Text('괴롭힘/따돌림')),
-                  DropdownMenuItem(value: '스팸', child: Text('스팸')),
-                  DropdownMenuItem(value: '불법/위험 행위', child: Text('불법/위험 행위')),
-                  DropdownMenuItem(value: '기타', child: Text('기타 (직접 입력)')),
-                ],
-                onChanged: (v) {
-                  selectedReason = v;
-                },
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: controller,
-                maxLines: 2,
-                decoration: const InputDecoration(
-                  labelText: '상세 사유 (선택)',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(false),
-              child: const Text('취소'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(ctx).pop(true),
-              child: const Text('신고'),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (confirmed != true) return;
-
-    final baseReason = selectedReason ?? '기타';
-    final extra = controller.text.trim();
-    final reason = extra.isEmpty ? baseReason : '$baseReason - $extra';
+    final reason = await _pickReportReason(context);
+    if (reason == null) return;
 
     try {
       await _contentReportRepo.reportContent(
@@ -566,20 +475,10 @@ class _SuggestionsTabState extends State<SuggestionsTab>
         reason: reason,
       );
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('신고가 접수되었습니다.'),
-          backgroundColor: AppColors.success,
-        ),
-      );
+      AppFeedback.showSuccess(context, '신고가 접수되었습니다.');
     } catch (e) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('신고 중 오류가 발생했습니다: $e'),
-          backgroundColor: AppColors.error,
-        ),
-      );
+      AppFeedback.showError(context, '신고 중 오류가 발생했습니다: $e');
     }
   }
 
@@ -588,20 +487,10 @@ class _SuggestionsTabState extends State<SuggestionsTab>
       await _blockRepo.blockProfile(profileId);
       await _fetch();
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('해당 사용자를 차단했습니다.'),
-          backgroundColor: AppColors.success,
-        ),
-      );
+      AppFeedback.showSuccess(context, '해당 사용자를 차단했습니다.');
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('차단 중 오류가 발생했습니다: $e'),
-          backgroundColor: AppColors.error,
-        ),
-      );
+      AppFeedback.showError(context, '차단 중 오류가 발생했습니다: $e');
     }
   }
 
@@ -611,11 +500,9 @@ class _SuggestionsTabState extends State<SuggestionsTab>
     bool submitting = false;
     final overlayContext = rootNavigatorKey.currentContext ?? context;
 
-    showModalBottomSheet<bool>(
+    GlassSheet.show<bool>(
       context: overlayContext,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: Colors.transparent,
+      quality: kAppGlassQuality,
       builder: (sheetContext) {
         return DraggableScrollableSheet(
           expand: false,
@@ -685,13 +572,9 @@ class _SuggestionsTabState extends State<SuggestionsTab>
                                     ContentModerationService.checkText('$title\n$bodyText');
                                 if (moderation.hasAbuse) {
                                   if (innerContext.mounted) {
-                                    ScaffoldMessenger.of(innerContext).showSnackBar(
-                                      const SnackBar(
-                                        content: Text(
-                                          '부적절한 표현이 포함되어 있어 건의를 등록할 수 없습니다.',
-                                        ),
-                                        backgroundColor: AppColors.error,
-                                      ),
+                                    AppFeedback.showError(
+                                      innerContext,
+                                      '부적절한 표현이 포함되어 있어 건의를 등록할 수 없습니다.',
                                     );
                                   }
                                   return;
@@ -746,15 +629,98 @@ class _SuggestionsTabState extends State<SuggestionsTab>
       bodyController.dispose();
       if (success == true && mounted) {
         _fetch();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('등록되었습니다.'),
-            backgroundColor: AppColors.success,
-          ),
-        );
+        AppFeedback.showSuccess(context, '등록되었습니다.');
       }
     });
   }
+}
+
+Future<String?> _pickReportReason(BuildContext context) async {
+  const reasons = [
+    '욕설/비하',
+    '괴롭힘/따돌림',
+    '스팸',
+    '불법/위험 행위',
+    '기타 (직접 입력)',
+  ];
+  final detailController = TextEditingController();
+  String? selectedReason;
+
+  final confirmed = await GlassSheet.show<bool>(
+    context: context,
+    quality: kAppGlassQuality,
+    builder: (ctx) {
+      return StatefulBuilder(
+        builder: (innerCtx, setSheetState) {
+          return SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('신고하기', style: AppTypography.title2(innerCtx)),
+                  const SizedBox(height: AppSpacing.sm),
+                  for (final reason in reasons)
+                    CupertinoButton(
+                      padding: EdgeInsets.zero,
+                      onPressed: () => setSheetState(() => selectedReason = reason),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: Row(
+                          children: [
+                            Icon(
+                              selectedReason == reason
+                                  ? CupertinoIcons.check_mark_circled_solid
+                                  : CupertinoIcons.circle,
+                              size: 20,
+                              color: AppDesignColors.primary(innerCtx),
+                            ),
+                            const SizedBox(width: AppSpacing.xs),
+                            Expanded(child: Text(reason)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  const SizedBox(height: AppSpacing.sm),
+                  AppleTextField(
+                    controller: detailController,
+                    placeholder: '상세 사유 (선택)',
+                    maxLines: 2,
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: AppleButton(
+                          label: '취소',
+                          variant: AppleButtonVariant.secondary,
+                          onPressed: () => Navigator.of(innerCtx).pop(false),
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      Expanded(
+                        child: AppleButton(
+                          label: '신고',
+                          onPressed: () => Navigator.of(innerCtx).pop(true),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+    },
+  );
+
+  final detail = detailController.text.trim();
+  detailController.dispose();
+  if (confirmed != true) return null;
+  final baseReason = selectedReason ?? '기타';
+  return detail.isEmpty ? baseReason : '$baseReason - $detail';
 }
 
 /// 질문하기(건의 등록) 폼. 카드 스타일, Supabase 연동.
@@ -794,18 +760,7 @@ class _AddSuggestionFormState extends State<_AddSuggestionForm> {
     final title = _titleController.text.trim();
     if (title.isEmpty) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text(
-            '제목을 입력해 주세요.',
-            style: TextStyle(color: AppColors.white),
-          ),
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: AppColors.error,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          margin: const EdgeInsets.only(bottom: 80, left: 16, right: 16),
-        ),
-      );
+      AppFeedback.showError(context, '제목을 입력해 주세요.');
       return;
     }
 
@@ -813,17 +768,9 @@ class _AddSuggestionFormState extends State<_AddSuggestionForm> {
     final moderation = ContentModerationService.checkText('$title\n$bodyText');
     if (moderation.hasAbuse) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text(
-            '부적절한 표현이 포함되어 있어 건의를 등록할 수 없습니다. 표현을 수정해 주세요.',
-            style: TextStyle(color: AppColors.white),
-          ),
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: AppColors.error,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          margin: const EdgeInsets.only(bottom: 80, left: 16, right: 16),
-        ),
+      AppFeedback.showError(
+        context,
+        '부적절한 표현이 포함되어 있어 건의를 등록할 수 없습니다. 표현을 수정해 주세요.',
       );
       return;
     }
@@ -864,18 +811,7 @@ class _AddSuggestionFormState extends State<_AddSuggestionForm> {
       _bodyController.clear();
       widget.onSubmitted();
       setState(() => _submitting = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text(
-            '등록 되었습니다.',
-            style: TextStyle(color: AppColors.white),
-          ),
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: AppColors.success,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          margin: const EdgeInsets.only(bottom: 80, left: 16, right: 16),
-        ),
-      );
+      AppFeedback.showSuccess(context, '등록 되었습니다.');
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -888,19 +824,11 @@ class _AddSuggestionFormState extends State<_AddSuggestionForm> {
           msg.contains('로그인 세션이 없습니다') ||
           msg.contains('row-level security') ||
           msg.contains('42501');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            isSessionError
-                ? '서버 인증 세션이 없습니다. 로그아웃 후 다시 로그인해 주세요.'
-                : '등록 중 오류가 발생했습니다: $e',
-            style: const TextStyle(color: AppColors.white),
-          ),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          backgroundColor: AppColors.error,
-          margin: const EdgeInsets.only(bottom: 80, left: 16, right: 16),
-        ),
+      AppFeedback.showError(
+        context,
+        isSessionError
+            ? '서버 인증 세션이 없습니다. 로그아웃 후 다시 로그인해 주세요.'
+            : '등록 중 오류가 발생했습니다: $e',
       );
     }
   }
@@ -1120,9 +1048,7 @@ class _SuggestionDetailBodyWidgetState
     if (ok == true && mounted && enteredPassword == storedPassword) {
       setState(() => _unlockedIds.add(id));
     } else if (ok == true && mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('비밀번호가 맞지 않습니다.')));
+      AppFeedback.showError(context, '비밀번호가 맞지 않습니다.');
     }
   }
 
@@ -1132,11 +1058,9 @@ class _SuggestionDetailBodyWidgetState
     bool isPrivate = false;
     bool submitting = false;
 
-    return showModalBottomSheet<bool>(
+    return GlassSheet.show<bool>(
       context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: Colors.transparent,
+      quality: kAppGlassQuality,
       builder: (sheetContext) {
         return StatefulBuilder(
           builder: (innerContext, setSheetState) {
@@ -1148,14 +1072,15 @@ class _SuggestionDetailBodyWidgetState
               builder: (_, scrollController) {
                 return Container(
                   decoration: BoxDecoration(
-                    color: Theme.of(innerContext).colorScheme.surface,
+                    color: innerContext.appColors.surface,
                     borderRadius: BorderRadius.vertical(
                       top: Radius.circular(AppShapes.radiusLarge),
                     ),
                   ),
                   child: SafeArea(
                     top: false,
-                    child: Padding(
+                    child: SingleChildScrollView(
+                      controller: scrollController,
                       padding: EdgeInsets.all(innerContext.rs(20)),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1169,14 +1094,10 @@ class _SuggestionDetailBodyWidgetState
                             ),
                           ),
                           SizedBox(height: innerContext.rh(16)),
-                          TextField(
+                          AppleTextField(
                             controller: contentController,
+                            placeholder: '댓글 내용',
                             maxLines: 3,
-                            decoration: const InputDecoration(
-                              labelText: '댓글 내용',
-                              hintText: '댓글을 입력하세요',
-                              border: OutlineInputBorder(),
-                            ),
                           ),
                           SizedBox(height: innerContext.rh(12)),
                           Row(
@@ -1188,7 +1109,7 @@ class _SuggestionDetailBodyWidgetState
                                   AppFonts.bodyRegular,
                                 ),
                               ),
-                              Switch(
+                              CupertinoSwitch(
                                 value: isPrivate,
                                 onChanged: (v) =>
                                     setSheetState(() => isPrivate = v),
@@ -1197,29 +1118,25 @@ class _SuggestionDetailBodyWidgetState
                           ),
                           if (isPrivate) ...[
                             SizedBox(height: innerContext.rh(8)),
-                            TextField(
+                            AppleTextField(
                               controller: passwordController,
+                              placeholder: '비공개 댓글 열람용 비밀번호',
                               obscureText: true,
-                              decoration: const InputDecoration(
-                                labelText: '비밀번호',
-                                hintText: '비공개 댓글 열람용 비밀번호',
-                                border: OutlineInputBorder(),
-                              ),
                             ),
                           ],
                           SizedBox(height: innerContext.rh(20)),
-                          FilledButton(
+                          AppleButton(
+                            label: '댓글 추가',
+                            fullWidth: true,
+                            loading: submitting,
                             onPressed: submitting
                                 ? null
                                 : () async {
                                     final text = contentController.text.trim();
                                     if (text.isEmpty) {
-                                      ScaffoldMessenger.of(
+                                      AppFeedback.showError(
                                         innerContext,
-                                      ).showSnackBar(
-                                        const SnackBar(
-                                          content: Text('댓글 내용을 입력하세요.'),
-                                        ),
+                                        '댓글 내용을 입력하세요.',
                                       );
                                       return;
                                     }
@@ -1228,26 +1145,18 @@ class _SuggestionDetailBodyWidgetState
                                           text,
                                         );
                                     if (moderation.hasAbuse) {
-                                      ScaffoldMessenger.of(
+                                      AppFeedback.showError(
                                         innerContext,
-                                      ).showSnackBar(
-                                        const SnackBar(
-                                          content: Text(
-                                            '부적절한 표현이 포함되어 있어 댓글을 등록할 수 없습니다. 표현을 수정해 주세요.',
-                                          ),
-                                        ),
+                                        '부적절한 표현이 포함되어 있어 댓글을 등록할 수 없습니다. 표현을 수정해 주세요.',
                                       );
                                       return;
                                     }
                                     final profile = await getCurrentProfile();
                                     if (profile == null) {
                                       if (innerContext.mounted) {
-                                        ScaffoldMessenger.of(
+                                        AppFeedback.showError(
                                           innerContext,
-                                        ).showSnackBar(
-                                          const SnackBar(
-                                            content: Text('로그인이 필요합니다.'),
-                                          ),
+                                          '로그인이 필요합니다.',
                                         );
                                       }
                                       return;
@@ -1276,23 +1185,13 @@ class _SuggestionDetailBodyWidgetState
                                     } catch (e) {
                                       if (innerContext.mounted) {
                                         setSheetState(() => submitting = false);
-                                        ScaffoldMessenger.of(
+                                        AppFeedback.showError(
                                           innerContext,
-                                        ).showSnackBar(
-                                          SnackBar(content: Text('등록 실패: $e')),
+                                          '등록 실패: $e',
                                         );
                                       }
                                     }
                                   },
-                            child: submitting
-                                ? const SizedBox(
-                                    height: 20,
-                                    width: 20,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                : const Text('댓글 추가'),
                           ),
                         ],
                       ),
@@ -1557,20 +1456,10 @@ class _SuggestionDetailBodyWidgetState
         reason: reason,
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('댓글 신고가 접수되었습니다.'),
-          backgroundColor: AppColors.success,
-        ),
-      );
+      AppFeedback.showSuccess(context, '댓글 신고가 접수되었습니다.');
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('댓글 신고 중 오류가 발생했습니다: $e'),
-          backgroundColor: AppColors.error,
-        ),
-      );
+      AppFeedback.showError(context, '댓글 신고 중 오류가 발생했습니다: $e');
     }
   }
 
@@ -1579,77 +1468,12 @@ class _SuggestionDetailBodyWidgetState
       await _blockRepo.blockProfile(profileId);
       await _loadComments();
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('해당 사용자를 차단했습니다.'),
-          backgroundColor: AppColors.success,
-        ),
-      );
+      AppFeedback.showSuccess(context, '해당 사용자를 차단했습니다.');
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('차단 중 오류가 발생했습니다: $e'),
-          backgroundColor: AppColors.error,
-        ),
-      );
+      AppFeedback.showError(context, '차단 중 오류가 발생했습니다: $e');
     }
   }
 
-  Future<String?> _askReason() async {
-    final controller = TextEditingController();
-    String? selectedReason;
-
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) {
-        return AlertDialog(
-          title: const Text('신고하기'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              DropdownButtonFormField<String>(
-                initialValue: selectedReason,
-                decoration: const InputDecoration(labelText: '사유 선택'),
-                items: const [
-                  DropdownMenuItem(value: '욕설/비하', child: Text('욕설/비하')),
-                  DropdownMenuItem(value: '괴롭힘/따돌림', child: Text('괴롭힘/따돌림')),
-                  DropdownMenuItem(value: '스팸', child: Text('스팸')),
-                  DropdownMenuItem(value: '불법/위험 행위', child: Text('불법/위험 행위')),
-                  DropdownMenuItem(value: '기타', child: Text('기타 (직접 입력)')),
-                ],
-                onChanged: (v) {
-                  selectedReason = v;
-                },
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: controller,
-                maxLines: 2,
-                decoration: const InputDecoration(
-                  labelText: '상세 사유 (선택)',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(false),
-              child: const Text('취소'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(ctx).pop(true),
-              child: const Text('신고'),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (ok != true) return null;
-    final baseReason = selectedReason ?? '기타';
-    final extra = controller.text.trim();
-    return extra.isEmpty ? baseReason : '$baseReason - $extra';
-  }
+  Future<String?> _askReason() => _pickReportReason(context);
 }

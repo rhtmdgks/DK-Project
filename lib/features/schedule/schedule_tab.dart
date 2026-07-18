@@ -2,19 +2,24 @@ import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:go_router/go_router.dart';
+import 'package:myapp/components/apple_button.dart';
+import 'package:myapp/components/apple_text_field.dart';
 import 'package:myapp/core/routing/app_router.dart';
 import 'package:myapp/core/auth/auth_state.dart';
 import 'package:myapp/core/auth/auth_repository.dart';
 import 'package:myapp/core/supabase_client.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:myapp/core/theme/app_resolved_colors.dart';
 import 'package:myapp/core/theme/app_theme.dart';
 import 'package:myapp/core/theme/responsive.dart';
+import 'package:myapp/core/widgets/app_feedback.dart';
 import 'package:myapp/core/widgets/async_body.dart';
 import 'package:myapp/core/widgets/dismiss_keyboard.dart';
 import 'package:myapp/core/widgets/m3_list.dart';
 import 'package:myapp/core/widgets/tab_page_header.dart';
+import 'package:myapp/design/glass.dart';
 import 'package:myapp/repositories/personal_event_attachment_repository.dart';
 import 'package:myapp/repositories/schedule_repository.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -32,6 +37,64 @@ DateTime? _parseUtc(String? s) {
   } catch (_) {
     return null;
   }
+}
+
+Future<DateTime?> _pickDateTime(BuildContext context, DateTime initial) async {
+  var picked = initial;
+  return showCupertinoModalPopup<DateTime>(
+    context: context,
+    builder: (ctx) {
+      final colors = ctx.appColors;
+      return Container(
+        height: 320,
+        color: colors.surface,
+        child: Column(
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                CupertinoButton(
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  child: const Text('취소'),
+                ),
+                CupertinoButton(
+                  onPressed: () => Navigator.of(ctx).pop(picked),
+                  child: const Text('확인'),
+                ),
+              ],
+            ),
+            Expanded(
+              child: CupertinoDatePicker(
+                mode: CupertinoDatePickerMode.dateAndTime,
+                initialDateTime: initial,
+                onDateTimeChanged: (dt) => picked = dt,
+              ),
+            ),
+          ],
+        ),
+      );
+    },
+  );
+}
+
+Future<bool> _confirmDelete(BuildContext context) async {
+  final result = await GlassDialog.show<bool>(
+    context: context,
+    quality: kAppGlassQuality,
+    title: '삭제하시겠습니까?',
+    actions: [
+      GlassDialogAction(
+        label: '취소',
+        onPressed: () => Navigator.of(context).pop(false),
+      ),
+      GlassDialogAction(
+        label: '삭제',
+        isDestructive: true,
+        onPressed: () => Navigator.of(context).pop(true),
+      ),
+    ],
+  );
+  return result ?? false;
 }
 
 /// 일정 관리 탭. 반응형 대응.
@@ -215,71 +278,74 @@ class _ScheduleTabState extends State<ScheduleTab> {
   @override
   Widget build(BuildContext context) {
     return DismissKeyboard(
-      child: Scaffold(
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        body: Column(
-        children: [
-          SafeArea(
-            top: true,
-            bottom: false,
-            minimum: EdgeInsets.zero,
-            child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: context.rs(22)),
-              child: TabPageHeader(
-                title: '일정',
-                subtitle: '날짜를 선택해 일정을 확인하세요.',
-                trailing: _canEdit
-                    ? CupertinoButton(
-                        padding: EdgeInsets.zero,
-                        onPressed: _showAddDialog,
-                        child: const Icon(CupertinoIcons.add),
-                      )
-                    : null,
+      child: ColoredBox(
+        color: context.appColors.background,
+        child: Column(
+          children: [
+            SafeArea(
+              top: true,
+              bottom: false,
+              minimum: EdgeInsets.zero,
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: context.rs(22)),
+                child: TabPageHeader(
+                  title: '일정',
+                  subtitle: '날짜를 선택해 일정을 확인하세요.',
+                  trailing: _canEdit
+                      ? CupertinoButton(
+                          padding: EdgeInsets.zero,
+                          onPressed: _showAddDialog,
+                          child: const Icon(CupertinoIcons.add),
+                        )
+                      : null,
+                ),
               ),
             ),
-          ),
-          Expanded(
-            child: Material(
-              type: MaterialType.transparency,
+            Expanded(
               child: AsyncBody(
                 loading: _loading,
                 error: _error,
                 isEmpty: false,
                 onRetry: _fetch,
                 emptyMessage: '',
-                child: RefreshIndicator(
-                  onRefresh: _fetch,
-                  child: ListView(
-                    padding: context.horizontalPadding.copyWith(
-                      top: context.rh(16),
-                      bottom: context.rh(16),
-                    ),
-                    children: [
-                      _buildCalendarSection(),
-                      SizedBox(height: context.rh(24)),
-                      _buildSectionTitle(),
-                      SizedBox(height: context.rh(2)),
-                      _buildScheduleList(),
-                      SizedBox(height: context.rh(20)),
-                      _buildNewEventButton(),
-                      SizedBox(height: context.rh(24)),
-                      _buildClassPhotoSection(),
-                      SizedBox(height: context.rh(24)),
-                    ],
+                child: CustomScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(
+                    parent: BouncingScrollPhysics(),
                   ),
+                  slivers: [
+                    CupertinoSliverRefreshControl(onRefresh: _fetch),
+                    SliverPadding(
+                      padding: context.horizontalPadding.copyWith(
+                        top: context.rh(16),
+                        bottom: context.rh(16),
+                      ),
+                      sliver: SliverList(
+                        delegate: SliverChildListDelegate([
+                          _buildCalendarSection(),
+                          SizedBox(height: context.rh(24)),
+                          _buildSectionTitle(),
+                          SizedBox(height: context.rh(2)),
+                          _buildScheduleList(),
+                          SizedBox(height: context.rh(20)),
+                          _buildNewEventButton(),
+                          SizedBox(height: context.rh(24)),
+                          _buildClassPhotoSection(),
+                          SizedBox(height: context.rh(24)),
+                        ]),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
-          ),
-        ],
-      ),
+          ],
+        ),
       ),
     );
   }
 
-  /// 반별 사진 공유 진입 섹션.
   Widget _buildClassPhotoSection() {
-    final theme = Theme.of(context);
+    final colors = context.appColors;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -290,48 +356,48 @@ class _ScheduleTabState extends State<ScheduleTab> {
             style: AppFonts.scaled(context, AppFonts.sectionTitle),
           ),
         ),
-        Material(
-          color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
-          borderRadius: BorderRadius.circular(12),
-          child: InkWell(
-            onTap: () => context.push(AppRoute.classPhotoShares.path),
-            borderRadius: BorderRadius.circular(12),
-            child: Padding(
-              padding: EdgeInsets.symmetric(
-                horizontal: context.rs(16),
-                vertical: context.rh(14),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.photo_library_outlined,
-                    size: context.rs(22),
-                    color: theme.colorScheme.primary,
+        GestureDetector(
+          onTap: () => context.push(AppRoute.classPhotoShares.path),
+          behavior: HitTestBehavior.opaque,
+          child: Container(
+            decoration: BoxDecoration(
+              color: colors.surfaceContainerHighest.withValues(alpha: 0.6),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            padding: EdgeInsets.symmetric(
+              horizontal: context.rs(16),
+              vertical: context.rh(14),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  CupertinoIcons.photo_on_rectangle,
+                  size: context.rs(22),
+                  color: colors.primary,
+                ),
+                SizedBox(width: context.rs(10)),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '반별 사진 공유',
+                        style: AppFonts.scaled(context, AppFonts.titleMedium),
+                      ),
+                      SizedBox(height: context.rh(2)),
+                      Text(
+                        '같은 반 친구들과 사진을 올리고 볼 수 있어요.',
+                        style: AppFonts.scaled(context, AppFonts.captionRegular),
+                      ),
+                    ],
                   ),
-                  SizedBox(width: context.rs(10)),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '반별 사진 공유',
-                          style: AppFonts.scaled(context, AppFonts.titleMedium),
-                        ),
-                        SizedBox(height: context.rh(2)),
-                        Text(
-                          '같은 반 친구들과 사진을 올리고 볼 수 있어요.',
-                          style: AppFonts.scaled(context, AppFonts.captionRegular),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Icon(
-                    Icons.chevron_right_rounded,
-                    size: context.rs(22),
-                    color: AppColors.hint,
-                  ),
-                ],
-              ),
+                ),
+                Icon(
+                  CupertinoIcons.chevron_right,
+                  size: context.rs(22),
+                  color: AppColors.hint,
+                ),
+              ],
             ),
           ),
         ),
@@ -339,40 +405,39 @@ class _ScheduleTabState extends State<ScheduleTab> {
     );
   }
 
-  /// iOS HIG 스타일: 가로로 긴, 둥근 모서리의 "새로운 이벤트" 버튼.
   Widget _buildNewEventButton() {
-    final theme = Theme.of(context);
+    final colors = context.appColors;
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: context.rs(20)),
-      child: Material(
-        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
-        borderRadius: BorderRadius.circular(12),
-        child: InkWell(
-          onTap: _showAddPersonalEventDialog,
-          borderRadius: BorderRadius.circular(12),
-          child: Padding(
-            padding: EdgeInsets.symmetric(
-              horizontal: context.rs(16),
-              vertical: context.rh(10),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.add_rounded,
-                  size: context.rs(20),
-                  color: theme.colorScheme.onSurface,
+      child: GestureDetector(
+        onTap: _showAddPersonalEventDialog,
+        behavior: HitTestBehavior.opaque,
+        child: Container(
+          decoration: BoxDecoration(
+            color: colors.surfaceContainerHighest.withValues(alpha: 0.6),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          padding: EdgeInsets.symmetric(
+            horizontal: context.rs(16),
+            vertical: context.rh(10),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                CupertinoIcons.add,
+                size: context.rs(20),
+                color: colors.onSurface,
+              ),
+              SizedBox(width: context.rs(8)),
+              Text(
+                '새로운 이벤트',
+                style: AppFonts.scaled(context, AppFonts.bodyMedium).copyWith(
+                  color: colors.onSurface,
+                  fontWeight: FontWeight.w400,
                 ),
-                SizedBox(width: context.rs(8)),
-                Text(
-                  '새로운 이벤트',
-                  style: AppFonts.scaled(context, AppFonts.bodyMedium).copyWith(
-                    color: theme.colorScheme.onSurface,
-                    fontWeight: FontWeight.w400,
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -392,12 +457,12 @@ class _ScheduleTabState extends State<ScheduleTab> {
     return Container(
       padding: EdgeInsets.all(context.rs(16)),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
+        color: context.appColors.surface,
         borderRadius: AppShapes.borderRadiusMedium,
         border: Border.all(color: AppColors.borderLight),
         boxShadow: [
           BoxShadow(
-            color: Theme.of(context).colorScheme.shadow.withValues(alpha: 0.06),
+            color: context.appColors.shadow.withValues(alpha: 0.06),
             offset: const Offset(0, 2),
             blurRadius: 8,
           ),
@@ -637,7 +702,7 @@ class _ScheduleTabState extends State<ScheduleTab> {
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       itemCount: list.length,
-      separatorBuilder: (_, __) => Divider(height: 1),
+      separatorBuilder: (_, __) => Container(height: 1, color: context.appColors.border),
       itemBuilder: (context, i) => _buildScheduleTile(list[i]),
     );
   }
@@ -676,7 +741,7 @@ class _ScheduleTabState extends State<ScheduleTab> {
         .join(' · ');
     final subtitleTrim = subtitle.isEmpty ? null : subtitle;
 
-    Color leadingColor = Theme.of(context).colorScheme.primary;
+    Color leadingColor = context.appColors.primary;
     if (isPersonal) leadingColor = AppColors.primaryBlue500;
     if (isClass) leadingColor = AppColors.primaryBlue;
     if (isNeis) leadingColor = AppColors.timetableHighlight;
@@ -692,7 +757,7 @@ class _ScheduleTabState extends State<ScheduleTab> {
           borderRadius: BorderRadius.circular(2),
         ),
       ),
-      trailing: Icon(Icons.chevron_right, size: context.rs(20), color: AppColors.hint),
+      trailing: Icon(CupertinoIcons.chevron_right, size: context.rs(20), color: AppColors.hint),
       onTap: () => _showScheduleDetail(
         context,
         item,
@@ -727,18 +792,20 @@ class _ScheduleTabState extends State<ScheduleTab> {
     // 개인 일정: 첨부파일 열람 버튼.
     if (isPersonal && id != null) {
       actions.add(
-        TextButton.icon(
+        AppleButton(
+          label: '첨부파일',
+          variant: AppleButtonVariant.plain,
+          icon: CupertinoIcons.paperclip,
           onPressed: () => _showAttachmentsSheet(id),
-          icon: const Icon(Icons.attach_file_rounded, size: 18),
-          label: const Text('첨부파일'),
         ),
       );
     }
 
-    // 학사일정(NEIS)은 삭제 불가. 개인 일정/학교 일정만 삭제 버튼 표시.
     if (!isNeis && id != null && (isPersonal || isClassOwner || _canEdit)) {
       actions.add(
-        TextButton(
+        AppleButton(
+          label: '삭제',
+          variant: AppleButtonVariant.destructive,
           onPressed: () async {
             if (isPersonal) {
               await _deletePersonalEvent(id);
@@ -749,7 +816,6 @@ class _ScheduleTabState extends State<ScheduleTab> {
             }
             if (context.mounted) Navigator.of(context).pop();
           },
-          child: Text('삭제', style: TextStyle(color: AppColors.error)),
         ),
       );
     }
@@ -774,9 +840,9 @@ class _ScheduleTabState extends State<ScheduleTab> {
     }
     if (!mounted) return;
 
-    showModalBottomSheet<void>(
+    GlassSheet.show<void>(
       context: context,
-      useRootNavigator: true,
+      quality: kAppGlassQuality,
       builder: (sheetContext) => SafeArea(
         child: attachments.isEmpty
             ? Padding(
@@ -791,18 +857,7 @@ class _ScheduleTabState extends State<ScheduleTab> {
                 shrinkWrap: true,
                 children: [
                   for (final a in attachments)
-                    ListTile(
-                      leading: Icon(
-                        (a['mime_type'] as String? ?? '').contains('pdf')
-                            ? Icons.picture_as_pdf_rounded
-                            : Icons.image_rounded,
-                        color: AppColors.primaryBlue,
-                      ),
-                      title: Text(
-                        a['file_name'] as String? ?? '파일',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                    GestureDetector(
                       onTap: () async {
                         final path = a['storage_path'] as String?;
                         if (path == null) return;
@@ -816,15 +871,38 @@ class _ScheduleTabState extends State<ScheduleTab> {
                           );
                         } catch (_) {
                           if (sheetContext.mounted) {
-                            ScaffoldMessenger.of(sheetContext).showSnackBar(
-                              const SnackBar(
-                                content: Text('파일을 열 수 없습니다.'),
-                                backgroundColor: AppColors.error,
-                              ),
+                            AppFeedback.showError(
+                              sheetContext,
+                              '파일을 열 수 없습니다.',
                             );
                           }
                         }
                       },
+                      behavior: HitTestBehavior.opaque,
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: sheetContext.rs(16),
+                          vertical: sheetContext.rh(12),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              (a['mime_type'] as String? ?? '').contains('pdf')
+                                  ? CupertinoIcons.doc_fill
+                                  : CupertinoIcons.photo,
+                              color: AppColors.primaryBlue,
+                            ),
+                            SizedBox(width: sheetContext.rs(12)),
+                            Expanded(
+                              child: Text(
+                                a['file_name'] as String? ?? '파일',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                 ],
               ),
@@ -845,45 +923,28 @@ class _ScheduleTabState extends State<ScheduleTab> {
     var end = DateTime.now().add(const Duration(hours: 1));
 
     try {
-      final added = await showDialog<bool>(
+      final added = await GlassSheet.show<bool>(
         context: context,
+        quality: kAppGlassQuality,
         builder: (dialogContext) {
           return StatefulBuilder(
             builder: (dialogContext, setDialogState) {
-              return AlertDialog(
-                title: const Text('일정 추가'),
-                content: SingleChildScrollView(
+              return SafeArea(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(20),
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      CupertinoTextField(
-                        controller: titleController,
-                        placeholder: '제목',
-                        padding: EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 12,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.white,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: AppColors.border),
-                        ),
+                      Text(
+                        '일정 추가',
+                        style: AppFonts.scaled(dialogContext, AppFonts.titleBold),
                       ),
-                      SizedBox(height: 8),
-                      CupertinoTextField(
-                        controller: descController,
-                        placeholder: '설명',
-                        padding: EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 12,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.white,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: AppColors.border),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 16),
+                      AppleTextField(controller: titleController, placeholder: '제목'),
+                      const SizedBox(height: 12),
+                      AppleTextField(controller: descController, placeholder: '설명'),
+                      const SizedBox(height: 12),
                       _buildDateTimeTile(
                         dialogContext: dialogContext,
                         label: '시작',
@@ -896,34 +957,43 @@ class _ScheduleTabState extends State<ScheduleTab> {
                         dateTime: end,
                         onChanged: (dt) => setDialogState(() => end = dt),
                       ),
+                      const SizedBox(height: 20),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: AppleButton(
+                              label: '취소',
+                              variant: AppleButtonVariant.secondary,
+                              onPressed: () => Navigator.of(dialogContext).pop(false),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: AppleButton(
+                              label: '추가',
+                              onPressed: () async {
+                                final profile = _profile;
+                                if (profile == null) return;
+                                await supabase.from('schedule_items').insert({
+                                  'title': titleController.text,
+                                  'description': descController.text.isEmpty
+                                      ? null
+                                      : descController.text,
+                                  'start_at': start.toIso8601String(),
+                                  'end_at': end.toIso8601String(),
+                                  'created_by': profile.id,
+                                });
+                                if (dialogContext.mounted) {
+                                  Navigator.of(dialogContext).pop(true);
+                                }
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
                     ],
                   ),
                 ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.of(dialogContext).pop(false),
-                    child: const Text('취소'),
-                  ),
-                  FilledButton(
-                    onPressed: () async {
-                      final profile = _profile;
-                      if (profile == null) return;
-                      await supabase.from('schedule_items').insert({
-                        'title': titleController.text,
-                        'description': descController.text.isEmpty
-                            ? null
-                            : descController.text,
-                        'start_at': start.toIso8601String(),
-                        'end_at': end.toIso8601String(),
-                        'created_by': profile.id,
-                      });
-                      if (dialogContext.mounted) {
-                        Navigator.of(dialogContext).pop(true);
-                      }
-                    },
-                    child: const Text('추가'),
-                  ),
-                ],
               );
             },
           );
@@ -946,59 +1016,39 @@ class _ScheduleTabState extends State<ScheduleTab> {
     required ValueChanged<DateTime> onChanged,
     bool enabled = true,
   }) {
-    return ListTile(
-      title: Text(label),
-      subtitle: Text(
-        enabled
-            ? '${dateTime.year}년 ${dateTime.month}월 ${dateTime.day}일 ${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}'
-            : '하루 종일',
-      ),
-      enabled: enabled,
+    return GestureDetector(
       onTap: enabled
           ? () async {
-              final d = await showDatePicker(
-                context: dialogContext,
-                initialDate: dateTime,
-                firstDate: DateTime(2020),
-                lastDate: DateTime(2030),
-              );
-              if (d == null) return;
-              if (!dialogContext.mounted) return;
-
-              final t = await showTimePicker(
-                context: dialogContext,
-                initialTime: TimeOfDay.fromDateTime(dateTime),
-              );
-              if (t != null) {
-                onChanged(DateTime(d.year, d.month, d.day, t.hour, t.minute));
-              }
+              final picked = await _pickDateTime(dialogContext, dateTime);
+              if (picked != null) onChanged(picked);
             }
           : null,
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label, style: AppFonts.scaled(dialogContext, AppFonts.bodyMedium)),
+            const SizedBox(height: 4),
+            Text(
+              enabled
+                  ? '${dateTime.year}년 ${dateTime.month}월 ${dateTime.day}일 ${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}'
+                  : '하루 종일',
+              style: AppFonts.scaled(dialogContext, AppFonts.captionRegular).copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
   Future<void> _delete(String id) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('삭제하시겠습니까?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('취소'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            style: FilledButton.styleFrom(
-              backgroundColor: AppColors.error,
-            ),
-            child: const Text('삭제'),
-          ),
-        ],
-      ),
-    );
+    final ok = await _confirmDelete(context);
 
-    if (ok == true) {
+    if (ok) {
       await supabase.from('schedule_items').delete().eq('id', id);
       _fetch();
     }
@@ -1023,14 +1073,9 @@ class _ScheduleTabState extends State<ScheduleTab> {
 
     if (!mounted) return;
     try {
-      final added = await showModalBottomSheet<bool>(
+      final added = await GlassSheet.show<bool>(
         context: context,
-        useRootNavigator: true,
-        isScrollControlled: true,
-        useSafeArea: true,
-        backgroundColor: Colors.transparent,
-        isDismissible: false,
-        enableDrag: false,
+        quality: kAppGlassQuality,
         builder: (sheetContext) {
           return DraggableScrollableSheet(
             expand: false,
@@ -1045,7 +1090,7 @@ class _ScheduleTabState extends State<ScheduleTab> {
                     behavior: HitTestBehavior.opaque,
                     child: Container(
                       decoration: BoxDecoration(
-                        color: Theme.of(innerContext).colorScheme.surface,
+                        color: innerContext.appColors.surface,
                         borderRadius: BorderRadius.vertical(
                           top: Radius.circular(AppShapes.radiusLarge),
                         ),
@@ -1078,11 +1123,13 @@ class _ScheduleTabState extends State<ScheduleTab> {
                                   style: AppFonts.scaled(innerContext, AppFonts.titleBold),
                                 ),
                                 const Spacer(),
-                                IconButton(
+                                CupertinoButton(
+                                  padding: EdgeInsets.zero,
                                   onPressed: () => Navigator.of(sheetContext).pop(false),
-                                  icon: const Icon(Icons.close),
-                                  style: IconButton.styleFrom(
-                                    foregroundColor: AppColors.textSecondary,
+                                  child: Icon(
+                                    CupertinoIcons.xmark,
+                                    color: AppColors.textSecondary,
+                                    size: innerContext.rs(22),
                                   ),
                                 ),
                               ],
@@ -1100,53 +1147,70 @@ class _ScheduleTabState extends State<ScheduleTab> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
-                                  CupertinoTextField(
+                                  AppleTextField(
                                     controller: titleController,
                                     placeholder: '제목',
-                                    padding: EdgeInsets.symmetric(
-                                      horizontal: 16,
-                                      vertical: 12,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: Theme.of(innerContext).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                                      borderRadius: BorderRadius.circular(AppShapes.radiusSmall),
-                                      border: Border.all(color: AppColors.border),
-                                    ),
                                   ),
                                   SizedBox(height: innerContext.rh(12)),
-                                  CupertinoTextField(
+                                  AppleTextField(
                                     controller: descController,
                                     placeholder: '설명 (선택)',
                                     maxLines: 3,
-                                    padding: EdgeInsets.symmetric(
-                                      horizontal: 16,
-                                      vertical: 12,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: Theme.of(innerContext).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                                      borderRadius: BorderRadius.circular(AppShapes.radiusSmall),
-                                      border: Border.all(color: AppColors.border),
-                                    ),
                                   ),
                                   SizedBox(height: innerContext.rh(12)),
-                                  CheckboxListTile(
-                                    title: const Text('하루 종일'),
-                                    value: allDay,
-                                    onChanged: (value) => setSheetState(() => allDay = value ?? false),
-                                    contentPadding: EdgeInsets.zero,
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          '하루 종일',
+                                          style: AppFonts.scaled(
+                                            innerContext,
+                                            AppFonts.bodyRegular,
+                                          ),
+                                        ),
+                                      ),
+                                      CupertinoSwitch(
+                                        value: allDay,
+                                        onChanged: (value) =>
+                                            setSheetState(() => allDay = value),
+                                      ),
+                                    ],
                                   ),
-                                  CheckboxListTile(
-                                    title: const Text('반 전체에 공유하기'),
-                                    subtitle: Text(
-                                      _profile?.hasGradeClass != true
-                                          ? '프로필에 학년/반 정보가 없어 학급 공유를 사용할 수 없습니다.'
-                                          : '학생회 권한 없이 같은 반 학생 모두에게 표시됩니다.',
-                                    ),
-                                    value: shareWithClass,
-                                    onChanged: _profile?.hasGradeClass == true
-                                        ? (value) => setSheetState(() => shareWithClass = value ?? false)
-                                        : null,
-                                    contentPadding: EdgeInsets.zero,
+                                  Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              '반 전체에 공유하기',
+                                              style: AppFonts.scaled(
+                                                innerContext,
+                                                AppFonts.bodyRegular,
+                                              ),
+                                            ),
+                                            Text(
+                                              _profile?.hasGradeClass != true
+                                                  ? '프로필에 학년/반 정보가 없어 학급 공유를 사용할 수 없습니다.'
+                                                  : '학생회 권한 없이 같은 반 학생 모두에게 표시됩니다.',
+                                              style: AppFonts.scaled(
+                                                innerContext,
+                                                AppFonts.captionRegular,
+                                              ).copyWith(color: AppColors.textSecondary),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      CupertinoSwitch(
+                                        value: shareWithClass,
+                                        onChanged: _profile?.hasGradeClass == true
+                                            ? (value) => setSheetState(
+                                                () => shareWithClass = value,
+                                              )
+                                            : null,
+                                      ),
+                                    ],
                                   ),
                                   _buildDateTimeTile(
                                     dialogContext: innerContext,
@@ -1165,7 +1229,10 @@ class _ScheduleTabState extends State<ScheduleTab> {
                                   SizedBox(height: innerContext.rh(8)),
                                   // 파일 첨부 (개인 일정만). 시험 시간표 이미지·PDF 등.
                                   if (!shareWithClass) ...[
-                                    OutlinedButton.icon(
+                                    AppleButton(
+                                      label: '파일 첨부 (이미지·PDF)',
+                                      variant: AppleButtonVariant.secondary,
+                                      icon: CupertinoIcons.paperclip,
                                       onPressed: () async {
                                         final result =
                                             await FilePicker.pickFiles(
@@ -1181,28 +1248,40 @@ class _ScheduleTabState extends State<ScheduleTab> {
                                               .where((f) => f.path != null));
                                         });
                                       },
-                                      icon: const Icon(Icons.attach_file_rounded),
-                                      label: const Text('파일 첨부 (이미지·PDF)'),
                                     ),
                                     for (var i = 0; i < pickedFiles.length; i++)
-                                      ListTile(
-                                        dense: true,
-                                        contentPadding: EdgeInsets.zero,
-                                        leading: Icon(
-                                          pickedFiles[i].extension == 'pdf'
-                                              ? Icons.picture_as_pdf_rounded
-                                              : Icons.image_rounded,
-                                          color: AppColors.primaryBlue,
+                                      Padding(
+                                        padding: EdgeInsets.symmetric(
+                                          vertical: innerContext.rh(4),
                                         ),
-                                        title: Text(
-                                          pickedFiles[i].name,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                        trailing: IconButton(
-                                          icon: const Icon(Icons.close, size: 18),
-                                          onPressed: () => setSheetState(
-                                              () => pickedFiles.removeAt(i)),
+                                        child: Row(
+                                          children: [
+                                            Icon(
+                                              pickedFiles[i].extension == 'pdf'
+                                                  ? CupertinoIcons.doc_fill
+                                                  : CupertinoIcons.photo,
+                                              color: AppColors.primaryBlue,
+                                            ),
+                                            SizedBox(width: innerContext.rs(8)),
+                                            Expanded(
+                                              child: Text(
+                                                pickedFiles[i].name,
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                            CupertinoButton(
+                                              padding: EdgeInsets.zero,
+                                              minimumSize: Size.zero,
+                                              onPressed: () => setSheetState(
+                                                () => pickedFiles.removeAt(i),
+                                              ),
+                                              child: Icon(
+                                                CupertinoIcons.xmark,
+                                                size: innerContext.rs(18),
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ),
                                   ],
@@ -1220,23 +1299,23 @@ class _ScheduleTabState extends State<ScheduleTab> {
                             child: Row(
                               children: [
                                 Expanded(
-                                  child: OutlinedButton(
+                                  child: AppleButton(
+                                    label: '취소',
+                                    variant: AppleButtonVariant.secondary,
                                     onPressed: () => Navigator.of(sheetContext).pop(false),
-                                    child: const Text('취소'),
                                   ),
                                 ),
                                 SizedBox(width: innerContext.rs(12)),
                                 Expanded(
-                                  child: FilledButton(
+                                  child: AppleButton(
+                                    label: '추가',
                                     onPressed: () async {
                                       final uid = await AuthRepository.instance.getUserId();
                                       if (uid == null) {
                                         if (innerContext.mounted) {
-                                          ScaffoldMessenger.of(innerContext).showSnackBar(
-                                            const SnackBar(
-                                              content: Text('로그인 세션이 없습니다. 로그아웃 후 다시 로그인해 주세요.'),
-                                              behavior: SnackBarBehavior.floating,
-                                            ),
+                                          AppFeedback.showError(
+                                            innerContext,
+                                            '로그인 세션이 없습니다. 로그아웃 후 다시 로그인해 주세요.',
                                           );
                                         }
                                         return;
@@ -1245,11 +1324,9 @@ class _ScheduleTabState extends State<ScheduleTab> {
                                       final title = titleController.text.trim();
                                       if (title.isEmpty) {
                                         if (innerContext.mounted) {
-                                          ScaffoldMessenger.of(innerContext).showSnackBar(
-                                            const SnackBar(
-                                              content: Text('제목을 입력해 주세요.'),
-                                              behavior: SnackBarBehavior.floating,
-                                            ),
+                                          AppFeedback.showError(
+                                            innerContext,
+                                            '제목을 입력해 주세요.',
                                           );
                                         }
                                         return;
@@ -1267,11 +1344,9 @@ class _ScheduleTabState extends State<ScheduleTab> {
                                             final classNum = profile?.classNumOrFromStudentId;
                                             if (profile == null || grade == null || classNum == null) {
                                               if (innerContext.mounted) {
-                                                ScaffoldMessenger.of(innerContext).showSnackBar(
-                                                  const SnackBar(
-                                                    content: Text('학급 공유를 하려면 프로필에 학년/반 정보가 필요합니다.'),
-                                                    behavior: SnackBarBehavior.floating,
-                                                  ),
+                                                AppFeedback.showError(
+                                                  innerContext,
+                                                  '학급 공유를 하려면 프로필에 학년/반 정보가 필요합니다.',
                                                 );
                                               }
                                               return;
@@ -1289,7 +1364,6 @@ class _ScheduleTabState extends State<ScheduleTab> {
                                               'created_by_profile_id': profile.id,
                                             });
                                           } else {
-                                            // Supabase Auth 세션이 있는 경우: RLS(auth.uid() = user_id) 기준으로 직접 insert.
                                             final inserted = await supabase
                                                 .from('personal_events')
                                                 .insert({
@@ -1303,7 +1377,6 @@ class _ScheduleTabState extends State<ScheduleTab> {
                                                 .select('id')
                                                 .single();
 
-                                            // 첨부파일 업로드. 실패한 파일은 건너뛴다.
                                             final eventId =
                                                 inserted['id'] as String?;
                                             if (eventId != null) {
@@ -1324,12 +1397,9 @@ class _ScheduleTabState extends State<ScheduleTab> {
                                           }
                                         } else {
                                           if (innerContext.mounted) {
-                                            ScaffoldMessenger.of(innerContext).showSnackBar(
-                                              const SnackBar(
-                                                content: Text('로그인 정보가 만료되었습니다. 다시 로그인한 뒤 개인 일정을 추가해 주세요.'),
-                                                behavior: SnackBarBehavior.floating,
-                                                backgroundColor: AppColors.error,
-                                              ),
+                                            AppFeedback.showError(
+                                              innerContext,
+                                              '로그인 정보가 만료되었습니다. 다시 로그인한 뒤 개인 일정을 추가해 주세요.',
                                             );
                                           }
                                           return;
@@ -1340,36 +1410,22 @@ class _ScheduleTabState extends State<ScheduleTab> {
                                         }
                                       } on PostgrestException catch (e) {
                                         if (!innerContext.mounted) return;
-                                        // 개발용 상세 로그
-                                        // ignore: avoid_print
                                         print('personal_events insert error: code=${e.code}, message=${e.message}, details=${e.details}');
                                         final message = switch (e.code) {
-                                          // RLS/권한 문제
                                           '42501' => '권한 문제로 일정을 저장하지 못했습니다. 관리자에게 문의해 주세요.',
-                                          // 정의되지 않은 함수 등 스키마 불일치
                                           'PGRST204' || 'PGRST301' =>
                                               '서버 설정이 아직 반영되지 않아 일정을 저장할 수 없습니다. 잠시 후 다시 시도해 주세요.',
                                           _ => '일정을 저장하는 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.',
                                         };
-                                        ScaffoldMessenger.of(innerContext).showSnackBar(
-                                          SnackBar(
-                                            content: Text(message),
-                                            behavior: SnackBarBehavior.floating,
-                                            backgroundColor: AppColors.error,
-                                          ),
-                                        );
+                                        AppFeedback.showError(innerContext, message);
                                       } catch (e) {
                                         if (!innerContext.mounted) return;
-                                        ScaffoldMessenger.of(innerContext).showSnackBar(
-                                          const SnackBar(
-                                            content: Text('일정을 저장하는 중 알 수 없는 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.'),
-                                            behavior: SnackBarBehavior.floating,
-                                            backgroundColor: AppColors.error,
-                                          ),
+                                        AppFeedback.showError(
+                                          innerContext,
+                                          '일정을 저장하는 중 알 수 없는 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.',
                                         );
                                       }
                                     },
-                                    child: const Text('추가'),
                                   ),
                                 ),
                               ],
@@ -1391,32 +1447,17 @@ class _ScheduleTabState extends State<ScheduleTab> {
         if (!mounted) return;
         _fetch();
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                shareWithClass ? '학급 공유 일정이 추가되었습니다.' : '개인 일정이 추가되었습니다.',
-              ),
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-              margin: const EdgeInsets.only(
-                bottom: 80,
-                left: 16,
-                right: 16,
-              ),
-            ),
+          AppFeedback.showSuccess(
+            context,
+            shareWithClass ? '학급 공유 일정이 추가되었습니다.' : '개인 일정이 추가되었습니다.',
           );
         }
       }
     } catch (e, st) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('일정 추가 화면을 열 수 없습니다: ${e.toString().split('\n').first}'),
-            behavior: SnackBarBehavior.floating,
-            backgroundColor: AppColors.error,
-          ),
+        AppFeedback.showError(
+          context,
+          '일정 추가 화면을 열 수 없습니다: ${e.toString().split('\n').first}',
         );
       }
       debugPrint('_showAddPersonalEventDialog error: $e\n$st');
@@ -1429,28 +1470,9 @@ class _ScheduleTabState extends State<ScheduleTab> {
   }
 
   Future<void> _deletePersonalEvent(String id) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('삭제하시겠습니까?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('취소'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            style: FilledButton.styleFrom(
-              backgroundColor: AppColors.error,
-            ),
-            child: const Text('삭제'),
-          ),
-        ],
-      ),
-    );
+    final ok = await _confirmDelete(context);
 
-    if (ok == true) {
-      // 첨부 Storage 파일 정리 (메타는 FK CASCADE 삭제).
+    if (ok) {
       try {
         await PersonalEventAttachmentRepository.instance
             .deleteStorageFilesForEvent(id);
@@ -1458,63 +1480,19 @@ class _ScheduleTabState extends State<ScheduleTab> {
       await supabase.from('personal_events').delete().eq('id', id);
       _fetch();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('개인 일정이 삭제되었습니다.'),
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-            margin: const EdgeInsets.only(
-              bottom: 80,
-              left: 16,
-              right: 16,
-            ),
-          ),
-        );
+        AppFeedback.showSuccess(context, '개인 일정이 삭제되었습니다.');
       }
     }
   }
 
   Future<void> _deleteClassEvent(String id) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('삭제하시겠습니까?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('취소'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            style: FilledButton.styleFrom(
-              backgroundColor: AppColors.error,
-            ),
-            child: const Text('삭제'),
-          ),
-        ],
-      ),
-    );
+    final ok = await _confirmDelete(context);
 
-    if (ok == true) {
+    if (ok) {
       await supabase.from('class_events').delete().eq('id', id);
       _fetch();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('학급 공유 일정이 삭제되었습니다.'),
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-            margin: const EdgeInsets.only(
-              bottom: 80,
-              left: 16,
-              right: 16,
-            ),
-          ),
-        );
+        AppFeedback.showSuccess(context, '학급 공유 일정이 삭제되었습니다.');
       }
     }
   }

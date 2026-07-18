@@ -1,10 +1,12 @@
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:myapp/components/apple_button.dart';
+import 'package:myapp/core/school/school_context.dart';
 import 'package:myapp/core/supabase_client.dart';
+import 'package:myapp/core/theme/app_resolved_colors.dart';
 import 'package:myapp/core/theme/app_theme.dart';
 import 'package:myapp/core/theme/responsive.dart';
 import 'package:myapp/core/widgets/tab_page_header.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Figma "급식 페이지" (node 753-7394, 758-7664) 급식 메뉴 탭.
 ///
@@ -51,10 +53,19 @@ class _MealTabState extends State<MealTab> {
         '${d.year}${d.month.toString().padLeft(2, '0')}${d.day.toString().padLeft(2, '0')}';
 
     try {
+      await SchoolContext.instance.ensureLoaded();
+      final schoolId = SchoolContext.instance.currentSchoolId;
+
       final res = await supabase.functions.invoke(
         'neis_meal',
-        queryParameters: {'date': dateStr},
-        body: {'date': dateStr},
+        queryParameters: {
+          'date': dateStr,
+          if (schoolId != null) 'school_id': schoolId,
+        },
+        body: {
+          'date': dateStr,
+          if (schoolId != null) 'school_id': schoolId,
+        },
       ).timeout(
         const Duration(seconds: 15),
         onTimeout: () => throw Exception('요청 시간이 초과되었습니다. 네트워크를 확인해 주세요.'),
@@ -107,19 +118,23 @@ class _MealTabState extends State<MealTab> {
   @override
   Widget build(BuildContext context) {
     return SafeArea(
-      child: RefreshIndicator(
-        onRefresh: _fetch,
-        color: Theme.of(context).colorScheme.primary,
-        child: ListView(
-          padding: EdgeInsets.only(bottom: context.rh(24)),
-          children: [
-            _buildHeader(),
-            SizedBox(height: context.rh(10)),
-            _buildCalendarCard(),
-            SizedBox(height: context.rh(10)),
-            _buildBodyContent(),
-          ],
+      child: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(
+          parent: BouncingScrollPhysics(),
         ),
+        slivers: [
+          CupertinoSliverRefreshControl(onRefresh: _fetch),
+          SliverList(
+            delegate: SliverChildListDelegate([
+              _buildHeader(),
+              SizedBox(height: context.rh(10)),
+              _buildCalendarCard(),
+              SizedBox(height: context.rh(10)),
+              _buildBodyContent(),
+              SizedBox(height: context.rh(24)),
+            ]),
+          ),
+        ],
       ),
     );
   }
@@ -139,6 +154,7 @@ class _MealTabState extends State<MealTab> {
   // ── 캘린더 (일정 탭과 동일한 모양) ──
 
   Widget _buildCalendarCard() {
+    final colors = context.appColors;
     final year = _viewMonth.year;
     final month = _viewMonth.month;
     final first = DateTime(year, month, 1);
@@ -153,16 +169,14 @@ class _MealTabState extends State<MealTab> {
       child: Container(
         padding: EdgeInsets.all(context.rs(16)),
         decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
+          color: colors.surface,
           borderRadius: AppShapes.borderRadiusMedium,
           border: Border.all(
-            color: Theme.of(context).brightness == Brightness.dark
-                ? AppDarkColors.border
-                : AppColors.borderLight,
+            color: colors.border,
           ),
           boxShadow: [
             BoxShadow(
-              color: Theme.of(context).colorScheme.shadow.withValues(alpha: 0.06),
+              color: colors.shadow.withValues(alpha: 0.06),
               offset: const Offset(0, 2),
               blurRadius: 8,
             ),
@@ -184,7 +198,7 @@ class _MealTabState extends State<MealTab> {
                   },
                   child: Icon(
                     CupertinoIcons.chevron_left,
-                    color: Theme.of(context).colorScheme.onSurface,
+                    color: colors.onSurface,
                     size: context.rs(28),
                   ),
                 ),
@@ -213,7 +227,7 @@ class _MealTabState extends State<MealTab> {
                   },
                   child: Icon(
                     CupertinoIcons.chevron_right,
-                    color: Theme.of(context).colorScheme.onSurface,
+                    color: colors.onSurface,
                     size: context.rs(28),
                   ),
                 ),
@@ -293,12 +307,8 @@ class _MealTabState extends State<MealTab> {
                                     color: isSelected
                                         ? AppColors.white
                                         : (isSunday
-                                            ? Theme.of(context)
-                                                .colorScheme
-                                                .onSurfaceVariant
-                                            : Theme.of(context)
-                                                .colorScheme
-                                                .onSurface),
+                                            ? colors.onSurfaceVariant
+                                            : colors.onSurface),
                                   ),
                                 ),
                               ),
@@ -324,9 +334,8 @@ class _MealTabState extends State<MealTab> {
       return Padding(
         padding: EdgeInsets.symmetric(vertical: context.rh(32)),
         child: Center(
-          child: CircularProgressIndicator(
-            strokeWidth: 2,
-            color: Theme.of(context).colorScheme.primary,
+          child: CupertinoActivityIndicator(
+            color: context.appColors.primary,
           ),
         ),
       );
@@ -346,9 +355,9 @@ class _MealTabState extends State<MealTab> {
                 textAlign: TextAlign.center,
               ),
               SizedBox(height: context.rh(16)),
-              TextButton(
+              AppleButton(
+                label: '다시 시도',
                 onPressed: _fetch,
-                child: const Text('다시 시도'),
               ),
             ],
           ),
@@ -381,6 +390,7 @@ class _MealTabState extends State<MealTab> {
       );
     }
 
+    final colors = context.appColors;
     return Padding(
       padding: context.horizontalPadding.copyWith(top: context.rh(4)),
       child: Column(
@@ -390,7 +400,7 @@ class _MealTabState extends State<MealTab> {
           RichText(
             text: TextSpan(
               style: AppFonts.scaled(context, AppFonts.bodyMedium).copyWith(
-                color: Theme.of(context).colorScheme.onSurface,
+                color: colors.onSurface,
               ),
               children: [
                 TextSpan(
@@ -414,6 +424,7 @@ class _MealTabState extends State<MealTab> {
   // ── Meal Card ──
 
   Widget _buildMealCard(Map<String, dynamic> row) {
+    final colors = context.appColors;
     final dish = row['DDISH_NM'] as String? ?? '';
     final cal = row['CAL_INFO'] as String? ?? '';
     final mealType = row['MMEAL_SC_NM'] as String? ?? '';
@@ -427,7 +438,7 @@ class _MealTabState extends State<MealTab> {
     final cardPad = context.rs(16);
     final mealTypeWidth = context.rs(80);
 
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isDark = context.isAppDark;
 
     return Container(
       margin: EdgeInsets.only(bottom: context.rh(16)),
@@ -457,13 +468,13 @@ class _MealTabState extends State<MealTab> {
                       vertical: context.rh(2),
                     ),
                     decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.surface,
+                      color: colors.surface,
                       borderRadius: AppShapes.borderRadiusSmall,
                     ),
                     child: Text(
                       cal,
                       style: AppFonts.scaled(context, AppFonts.tiny).copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        color: colors.onSurfaceVariant,
                       ),
                     ),
                   ),
@@ -477,7 +488,7 @@ class _MealTabState extends State<MealTab> {
             child: Container(
               padding: EdgeInsets.all(context.rs(12)),
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surface,
+                color: colors.surface,
                 borderRadius: AppShapes.borderRadiusExtraSmall,
               ),
               child: Column(
@@ -489,7 +500,7 @@ class _MealTabState extends State<MealTab> {
                             item,
                             style: AppFonts.scaled(context, AppFonts.smallMedium)
                                 .copyWith(
-                              color: Theme.of(context).colorScheme.onSurface,
+                              color: colors.onSurface,
                             ),
                           ),
                         ))

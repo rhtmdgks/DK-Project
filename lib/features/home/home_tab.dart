@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
+import 'package:myapp/core/theme/app_resolved_colors.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:myapp/core/auth/auth_state.dart';
@@ -42,7 +42,7 @@ class _HomeTabState extends State<HomeTab> {
 
   String? _fullName;
   String? _avatarUrl;
-  String? _role;
+  AppProfile? _profile;
   String? _targetUniversity;
   bool _loading = true;
   String? _dynamicGreeting;
@@ -52,7 +52,7 @@ class _HomeTabState extends State<HomeTab> {
   List<Map<String, dynamic>> _latestAnnouncements = const [];
   List<Map<String, dynamic>> _activePolls = const [];
 
-  bool get _isTeacher => _role == 'teacher';
+  bool get _isTeacher => _profile?.isTeacher ?? false;
   String get _nameWithHonorific {
     final name = _fullName ?? (_isTeacher ? '선생님' : '학생');
     return _isTeacher ? '$name 선생님' : '$name님';
@@ -141,7 +141,7 @@ class _HomeTabState extends State<HomeTab> {
       setState(() {
         _fullName = profile?.fullName;
         _avatarUrl = profile?.avatarUrl;
-        _role = profile?.role;
+        _profile = profile;
         _targetUniversity = profile?.targetUniversity;
         _loading = false;
       });
@@ -314,32 +314,37 @@ class _HomeTabState extends State<HomeTab> {
   Widget build(BuildContext context) {
     return SafeArea(
       bottom: false,
-      child: RefreshIndicator(
-        onRefresh: () async {
-          await _loadProfile();
-          await _loadGreeting();
-          await _loadTodayTimetable();
-          await _loadHomeFeed();
-        },
-        child: _loading
-            ? Center(
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-              )
-            : ListView(
-                padding: EdgeInsets.zero,
-                children: [
-                  _buildAppBar(),
-                  SizedBox(height: context.rh(24)),
-                  _buildGreeting(),
-                  SizedBox(height: context.rh(24)),
-                  _buildPremiumDashboard(),
-                  SizedBox(height: context.rh(32)),
-                ],
+      child: _loading
+          ? Center(
+              child: CupertinoActivityIndicator(
+                color: context.appColors.primary,
               ),
-      ),
+            )
+          : CustomScrollView(
+              physics: const AlwaysScrollableScrollPhysics(
+                parent: BouncingScrollPhysics(),
+              ),
+              slivers: [
+                CupertinoSliverRefreshControl(
+                  onRefresh: () async {
+                    await _loadProfile();
+                    await _loadGreeting();
+                    await _loadTodayTimetable();
+                    await _loadHomeFeed();
+                  },
+                ),
+                SliverList(
+                  delegate: SliverChildListDelegate([
+                    _buildAppBar(),
+                    SizedBox(height: context.rh(24)),
+                    _buildGreeting(),
+                    SizedBox(height: context.rh(24)),
+                    _buildPremiumDashboard(),
+                    SizedBox(height: context.rh(32)),
+                  ]),
+                ),
+              ],
+            ),
     );
   }
 
@@ -572,20 +577,20 @@ class _HomeTabState extends State<HomeTab> {
     required bool isCompleted,
     required bool isUpcoming,
   }) {
-    final cs = Theme.of(context).colorScheme;
-    final scaffoldBg = Theme.of(context).scaffoldBackgroundColor;
+    final colors = context.appColors;
+    final scaffoldBg = colors.background;
     final pointColor = isCurrent
         ? AppColors.primaryBlue
         : isCompleted
-            ? cs.surfaceContainerHigh
-            : cs.surfaceContainer;
+            ? AppColors.surfaceContainerHigh
+            : AppColors.surfaceContainer;
     final cardColor = isCurrent
         ? AppColors.primaryBlue.withValues(alpha: 0.1)
-        : cs.surfaceContainerLow;
+        : AppColors.surfaceContainerLow;
     final borderColor = isCurrent
         ? AppColors.primaryBlue.withValues(alpha: 0.35)
-        : cs.outline.withValues(alpha: 0.45);
-    final textColor = isCompleted ? cs.onSurfaceVariant : cs.onSurface;
+        : colors.border.withValues(alpha: 0.45);
+    final textColor = isCompleted ? colors.onSurfaceVariant : colors.onSurface;
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -614,7 +619,7 @@ class _HomeTabState extends State<HomeTab> {
               ),
               child: isCompleted
                   ? Icon(
-                      Icons.check,
+                      CupertinoIcons.check_mark,
                       size: context.rs(8),
                       color: AppColors.textSecondary,
                     )
@@ -710,7 +715,7 @@ class _HomeTabState extends State<HomeTab> {
                 SizedBox(width: context.rs(8)),
                 if (isCurrent)
                   Icon(
-                    Icons.near_me_rounded,
+                    CupertinoIcons.location_north_fill,
                     size: context.rs(18),
                     color: AppColors.primaryBlue,
                   )
@@ -721,7 +726,7 @@ class _HomeTabState extends State<HomeTab> {
                       vertical: context.rh(4),
                     ),
                     decoration: BoxDecoration(
-                      color: cs.surfaceContainerHighest,
+                      color: AppColors.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(999),
                     ),
                     child: Text(
@@ -733,7 +738,7 @@ class _HomeTabState extends State<HomeTab> {
                   )
                 else
                   Icon(
-                    Icons.check_circle_rounded,
+                    CupertinoIcons.checkmark_circle_fill,
                     size: context.rs(18),
                     color: AppColors.textSecondary,
                   ),
@@ -779,10 +784,10 @@ class _HomeTabState extends State<HomeTab> {
               final startAt = _parseDateTime(event['start_at']);
               final scope = (event['event_scope'] as String?) ?? 'school';
               final icon = scope == 'personal'
-                  ? Icons.person_outline
+                  ? CupertinoIcons.person
                   : scope == 'class'
-                      ? Icons.groups_outlined
-                      : Icons.campaign_outlined;
+                      ? CupertinoIcons.person_2
+                      : CupertinoIcons.speaker_2;
               return Container(
                 margin: EdgeInsets.only(bottom: context.rh(8)),
                 padding: EdgeInsets.all(context.rs(12)),
@@ -830,9 +835,10 @@ class _HomeTabState extends State<HomeTab> {
                 style: AppFonts.scaled(context, AppFonts.sectionTitle),
               ),
               const Spacer(),
-              TextButton(
+              AppleButton(
+                label: '전체보기',
+                variant: AppleButtonVariant.plain,
                 onPressed: () => context.go('/?tab=notice'),
-                child: const Text('전체보기'),
               ),
             ],
           ),
@@ -862,7 +868,7 @@ class _HomeTabState extends State<HomeTab> {
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.campaign_outlined, size: context.rs(18), color: AppColors.primaryBlue500),
+                    Icon(CupertinoIcons.speaker_2, size: context.rs(18), color: AppColors.primaryBlue500),
                     SizedBox(width: context.rs(8)),
                     Expanded(
                       child: Text(
@@ -900,9 +906,10 @@ class _HomeTabState extends State<HomeTab> {
                 style: AppFonts.scaled(context, AppFonts.sectionTitle),
               ),
               const Spacer(),
-              TextButton(
+              AppleButton(
+                label: '참여하기',
+                variant: AppleButtonVariant.plain,
                 onPressed: () => context.go('/?tab=notice'),
-                child: const Text('참여하기'),
               ),
             ],
           ),
@@ -975,13 +982,13 @@ class _HomeTabState extends State<HomeTab> {
   /// 학생 의견 모집 진입 카드.
   Widget _buildOpinionsEntrySection() {
     return _buildGlassCard(
-      child: InkWell(
+      child: GestureDetector(
         onTap: () => context.push(AppRoute.opinions.path),
-        borderRadius: BorderRadius.circular(12),
+        behavior: HitTestBehavior.opaque,
         child: Row(
           children: [
             Icon(
-              Icons.lightbulb_outline_rounded,
+              CupertinoIcons.lightbulb,
               size: context.rs(22),
               color: AppColors.primaryBlue,
             ),
@@ -1003,7 +1010,7 @@ class _HomeTabState extends State<HomeTab> {
               ),
             ),
             Icon(
-              Icons.chevron_right_rounded,
+              CupertinoIcons.chevron_right,
               size: context.rs(22),
               color: AppColors.hint,
             ),
@@ -1014,13 +1021,13 @@ class _HomeTabState extends State<HomeTab> {
   }
 
   Widget _buildGlassCard({required Widget child}) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    final colors = context.appColors;
+    final isDark = context.isAppDark;
     return Container(
       width: double.infinity,
       padding: EdgeInsets.all(context.rs(16)),
       decoration: BoxDecoration(
-        color: theme.cardTheme.color ?? theme.colorScheme.surface,
+        color: colors.surface,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: isDark ? AppDarkColors.border : AppColors.borderLight,
@@ -1029,7 +1036,7 @@ class _HomeTabState extends State<HomeTab> {
             ? null
             : [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.03),
+                  color: const Color(0xFF000000).withValues(alpha: 0.03),
                   blurRadius: 12,
                   offset: const Offset(0, 6),
                 ),
@@ -1077,7 +1084,7 @@ class _HomeTabState extends State<HomeTab> {
                           color: const Color(0xFFFF3B30), // iOS 스타일 빨간색
                           shape: BoxShape.circle,
                           border: Border.all(
-                            color: Theme.of(context).colorScheme.surface,
+                            color: context.appColors.surface,
                             width: 1.5,
                           ),
                           boxShadow: [
@@ -1127,8 +1134,8 @@ class _HomeTabState extends State<HomeTab> {
 
   Widget _buildGreeting() {
     final avatarSize = context.rmin(64);
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    final colors = context.appColors;
+    final isDark = context.isAppDark;
 
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: context.rs(22)),
@@ -1140,7 +1147,7 @@ class _HomeTabState extends State<HomeTab> {
             height: avatarSize,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: theme.colorScheme.surface,
+              color: colors.surface,
               border: Border.all(
                 color: isDark ? AppDarkColors.border : AppColors.border,
                 width: 1.5,
@@ -1229,33 +1236,27 @@ class _HomeTabState extends State<HomeTab> {
                 style: AppFonts.scaled(context, AppFonts.sectionTitle),
               ),
               const Spacer(),
-              Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: () => context.push(AppRoute.todayClasses.path),
-                  borderRadius: AppShapes.borderRadiusExtraLarge,
-                  child: Container(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: context.rs(14),
-                      vertical: context.rh(8),
-                    ),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context)
-                          .colorScheme
-                          .primaryContainer
-                          .withValues(alpha: 0.6),
-                      borderRadius: AppShapes.borderRadiusExtraLarge,
-                    ),
-                    child: Text(
-                      '더보기',
-                      style: AppFonts.scaled(
-                        context,
-                        AppFonts.display3Medium,
-                      ).copyWith(
-                        color: Theme.of(context).colorScheme.primary,
-                        fontWeight: FontWeight.w600,
-                        fontSize: context.rs(14),
-                      ),
+              GestureDetector(
+                onTap: () => context.push(AppRoute.todayClasses.path),
+                child: Container(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: context.rs(14),
+                    vertical: context.rh(8),
+                  ),
+                  decoration: BoxDecoration(
+                    color: context.appColors.primaryContainer
+                        .withValues(alpha: 0.6),
+                    borderRadius: AppShapes.borderRadiusExtraLarge,
+                  ),
+                  child: Text(
+                    '더보기',
+                    style: AppFonts.scaled(
+                      context,
+                      AppFonts.display3Medium,
+                    ).copyWith(
+                      color: context.appColors.primary,
+                      fontWeight: FontWeight.w600,
+                      fontSize: context.rs(14),
                     ),
                   ),
                 ),
@@ -1359,7 +1360,7 @@ class _HomeTabState extends State<HomeTab> {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.1),
+              color: const Color(0xFF000000).withValues(alpha: 0.1),
               offset: const Offset(0, 4),
               blurRadius: 12,
             ),
@@ -1477,7 +1478,7 @@ class _HomeTabState extends State<HomeTab> {
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.1),
+                  color: const Color(0xFF000000).withValues(alpha: 0.1),
                   offset: const Offset(0, 4),
                   blurRadius: 12,
                 ),
@@ -1522,14 +1523,13 @@ class _HomeTabState extends State<HomeTab> {
                   child: Stack(
                     alignment: Alignment.center,
                     children: [
-                      SizedBox(
-                        width: context.rs(72),
-                        height: context.rs(72),
-                        child: CircularProgressIndicator(
-                          value: secondsLeft / _durationSeconds,
+                      CustomPaint(
+                        size: Size(context.rs(72), context.rs(72)),
+                        painter: _RingProgressPainter(
+                          progress: secondsLeft / _durationSeconds,
                           strokeWidth: context.rs(5),
                           backgroundColor: AppColors.white.withValues(alpha: 0.3),
-                          valueColor: const AlwaysStoppedAnimation<Color>(AppColors.white),
+                          foregroundColor: AppColors.white,
                         ),
                       ),
                       Column(
@@ -1617,7 +1617,7 @@ class _HomeTabState extends State<HomeTab> {
         borderRadius: BorderRadius.circular(16), // Figma: cornerRadius 16
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
+            color: const Color(0xFF000000).withValues(alpha: 0.1),
             offset: const Offset(0, 4),
             blurRadius: 12,
           ),
@@ -1679,7 +1679,7 @@ class _HomeTabState extends State<HomeTab> {
               Row(
                 children: [
                   Icon(
-                    Icons.location_on_outlined,
+                    CupertinoIcons.location,
                     size: infoIconSize,
                     color: AppColors.white,
                   ),
@@ -1701,7 +1701,7 @@ class _HomeTabState extends State<HomeTab> {
               Row(
                 children: [
                   Icon(
-                    Icons.schedule_outlined,
+                    CupertinoIcons.time,
                     size: infoIconSize,
                     color: AppColors.white,
                   ),
@@ -1785,7 +1785,7 @@ class _HomeTabState extends State<HomeTab> {
   }
 }
 
-/// 오늘의 수업 카드 데이터. [icon]은 Material 3 Icons.
+/// 오늘의 수업 카드 데이터. [icon]은 CupertinoIcons.
 /// 오늘의 수업 카드 데이터.
 /// 색상, 아이콘, 장식 벡터는 [SubjectThemeService]를 통해 자동 할당됩니다.
 class _SubjectCard {
@@ -1817,4 +1817,50 @@ class _NextClassInfo {
   final String location; // 교실 위치
   final String time; // 시작 시간
   final String notice; // 기타 알림 (한줄 짧게)
+}
+
+class _RingProgressPainter extends CustomPainter {
+  const _RingProgressPainter({
+    required this.progress,
+    required this.strokeWidth,
+    required this.backgroundColor,
+    required this.foregroundColor,
+  });
+
+  final double progress;
+  final double strokeWidth;
+  final Color backgroundColor;
+  final Color foregroundColor;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = (size.shortestSide - strokeWidth) / 2;
+    final bgPaint = Paint()
+      ..color = backgroundColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.round;
+    final fgPaint = Paint()
+      ..color = foregroundColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.round;
+    canvas.drawCircle(center, radius, bgPaint);
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: radius),
+      -3.141592653589793 / 2,
+      6.283185307179586 * progress.clamp(0.0, 1.0),
+      false,
+      fgPaint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _RingProgressPainter oldDelegate) {
+    return oldDelegate.progress != progress ||
+        oldDelegate.strokeWidth != strokeWidth ||
+        oldDelegate.backgroundColor != backgroundColor ||
+        oldDelegate.foregroundColor != foregroundColor;
+  }
 }
