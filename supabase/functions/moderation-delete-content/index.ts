@@ -68,7 +68,7 @@ Deno.serve(async (req: Request) => {
   // Verify caller profile has backoffice access
   const { data: moderator, error: moderatorError } = await supabase
     .from("profiles")
-    .select("id, can_access_backoffice")
+    .select("id, can_access_backoffice, school_id, role")
     .eq("user_id", userData.user.id)
     .maybeSingle();
 
@@ -80,6 +80,10 @@ Deno.serve(async (req: Request) => {
     return jsonResponse({ error: "forbidden" }, 403);
   }
   const moderator_profile_id = moderator.id as string;
+  const actorSchoolId = typeof moderator.school_id === "string" && moderator.school_id !== ""
+    ? moderator.school_id
+    : null;
+  const actorIsSuperAdmin = moderator.role === "super_admin";
 
   // Helper to load original content best-effort
   async function fetchOriginal(): Promise<Record<string, unknown> | null> {
@@ -143,6 +147,27 @@ Deno.serve(async (req: Request) => {
   }
 
   const original = await fetchOriginal();
+
+  // Multi-school guard: a moderator may not act on content that belongs to a
+  // different school. Applied only when BOTH school_ids are known (non-null),
+  // so legacy rows/profiles without school_id keep the legacy behavior.
+  // super_admin actors are exempt.
+  if (!actorIsSuperAdmin && actorSchoolId) {
+    const rawTargetSchoolId = original ? original["school_id"] : null;
+    const targetSchoolId = typeof rawTargetSchoolId === "string" && rawTargetSchoolId !== ""
+      ? rawTargetSchoolId
+      : null;
+    if (targetSchoolId && targetSchoolId !== actorSchoolId) {
+      console.warn("Cross-school moderation blocked (delete_content)", {
+        moderator_profile_id,
+        actor_school_id: actorSchoolId,
+        target_school_id: targetSchoolId,
+        target_type,
+        target_id,
+      });
+      return jsonResponse({ error: "forbidden", message: "cross_school_forbidden" }, 403);
+    }
+  }
 
   // Insert tombstone
   const { error: tombstoneError } = await supabase.from("content_tombstones").insert({

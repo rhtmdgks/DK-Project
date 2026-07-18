@@ -80,7 +80,7 @@ Deno.serve(async (req: Request) => {
 
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
-    .select("grade,class_number,student_id")
+    .select("grade,class_number,student_id,school_id")
     .eq("user_id", userId)
     .single();
   if (profileError || !profile) {
@@ -108,6 +108,9 @@ Deno.serve(async (req: Request) => {
       token: token.trim(),
       grade,
       class_number: classNumber,
+      // Multi-school: null is intentionally included; a DB trigger fills the
+      // default school when null (legacy clients/profiles without school_id).
+      school_id: profile.school_id ?? null,
       ...(platform ? { platform } : {}),
       updated_at: new Date().toISOString(),
     },

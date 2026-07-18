@@ -1,5 +1,6 @@
 // NEIS Meal API proxy. API key from env only. Optional: 24h cache via Supabase table.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from 'jsr:@supabase/supabase-js@2';
 
 const NEIS_MEAL_URL = 'https://open.neis.go.kr/hub/mealServiceDietInfo';
 
@@ -45,6 +46,37 @@ function jsonResponse(body: unknown, status = 200): Response {
   });
 }
 
+/**
+ * Look up NEIS codes for a school row. Best-effort: any failure (missing env,
+ * query error, missing row, null columns) returns nulls so callers fall back
+ * to the legacy env/hardcoded path.
+ */
+async function lookupSchoolNeisCodes(
+  schoolId: string,
+): Promise<{ atpt: string | null; schul: string | null }> {
+  try {
+    const supabaseUrl = getEnvVar('SUPABASE_URL');
+    const serviceRoleKey = getEnvVar('SUPABASE_SERVICE_ROLE_KEY');
+    if (!supabaseUrl || !serviceRoleKey) return { atpt: null, schul: null };
+    const supabase = createClient(supabaseUrl, serviceRoleKey);
+    const { data, error } = await supabase
+      .from('schools')
+      .select('atpt_ofcdc_sc_code, sd_schul_code')
+      .eq('id', schoolId)
+      .maybeSingle();
+    if (error || !data) return { atpt: null, schul: null };
+    const atpt = typeof data.atpt_ofcdc_sc_code === 'string' && data.atpt_ofcdc_sc_code.trim() !== ''
+      ? data.atpt_ofcdc_sc_code.trim()
+      : null;
+    const schul = typeof data.sd_schul_code === 'string' && data.sd_schul_code.trim() !== ''
+      ? data.sd_schul_code.trim()
+      : null;
+    return { atpt, schul };
+  } catch {
+    return { atpt: null, schul: null };
+  }
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: { Allow: 'GET, POST, OPTIONS' } });
@@ -63,11 +95,17 @@ Deno.serve(async (req: Request) => {
 
   const url = new URL(req.url);
   let dateParam = url.searchParams.get('date') || url.searchParams.get('MLSV_YMD');
-  if ((!dateParam || dateParam.trim() === '') && req.method === 'POST') {
+  let schoolIdParam = url.searchParams.get('school_id');
+  if (req.method === 'POST') {
     try {
       const body = await req.clone().json() as Record<string, unknown> | null;
-      if (body && (body.date != null || body.MLSV_YMD != null)) {
-        dateParam = String(body.date ?? body.MLSV_YMD ?? '');
+      if (body) {
+        if ((!dateParam || dateParam.trim() === '') && (body.date != null || body.MLSV_YMD != null)) {
+          dateParam = String(body.date ?? body.MLSV_YMD ?? '');
+        }
+        if ((!schoolIdParam || schoolIdParam.trim() === '') && body.school_id != null) {
+          schoolIdParam = String(body.school_id);
+        }
       }
     } catch {
       // ignore
@@ -76,8 +114,21 @@ Deno.serve(async (req: Request) => {
   const mlsvYmd = parseDate(dateParam);
   const date = mlsvYmd || parseDate(new Date().toISOString().slice(0, 10));
 
-  const ofcdc = url.searchParams.get('ATPT_OFCDC_SC_CODE') || atpt;
-  const sdSchul = url.searchParams.get('SD_SCHUL_CODE') || schul;
+  // NEIS code resolution priority:
+  // 1) explicit ATPT_OFCDC_SC_CODE / SD_SCHUL_CODE query params (legacy compat)
+  // 2) schools table lookup via school_id (best-effort; failure falls through)
+  // 3) env NEIS_ATPT_OFCDC_SC_CODE / NEIS_SD_SCHUL_CODE
+  // 4) hardcoded legacy defaults ('G10' / '7430030')
+  let schoolAtpt: string | null = null;
+  let schoolSchul: string | null = null;
+  if (schoolIdParam && schoolIdParam.trim() !== '') {
+    const codes = await lookupSchoolNeisCodes(schoolIdParam.trim());
+    schoolAtpt = codes.atpt;
+    schoolSchul = codes.schul;
+  }
+
+  const ofcdc = url.searchParams.get('ATPT_OFCDC_SC_CODE') || schoolAtpt || atpt;
+  const sdSchul = url.searchParams.get('SD_SCHUL_CODE') || schoolSchul || schul;
 
   if (!ofcdc || !sdSchul) {
     return jsonResponse({

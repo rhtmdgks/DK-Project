@@ -101,7 +101,7 @@ Deno.serve(async (req: Request) => {
     );
   }
 
-  let body: { grade?: number; class_number?: number; message?: string; body?: string };
+  let body: { grade?: number; class_number?: number; message?: string; body?: string; school_id?: string };
   try {
     body = (await req.json()) as typeof body;
   } catch {
@@ -122,11 +122,21 @@ Deno.serve(async (req: Request) => {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
   );
 
-  const { data: rows, error } = await supabase
+  // Multi-school: filter by school_id only when provided (legacy callers omit it).
+  const schoolId = typeof body.school_id === "string" && body.school_id.trim() !== ""
+    ? body.school_id.trim()
+    : null;
+
+  let tokenQuery = supabase
     .from("fcm_tokens")
     .select("token")
     .eq("grade", grade)
     .eq("class_number", classNumber);
+  if (schoolId) {
+    tokenQuery = tokenQuery.eq("school_id", schoolId);
+  }
+
+  const { data: rows, error } = await tokenQuery;
 
   if (error) {
     console.error("fcm_tokens select error:", error);

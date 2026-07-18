@@ -59,7 +59,7 @@ Deno.serve(async (req: Request) => {
   // Verify caller profile has backoffice access
   const { data: moderator, error: moderatorError } = await supabase
     .from("profiles")
-    .select("id, can_access_backoffice")
+    .select("id, can_access_backoffice, school_id, role")
     .eq("user_id", userData.user.id)
     .maybeSingle();
 
@@ -71,6 +71,44 @@ Deno.serve(async (req: Request) => {
     return jsonResponse({ error: "forbidden" }, 403);
   }
   const moderator_profile_id = moderator.id as string;
+  const actorSchoolId = typeof moderator.school_id === "string" && moderator.school_id !== ""
+    ? moderator.school_id
+    : null;
+  const actorIsSuperAdmin = moderator.role === "super_admin";
+
+  // Multi-school guard: a moderator may not ban a user of a different school.
+  // Applied only when BOTH school_ids are known (non-null), so legacy profiles
+  // without school_id keep the legacy behavior. super_admin actors are exempt.
+  // Target lookup is best-effort: on failure the guard is skipped (legacy path).
+  if (!actorIsSuperAdmin && actorSchoolId) {
+    try {
+      const { data: targetProfile, error: targetError } = await supabase
+        .from("profiles")
+        .select("school_id")
+        .eq("id", reported_profile_id)
+        .maybeSingle();
+      const targetSchoolId = !targetError
+          && targetProfile
+          && typeof targetProfile.school_id === "string"
+          && targetProfile.school_id !== ""
+        ? targetProfile.school_id
+        : null;
+      if (targetSchoolId && targetSchoolId !== actorSchoolId) {
+        console.warn("Cross-school moderation blocked (ban_user)", {
+          moderator_profile_id,
+          actor_school_id: actorSchoolId,
+          target_school_id: targetSchoolId,
+          reported_profile_id,
+        });
+        return jsonResponse({ error: "forbidden", message: "cross_school_forbidden" }, 403);
+      }
+    } catch (e) {
+      console.warn("Cross-school guard lookup failed (ban_user); continuing", {
+        reported_profile_id,
+        error: (e as Error).message,
+      });
+    }
+  }
 
   // Insert or update banned_users record
   const { error: banError } = await supabase.from("banned_users").upsert(
