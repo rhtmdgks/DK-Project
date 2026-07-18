@@ -1,6 +1,7 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:go_router/go_router.dart';
 import 'package:myapp/core/auth/auth_repository.dart';
 import 'package:myapp/core/supabase_client.dart';
@@ -81,11 +82,11 @@ final class _SupabaseAuthRefreshListenable extends ChangeNotifier {
   }
 }
 
-/// Material 3 Motion: Shared Axis(수평) + Fade 페이지 전환.
-CustomTransitionPage<void> _m3Page(GoRouterState state, Widget child) {
+/// Cupertino 슬라이드 전환 + 라우트별 GlassBackdropScope (고스트 방지).
+CustomTransitionPage<void> _cupertinoGlassPage(GoRouterState state, Widget child) {
   return CustomTransitionPage<void>(
     key: state.pageKey,
-    child: child,
+    child: GlassBackdropScope(child: child),
     transitionDuration: AppMotion.pageTransitionDuration,
     reverseTransitionDuration: AppMotion.pageTransitionDuration,
     transitionsBuilder: (context, animation, secondaryAnimation, child) {
@@ -96,10 +97,10 @@ CustomTransitionPage<void> _m3Page(GoRouterState state, Widget child) {
       );
       return SlideTransition(
         position: Tween<Offset>(
-          begin: const Offset(0.05, 0),
+          begin: const Offset(1, 0),
           end: Offset.zero,
         ).animate(curve),
-        child: FadeTransition(opacity: curve, child: child),
+        child: child,
       );
     },
   );
@@ -124,70 +125,70 @@ GoRouter createAppRouter() {
     routes: [
       GoRoute(
         path: AppRoute.splash.path,
-        pageBuilder: (_, state) => _m3Page(state, const SplashScreen()),
+        pageBuilder: (_, state) => _cupertinoGlassPage(state, const SplashScreen()),
       ),
       GoRoute(
         path: AppRoute.terms.path,
-        pageBuilder: (_, state) => _m3Page(state, const TermsScreen()),
+        pageBuilder: (_, state) => _cupertinoGlassPage(state, const TermsScreen()),
       ),
       GoRoute(
         path: AppRoute.termsOfService.path,
         pageBuilder: (_, state) =>
-            _m3Page(state, const TermsOfServiceScreen()),
+            _cupertinoGlassPage(state, const TermsOfServiceScreen()),
       ),
       GoRoute(
         path: AppRoute.login.path,
-        pageBuilder: (_, state) => _m3Page(state, const LoginScreen()),
+        pageBuilder: (_, state) => _cupertinoGlassPage(state, const LoginScreen()),
       ),
       GoRoute(
         path: AppRoute.passwordChange.path,
         pageBuilder: (_, state) =>
-            _m3Page(state, const PasswordChangeScreen()),
+            _cupertinoGlassPage(state, const PasswordChangeScreen()),
       ),
       GoRoute(
         path: AppRoute.home.path,
-        pageBuilder: (_, state) => _m3Page(state, const HomeScreen()),
+        pageBuilder: (_, state) => _cupertinoGlassPage(state, const HomeScreen()),
       ),
       GoRoute(
         path: AppRoute.settings.path,
-        pageBuilder: (_, state) => _m3Page(state, const SettingsScreen()),
+        pageBuilder: (_, state) => _cupertinoGlassPage(state, const SettingsScreen()),
       ),
       GoRoute(
         path: AppRoute.mealDepartureAlert.path,
         pageBuilder: (_, state) =>
-            _m3Page(state, const MealDepartureAlertScreen()),
+            _cupertinoGlassPage(state, const MealDepartureAlertScreen()),
       ),
       GoRoute(
         path: AppRoute.privacyPolicy.path,
         pageBuilder: (_, state) =>
-            _m3Page(state, const PrivacyPolicyScreen()),
+            _cupertinoGlassPage(state, const PrivacyPolicyScreen()),
       ),
       GoRoute(
         path: AppRoute.support.path,
-        pageBuilder: (_, state) => _m3Page(state, const SupportScreen()),
+        pageBuilder: (_, state) => _cupertinoGlassPage(state, const SupportScreen()),
       ),
       GoRoute(
         path: AppRoute.appInfo.path,
-        pageBuilder: (_, state) => _m3Page(state, const AppInfoScreen()),
+        pageBuilder: (_, state) => _cupertinoGlassPage(state, const AppInfoScreen()),
       ),
       GoRoute(
         path: AppRoute.blockedUsers.path,
         pageBuilder: (_, state) =>
-            _m3Page(state, const BlockedUsersScreen()),
+            _cupertinoGlassPage(state, const BlockedUsersScreen()),
       ),
       GoRoute(
         path: AppRoute.bugReport.path,
-        pageBuilder: (_, state) => _m3Page(state, const BugReportScreen()),
+        pageBuilder: (_, state) => _cupertinoGlassPage(state, const BugReportScreen()),
       ),
       GoRoute(
         path: AppRoute.chatList.path,
-        pageBuilder: (_, state) => _m3Page(state, const ChatListScreen()),
+        pageBuilder: (_, state) => _cupertinoGlassPage(state, const ChatListScreen()),
         routes: [
           GoRoute(
             path: ':roomId',
             pageBuilder: (_, state) {
               final roomId = state.pathParameters['roomId']!;
-              return _m3Page(state, ChatScreen(roomId: roomId));
+              return _cupertinoGlassPage(state, ChatScreen(roomId: roomId));
             },
           ),
         ],
@@ -195,33 +196,33 @@ GoRouter createAppRouter() {
       GoRoute(
         path: AppRoute.suggestionsChat.path,
         pageBuilder: (_, state) =>
-            _m3Page(state, const SuggestionsChatScreen()),
+            _cupertinoGlassPage(state, const SuggestionsChatScreen()),
       ),
       GoRoute(
         path: AppRoute.todayClasses.path,
         pageBuilder: (_, state) =>
-            _m3Page(state, const TodayClassesScreen()),
+            _cupertinoGlassPage(state, const TodayClassesScreen()),
       ),
       GoRoute(
         path: AppRoute.profile.path,
         pageBuilder: (_, state) =>
-            _m3Page(state, const ProfileScreen()),
+            _cupertinoGlassPage(state, const ProfileScreen()),
         routes: [
           GoRoute(
             path: 'edit',
             pageBuilder: (_, state) =>
-                _m3Page(state, const ProfileEditScreen()),
+                _cupertinoGlassPage(state, const ProfileEditScreen()),
           ),
         ],
       ),
       GoRoute(
         path: AppRoute.opinions.path,
-        pageBuilder: (_, state) => _m3Page(state, const OpinionsScreen()),
+        pageBuilder: (_, state) => _cupertinoGlassPage(state, const OpinionsScreen()),
       ),
       GoRoute(
         path: AppRoute.classPhotoShares.path,
         pageBuilder: (_, state) =>
-            _m3Page(state, const ClassPhotoSharesScreen()),
+            _cupertinoGlassPage(state, const ClassPhotoSharesScreen()),
       ),
     ],
   );

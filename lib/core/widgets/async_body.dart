@@ -1,5 +1,5 @@
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
+import 'package:myapp/core/theme/app_resolved_colors.dart';
 import 'package:myapp/core/theme/app_theme.dart';
 import 'package:myapp/core/theme/responsive.dart';
 
@@ -29,9 +29,9 @@ class AsyncBody extends StatelessWidget {
   Widget build(BuildContext context) {
     if (loading) {
       return Center(
-        child: CircularProgressIndicator(
-          strokeWidth: 2,
-          color: Theme.of(context).colorScheme.primary,
+        child: CupertinoActivityIndicator(
+          radius: context.rs(10),
+          color: context.appColors.primary,
         ),
       );
     }

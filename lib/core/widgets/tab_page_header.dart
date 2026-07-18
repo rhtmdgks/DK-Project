@@ -1,9 +1,8 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
+import 'package:myapp/core/theme/app_resolved_colors.dart';
+import 'package:myapp/core/theme/app_theme.dart';
 
-/// Material 3 Small App Bar 스타일의 탭 제목 헤더.
-///
-/// 기본 높이 64dp를 *최소* 기준으로 두되, 글자 크기(TextScaler)가 커지면
-/// 세로로 늘어나 overflow 없이 표시한다.
+/// 탭 제목 헤더 (Cupertino / Paperlogy).
 class TabPageHeader extends StatelessWidget {
   const TabPageHeader({
     super.key,
@@ -27,7 +26,7 @@ class TabPageHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final colors = context.appColors;
 
     final resolvedPadding = contentPadding ??
         EdgeInsets.only(
@@ -53,22 +52,22 @@ class TabPageHeader extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: theme.textTheme.headlineSmall?.copyWith(
+                  style: AppFonts.heading2Medium.copyWith(
                     fontSize: 24,
                     fontWeight: FontWeight.w600,
                     letterSpacing: 0,
                     height: 1.2,
-                    color: theme.colorScheme.onSurface,
+                    color: colors.onSurface,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   subtitle,
-                  style: theme.textTheme.bodyMedium?.copyWith(
+                  style: AppFonts.bodyRegular.copyWith(
                     fontSize: 16,
                     fontWeight: FontWeight.w400,
                     height: 1.5,
-                    color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                    color: colors.onSurface.withValues(alpha: 0.6),
                   ),
                 ),
               ],

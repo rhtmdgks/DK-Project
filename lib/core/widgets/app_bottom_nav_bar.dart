@@ -1,5 +1,6 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:myapp/core/theme/app_resolved_colors.dart';
 import 'package:myapp/core/theme/app_theme.dart';
 import 'package:myapp/core/theme/responsive.dart';
 
@@ -31,24 +32,23 @@ class AppBottomNavBar extends StatelessWidget {
     final bottomPadding = context.safeArea.bottom;
     final hPad = context.rs(28);
     final vPad = context.rh(12);
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    final colors = context.appColors;
 
     return Container(
       decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
+        color: colors.surface,
         borderRadius: BorderRadius.only(
           topLeft: Radius.circular(AppShapes.radiusExtraLarge),
           topRight: Radius.circular(AppShapes.radiusExtraLarge),
         ),
         border: Border(
           top: BorderSide(
-            color: isDark ? AppDarkColors.border : AppColors.borderLight,
+            color: colors.border,
           ),
         ),
         boxShadow: [
           BoxShadow(
-            color: theme.colorScheme.shadow.withValues(alpha: 0.08),
+            color: colors.shadow.withValues(alpha: 0.08),
             offset: const Offset(0, -8),
             blurRadius: 28,
           ),

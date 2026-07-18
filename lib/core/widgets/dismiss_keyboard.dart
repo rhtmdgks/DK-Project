@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 
 /// 바깥 영역 터치 시 포커스(키보드)를 해제하는 래퍼.
 /// [child] 위를 터치하면 [FocusScope.of(context).unfocus]를 호출하며,

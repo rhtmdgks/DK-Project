@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'package:myapp/core/theme/app_motion.dart';
 
 /// M3 Carousel용 스크롤 물리: [AppMotion] duration · curve 기반 스냅 전환.
