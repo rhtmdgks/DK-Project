@@ -1,6 +1,12 @@
 ---
 version: alpha
 name: Apple
+# LAON app runtime (Flutter): CupertinoApp.router + liquid_glass_widgets
+# (GlassQuality.standard, adaptiveQuality: false). Brand colors stay AppColors
+# (#0B66FF primaryBlue). Font is Paperlogy (bundled). Icons: CupertinoIcons +
+# existing SVG/PNG assets. No Material widgets / SF Symbol names in app UI.
+# The YAML tokens below are a web/marketing reference; prefer lib/core/theme
+# and lib/design/* for the shipping app.
 description: A photography-first interface that turns marketing into a museum gallery. Edge-to-edge product tiles alternate light and dark canvases, framed by SF Pro Display headlines with negative letter-spacing and a single Action Blue (#0066cc) interactive color. UI chrome recedes so the product can speak — no decorative gradients, no shadows on chrome, only the one signature drop-shadow under product imagery resting on a surface.
 
 colors:
