@@ -3,8 +3,9 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:firebase_core/firebase_core.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:myapp/app.dart';
 import 'package:myapp/core/supabase_client.dart';
@@ -80,5 +81,13 @@ void main() async {
     } catch (_) {}
   });
 
-  runApp(const App());
+  await LiquidGlassWidgets.initialize();
+
+  runApp(
+    LiquidGlassWidgets.wrap(
+      adaptiveQuality: false,
+      respectSystemAccessibility: true,
+      child: const App(),
+    ),
+  );
 }

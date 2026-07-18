@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:myapp/models/notification_item.dart';
 
@@ -53,12 +53,12 @@ class NotificationProvider extends ChangeNotifier {
   /// 새 알림 추가
   Future<void> addNotification(NotificationItem notification) async {
     _notifications.insert(0, notification);
-    
+
     // 최대 개수 초과 시 오래된 알림 제거
     if (_notifications.length > _maxNotifications) {
       _notifications = _notifications.take(_maxNotifications).toList();
     }
-    
+
     notifyListeners();
     await _saveNotifications();
   }

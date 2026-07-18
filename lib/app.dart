@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:home_widget/home_widget.dart';
 import 'package:myapp/core/routing/app_router.dart';
@@ -123,33 +122,21 @@ class _AppState extends State<App> with WidgetsBindingObserver {
         builder: (context, prefs, _) {
           final platformBrightness =
               WidgetsBinding.instance.platformDispatcher.platformBrightness;
-          final cupertinoBrightness = switch (prefs.themeMode) {
-            ThemeMode.dark => Brightness.dark,
-            ThemeMode.light => Brightness.light,
-            ThemeMode.system => platformBrightness,
-          };
-          return CupertinoTheme(
-            data: buildCupertinoTheme(brightness: cupertinoBrightness),
-            child: Material(
-              type: MaterialType.transparency,
-              child: MaterialApp.router(
-                title: 'LAON',
-                theme: buildAppTheme(),
-                darkTheme: buildAppDarkTheme(),
-                themeMode: prefs.themeMode,
-                routerConfig: _router,
-                builder: (context, child) {
-                  // 사용자 글자 크기 설정 반영. 시스템 배율과 곱하지 않고
-                  // 앱 설정만 적용해 responsive.dart 스케일과 중복 확대를 방지.
-                  return MediaQuery(
-                    data: MediaQuery.of(context).copyWith(
-                      textScaler: TextScaler.linear(prefs.fontScale),
-                    ),
-                    child: child ?? const SizedBox.shrink(),
-                  );
-                },
-              ),
-            ),
+          final brightness = prefs.themeMode.resolve(platformBrightness);
+          return CupertinoApp.router(
+            title: 'LAON',
+            theme: buildCupertinoTheme(brightness: brightness),
+            routerConfig: _router,
+            builder: (context, child) {
+              // 사용자 글자 크기 설정 반영. 시스템 배율과 곱하지 않고
+              // 앱 설정만 적용해 responsive.dart 스케일과 중복 확대를 방지.
+              return MediaQuery(
+                data: MediaQuery.of(context).copyWith(
+                  textScaler: TextScaler.linear(prefs.fontScale),
+                ),
+                child: child ?? const SizedBox.shrink(),
+              );
+            },
           );
         },
       ),
